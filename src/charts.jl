@@ -63,6 +63,22 @@ function generate_characteristic_curves(parameters, results::DataFrame, theta_ra
     return curves
 end
 
+# Generate characteristic curves for each version
+function generate_information_curves(parameters, results::DataFrame, theta_range::AbstractVector)
+    bank = parameters.bank
+    num_versions = size(results, 2)
+    curves = DataFrame()
+
+    for i in 1:num_versions
+        selected_items = results[:, i]
+        a, b, c = get_item_parameters(bank, selected_items)
+        scores = map(theta -> sum(item_information.(theta, b, a, c)), theta_range)
+        curves[!, names(results)[i]] = round.(scores, digits=2)
+    end
+
+    return curves
+end
+
 # Function to write results to file
 function write_results_to_file(curve_data, output_file="data/tcc.csv")
     println("Writing results to file: ", output_file)
@@ -74,11 +90,12 @@ end
 function plot_characteristic_curves_and_simulation(parameters, results::DataFrame, theta_range::AbstractVector = -3.0:0.1:3.0, plot_file::String = "data/combined_plot.png")
     # Generate the plot data
     characteristic_curves = generate_characteristic_curves(parameters, results, theta_range)
+    information_curves = generate_information_curves(parameters, results, theta_range)
     simulation_data = generate_results_simulation(parameters, results, Normal(0.0, 1.0))
 
     # Set up the plot aesthetics
     theme(:mute)
-    gr(size=(900, 1000))
+    gr(size=(900, 800))
 
     # Create subplots
     p1 = @df characteristic_curves plot(theta_range, cols(),
@@ -92,7 +109,14 @@ function plot_characteristic_curves_and_simulation(parameters, results::DataFram
                   parameters.tau[1, :],
                   label="")
 
-    p2 = @df simulation_data plot(1:size(simulation_data, 1), cols(),
+    p2 = @df information_curves plot(theta_range, cols(),
+                                     title="Information Curves",
+                                     xlabel="Theta", ylabel="Information",
+                                     linewidth=1, label="",
+                                     grid=(:on, :olivedrab, :dot, 1, 0.9),
+                                     tickfontsize=12)
+
+    p3 = @df simulation_data plot(1:size(simulation_data, 1), cols(),
                                   title="Observed Score Distribution",
                                   xlabel="Item", ylabel="Score",
                                   linewidth=1, label="",
@@ -100,7 +124,7 @@ function plot_characteristic_curves_and_simulation(parameters, results::DataFram
                                   tickfontsize=12)
 
     # Combine the plots into a single image with subplots
-    combined_plot = plot(p1, p2, layout=(2, 1), size=(900, 950))
+    combined_plot = plot(p1, p2, p3, layout=(2, 2), size=(900, 800))
 
     write_results_to_file(hcat(theta_range, characteristic_curves))
 
