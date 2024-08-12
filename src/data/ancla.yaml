@@ -1,0 +1,25 @@
+
+# Archivo con los datos del banco
+itemsFile: ../data/items.csv
+
+# Archivo con versiones ancla armadas previamente
+# anchorFile: ../data/ancla.csv
+
+versionsFile: ../data/ancla.csv
+
+# Cantidad de información que imprime el programa
+verbose: True
+
+# Parámetros
+forms:
+  # Número de versiones para ensamblar
+  F: 4
+  # Número de reactivos totales por versión
+  N: 24
+  # Modelo para el ensamble (ICC, TCC o TC)
+  method: TCC
+  # Número de potencias para el modelo de igualación TCC
+  R: 3
+  # Puntos en la escala para igualar (incluye puntos de corte)
+  theta: [-2.5, -1.2, 0.0, 1.0, 2.4]
+  shadow_size: 0
