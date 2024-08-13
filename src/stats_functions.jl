@@ -95,14 +95,14 @@ Calculates the information tau vector for given parameters and items.
 # Returns
 - The information tau vector rounded to 4 decimal places.
 """
-function calc_info_tau(info, K::Int, N::Int, items)
+function calc_info_tau(info, K::Int, N::Int)
     tau = zeros(K)
-    rows, _ = size(items)
+    rows, _ = size(info)
     for _ in 1:500
         datos = info[rand(1:rows, N), :]
         tau .+= [sum(datos[:, i]) for i in 1:K]
     end
-    return tau / 500.0
+    return tau ./ 500.0
 end
 
 

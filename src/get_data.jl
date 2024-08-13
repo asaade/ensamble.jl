@@ -40,6 +40,8 @@ function Params(parms_dict::Dict{Symbol, Any})
         parms_dict[:INFO],
         parms_dict[:TAU],
         parms_dict[:TAU_INFO],
+        parms_dict[:RELATIVETARGETWEIGHTS],
+        parms_dict[:RELATIVETARGETPOINTS],
         get(parms_dict, :DELTA, nothing)
     )
 end
@@ -88,12 +90,12 @@ function clean_items_bank!(config::Config, bank::DataFrame)::DataFrame
 
     method = config.forms[:METHOD]
 
-    if method in ["TCC", "TIC"]
+    if method in ["TCC", "ICC", "ICC2"]
         clean_IRT!(bank)
     elseif method == "TC"
         clean_TC!(bank)
-    else
-        error("Unknown method: $method")
+    # else
+    #     error("Unknown method: $method")
     end
 
     println(original_size - size(bank, 1), " items in bank are invalid.")
@@ -191,9 +193,15 @@ function get_params(config::Config)::Params
 
     method = parms_dict[:METHOD]
 
-    if method in ["TCC", "TIC"]
-        a, b, c = bank[!, :A], bank[!, :B], bank[!, :C]
+    if method =="ICC2"
+        theta = parms_dict[:RELATIVETARGETPOINTS]
+    else
         theta = parms_dict[:THETA]
+    end
+
+    if method in ["TCC", "ICC", "ICC2"]
+        parms_dict[:THETA] = theta
+        a, b, c = bank[!, :A], bank[!, :B], bank[!, :C]
         parms_dict[:K] = length(theta)
 
         p = [Pr(t, b, a, c; d=1.0) for t in theta]
@@ -203,7 +211,7 @@ function get_params(config::Config)::Params
         parms_dict[:INFO] = reduce(hcat, info)
 
         parms_dict[:TAU] = get(parms_dict, :TAU, calc_tau(parms_dict[:P], parms_dict[:R], parms_dict[:K], parms_dict[:N], bank))
-        parms_dict[:TAU_INFO] = get(parms_dict, :TAU_INFO, calc_info_tau(parms_dict[:INFO], parms_dict[:R], parms_dict[:N], bank))
+        parms_dict[:TAU_INFO] = get(parms_dict, :TAU_INFO, calc_info_tau(parms_dict[:INFO], parms_dict[:K], parms_dict[:N]))
         parms_dict[:DELTA] = nothing
     elseif method == "TC"
         # parms_dict[:DELTA] = delta(bank[!, :DIF], bank[!, :CORR])

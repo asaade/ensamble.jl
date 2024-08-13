@@ -5,8 +5,8 @@ using CPLEX
 function CPLEX_solver(model)
     println("Configuring solver CPLEX");
     set_optimizer(model, CPLEX.Optimizer);
-    set_attribute(model, "CPX_PARAM_EPAGAP", 0.05);
     set_attribute(model, "CPX_PARAM_EPGAP", 0.05);
+    set_attribute(model, "CPX_PARAM_EPAGAP", 0.05);
     set_attribute(model, "CPX_PARAM_EPINT", 1e-6);
     set_attribute(model, "CPX_PARAM_PREIND", 1);
     set_time_limit_sec(model, 90);
@@ -38,7 +38,7 @@ function select_solver(model, solverType=:Cbc, verbose=false)
         println("Unknown solver type");
     end
     # if !verbose
-    set_silent(model)
+    # set_silent(model)
     # end
     return model
 end

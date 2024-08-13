@@ -32,7 +32,9 @@ mutable struct Params
     p::MatrixOrMissing
     info::MatrixOrMissing
     tau::MatrixOrMissing
-    tau_info::Vector{Float64}
+    tau_info::VectorOrMissing
+    relative_target_weights::VectorOrMissing
+    relative_target_points::VectorOrMissing
     delta::MatrixOrMissing
 end
 

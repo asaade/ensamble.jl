@@ -72,8 +72,8 @@ function generate_information_curves(parameters, results::DataFrame, theta_range
     for i in 1:num_versions
         selected_items = results[:, i]
         a, b, c = get_item_parameters(bank, selected_items)
-        scores = map(theta -> sum(item_information.(theta, b, a, c)), theta_range)
-        curves[!, names(results)[i]] = round.(scores, digits=2)
+        information = map(theta -> sum(item_information.(theta, b, a, c)), theta_range)
+        curves[!, names(results)[i]] = round.(information, digits=2)
     end
 
     return curves
@@ -95,36 +95,37 @@ function plot_characteristic_curves_and_simulation(parameters, results::DataFram
 
     # Set up the plot aesthetics
     theme(:mute)
-    gr(size=(900, 800))
+    gr(size=(900, 750))
 
     # Create subplots
     p1 = @df characteristic_curves plot(theta_range, cols(),
                                         title="Characteristic Curves",
                                         xlabel="Theta", ylabel="Score",
-                                        linewidth=1, label="",
+                                        linewidth=2, label="",
                                         grid=(:on, :olivedrab, :dot, 1, 0.9),
                                         tickfontsize=12)
-
-    p1 = scatter!(parameters.theta,
-                  parameters.tau[1, :],
-                  label="")
+    if parameters.method == "TCC"
+        p1 = scatter!(parameters.theta,
+                      parameters.tau[1, :],
+                      label="")
+    end
 
     p2 = @df information_curves plot(theta_range, cols(),
                                      title="Information Curves",
                                      xlabel="Theta", ylabel="Information",
-                                     linewidth=1, label="",
+                                     linewidth=2, label="",
                                      grid=(:on, :olivedrab, :dot, 1, 0.9),
                                      tickfontsize=12)
 
     p3 = @df simulation_data plot(1:size(simulation_data, 1), cols(),
                                   title="Observed Score Distribution",
                                   xlabel="Item", ylabel="Score",
-                                  linewidth=1, label="",
+                                  linewidth=2, label="",
                                   grid=(:on, :olivedrab, :dot, 1, 0.9),
                                   tickfontsize=12)
 
     # Combine the plots into a single image with subplots
-    combined_plot = plot(p1, p2, p3, layout=(2, 2), size=(900, 800))
+    combined_plot = plot(p1, p2, p3, layout=(2, 2), size=(900, 750))
 
     write_results_to_file(hcat(theta_range, characteristic_curves))
 

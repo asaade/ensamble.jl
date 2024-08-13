@@ -12,7 +12,11 @@ function initialize_model!(model::Model, parameters::Params, constraints::Dict{S
 
     @variable(model, y >= 0.0)
     @variable(model, x[1:num_items, 1:num_forms], Bin)
-    @objective(model, Min, y)
+    if parameters.method == "ICC2"
+        @objective(model, Max, y)
+    else
+        @objective(model, Min, y)
+    end
 
     apply_constraints!(model, parameters, constraints)
     write_to_file(model, "data/model.lp")
@@ -38,6 +42,10 @@ end
 function apply_objective!(model::Model, parameters::Params)
     if parameters.method == "TCC"
         objective_match_characteristic_curve!(model, parameters)
+    elseif parameters.method == "ICC"
+        objective_match_information_curve!(model, parameters)
+    elseif parameters.method == "ICC2"
+        objetive_info_relative!(model, parameters)
     elseif parameters.method == "TC"
         objective_match_items(model, parameters)
     else

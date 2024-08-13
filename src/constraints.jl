@@ -1,23 +1,25 @@
 using JuMP
 
 ## Número de reactivos totales (Items) en cada versión (forms)
-function constraint_items_per_version(model, parameters, minItems, maxItems=minItems)
-    constraint_item_count(model, parameters, 1:size(parameters.bank, 1), minItems, maxItems)
+function constraint_items_per_version(model::Model, parameters::Params, minItems::Int64, maxItems::Int64=minItems)
+    constraint_item_count(model::Model, parameters::Params, 1:size(parameters.bank, 1), minItems::Int64, maxItems::Int64)
 end
 
 
-function constraint_prevent_overlap!(model, parameters)
+function constraint_prevent_overlap!(model::Model, parameters::Params)
     if parameters.anchor_number == 0
         x = model[:x]
         items, forms = size(x)
-        @constraint(model, [i=1:items], sum([x[i, f] for f in 1:forms]) <= 1);
+        if forms > 1
+            @constraint(model, [i=1:items], sum([x[i, f] for f in 1:forms]) <= 1);
+        end
     end
     return model
 end
 
 
 ## Incluye un número de reactivos ente minItems y maxItems de la lista para la prueba sombra
-function constraint_item_count_shadow_aux(model, parameters, selected, minItems, maxItems=minItems)
+function constraint_item_count_shadow_aux(model::Model, parameters::Params, selected, minItems::Int, maxItems::Int=minItems)
     shadow_test_size = parameters.shadow_test_size
 
     if shadow_test_size > 0
@@ -37,10 +39,10 @@ end
 
 
 ## Incluye un número de reactivos ente minItems y maxItems] de la lista "selected" en cada prueba(F)
-function constraint_item_count_aux(model, parameters, selected, minItems, maxItems=minItems)
+function constraint_item_count_aux(model::Model, parameters::Params, selected, minItems::Int64, maxItems::Int64=minItems)
     x = model[:x]
     forms = size(x, 2)
-    forms -= (parameters.shadow_test_size > 0 ? 1 : 0)
+    forms -= parameters.shadow_test_size > 0 ? 1 : 0
 
     if minItems == maxItems && minItems >= 0
         @constraint(model, [f=1:forms], sum(x[i, f] for i in selected) == maxItems);
@@ -55,15 +57,15 @@ function constraint_item_count_aux(model, parameters, selected, minItems, maxIte
 end
 
 
-function constraint_item_count(model, parameters, selected, minItems, maxItems=minItems)
-    constraint_item_count_aux(model, parameters, selected, minItems, maxItems)
-    constraint_item_count_shadow_aux(model, parameters, selected, minItems, maxItems)
+function constraint_item_count(model::Model, parameters::Params, selected, minItems::Int64, maxItems::Int64=minItems)
+    constraint_item_count_aux(model::Model, parameters::Params, selected, minItems::Int64, maxItems::Int64)
+    constraint_item_count_shadow_aux(model::Model, parameters::Params, selected, minItems::Int64, maxItems::Int64)
     return model
 end
 
 
 ## Suma de los valores de los reactivos entre [minVal, maxVal] en la prueba sombra
-function constraint_item_sum_shadow_aux(model, parameters, vals, minVal, maxVal=minVal)
+function constraint_item_sum_shadow_aux(model::Model, parameters::Params, vals, minVal, maxVal=minVal)
     shadow_test_size = parameters.shadow_test_size
     if shadow_test_size > 0
         x = model[:x]
@@ -89,7 +91,7 @@ end
 
 
 ## Suma de los valores de los reactivos entre [minVal, maxVal] en cada prueba(F)
-function constraint_item_sum_aux(model, parameters, vals, minVal, maxVal=minVal)
+function constraint_item_sum_aux(model::Model, parameters::Params, vals, minVal, maxVal=minVal)
     x = model[:x]
     if size(vals, 2) == 1
         cond = fill(true, length(vals))
@@ -99,7 +101,7 @@ function constraint_item_sum_aux(model, parameters, vals, minVal, maxVal=minVal)
     end
 
     items, forms = size(x)
-    forms -= (parameters.shadow_test_size > 0 ? 1 : 0)
+    forms -= parameters.shadow_test_size > 0 ? 1 : 0
 
     if minVal == maxVal && minVal >= 0
         @constraint(model, [f=1:forms], sum([x[i, f] * val[i] for i in 1:items if cond[1]]) == maxVal);
@@ -114,15 +116,15 @@ function constraint_item_sum_aux(model, parameters, vals, minVal, maxVal=minVal)
 end
 
 
-function constraint_item_sum(model, parameters, vals, minVal, maxVal=minVal)
-    constraint_item_sum_aux(model, parameters, vals, minVal, maxVal)
-    constraint_item_sum_shadow_aux(model, parameters, vals, minVal, maxVal)
+function constraint_item_sum(model::Model, parameters::Params, vals, minVal, maxVal=minVal)
+    constraint_item_sum_aux(model::Model, parameters::Params, vals, minVal, maxVal)
+    constraint_item_sum_shadow_aux(model::Model, parameters::Params, vals, minVal, maxVal)
     return model
 end
 
 
 ## Tolerancia de y en todos los puntos k de la curva característica
-function constraint_TCC_shadow_aux(model, parameters)
+function constraint_TCC_shadow_aux(model::Model, parameters::Params)
     if parameters.shadow_test_size > 0
         R = 1:parameters.r;
         K = 1:parameters.k;
@@ -154,14 +156,14 @@ end
 
 
 ## Tolerancia de y en todos los puntos k de la curva característica
-function constraint_TCC_aux(model, parameters)
+function constraint_TCC_aux(model::Model, parameters::Params)
     R = 1:parameters.r;
     K = 1:parameters.k;
     P = parameters.p;
     tau = parameters.tau;
     x, y = model[:x], model[:y];
     items, forms = size(x)
-    forms -= (parameters.shadow_test_size > 0 ? 1 : 0)
+    forms -= parameters.shadow_test_size > 0 ? 1 : 0
 
     @assert(length(P[:, 1]) == items)
     @assert(length(P[1, :]) == parameters.k)
@@ -180,14 +182,69 @@ function constraint_TCC_aux(model, parameters)
 end
 
 
-function objective_match_characteristic_curve!(model, parameters)
-    constraint_TCC_aux(model, parameters)
-    constraint_TCC_shadow_aux(model, parameters)
+function objective_match_characteristic_curve!(model::Model, parameters::Params)
+    constraint_TCC_aux(model::Model, parameters::Params)
+    constraint_TCC_shadow_aux(model::Model, parameters::Params)
+end
+
+
+## Tolerancia de y en todos los puntos k de la curva característica
+function constraint_ICC_shadow_aux(model::Model, parameters::Params)
+    if parameters.shadow_test_size > 0
+        K = parameters.k;
+        info = parameters.info;
+        tau_info = parameters.tau_info;
+
+        x, y = model[:x], model[:y]
+        items, zcol = size(x);
+        shadow_test_size = parameters.shadow_test_size
+
+        @assert(length(info[:, 1]) == items)
+        @assert(length(info[1, :]) == parameters.k)
+
+        @constraint(model, [k=1:K],
+                    sum([info[i, k] * x[i, zcol] for
+                             i in 1:items]) <= (tau_info[k] + y) * shadow_test_size);
+
+        @constraint(model, [k=1:K],
+                    sum([info[i, k] * x[i, zcol] for
+                             i in 1:items]) >= (tau_info[k] - y) * shadow_test_size);
+    end
+    return model
+end
+
+
+## Tolerancia de y en todos los puntos k de la curva característica
+function constraint_ICC_aux(model::Model, parameters::Params)
+    K = parameters.k;
+    info = parameters.info;
+    tau_info = parameters.tau_info;
+
+    x, y = model[:x], model[:y];
+    items, forms = size(x)
+    forms -= parameters.shadow_test_size > 0 ? 1 : 0
+
+    @assert(length(info[:, 1]) == items)
+    @assert(length(info[1, :]) == parameters.k)
+
+    @constraint(model, [f=1:forms, k=1:K],
+                sum([info[i, k] * x[i, f] for i in 1:items]) <= tau_info[k] + y);
+
+    @constraint(model, [f=1:forms, k=1:K],
+                sum([info[i, k] * x[i, f] for i in 1:items]) >= tau_info[k] - y);
+
+    return model
+end
+
+
+function objective_match_information_curve!(model::Model, parameters::Params)
+    constraint_ICC_aux(model::Model, parameters::Params)
+    constraint_ICC_shadow_aux(model::Model, parameters::Params)
 end
 
 
 
-function objective_match_items(model, parameters)
+function objective_match_items(model::Model, parameters::Params)
     x, y = model[:x], model[:y];
     items, forms = size(x)
 
@@ -205,7 +262,7 @@ function objective_match_items(model, parameters)
 
 end
 
-function constraint_add_anchor!(model, parameters)
+function constraint_add_anchor!(model::Model, parameters::Params)
     if parameters.anchor_number > 0
         x = model[:x]
         all_items, forms = size(x)
@@ -214,9 +271,11 @@ function constraint_add_anchor!(model, parameters)
         anchor_items = items[(parameters.bank.ANCHOR .== parameters.anchor_number)]
         bank_items = setdiff(items, anchor_items)
 
-        @constraint(model, [i=bank_items], sum([x[i, f] for f in 1:forms]) <= 1);
+        if forms > 1
+            @constraint(model, [i=bank_items], sum([x[i, f] for f in 1:forms]) <= 1);
+        end
 
-        forms -= (parameters.shadow_test_size > 0 ? 1 : 0)
+        forms -= parameters.shadow_test_size > 0 ? 1 : 0
 
         for f in 1:forms
             for i in anchor_items
@@ -229,11 +288,11 @@ end
 
 
 
-function constraint_max_use(model, parameters, overlap=0)
+function constraint_max_use(model::Model, parameters::Params, overlap=0)
     if parameters.anchor_number == 0
         x = model[:x]
         items, forms = size(x)
-        forms -= (parameters.shadow_test_size > 0 ? 1 : 0)
+        forms -= parameters.shadow_test_size > 0 ? 1 : 0
 
         if forms > 1
             @constraint(model, [i=1:items], sum([x[i, f] for f in 1:forms]) <= 1 + overlap);
@@ -243,9 +302,29 @@ function constraint_max_use(model, parameters, overlap=0)
 end
 
 
+## Tolerancia de y en todos los puntos k de la función de información
+function objetive_info_relative!(model::Model, parameters::Params)
+    R = parameters.relative_target_weights;
+    K  = length(R)
+    info = parameters.info
+    x, y = model[:x], model[:y]
+    (items, forms)  = size(x)
+    shadow = parameters.shadow_test_size
+
+    forms -= shadow > 0 ? 1 : 0
+
+    @constraint(model, [f=1:forms, k=1:K],
+                sum([info[i, k] * x[i, f] for i in 1:items]) >= R[k] * y);
+
+    shadow > 0 &&  @constraint(model, [k=1:K],
+                               sum([info[i, k] * x[i, forms + 1]
+                                    for i in 1:items]) >= R[k] * y * shadow);
+
+    return model
+end
 
 # ## Tolerancia de y en todos los puntos k de la función de información
-# function constraintInfo(model, parameters)
+# function constraint_info(model::Model, parameters::Params)
 #     info = parameters.info;
 #     infoTau = parameters.tau_info;
 #     K = 1:parameters.k;

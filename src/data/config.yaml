@@ -3,7 +3,7 @@
 itemsFile: ./data/items.csv
 constraintsFile: ./data/constraints.csv
 anchorFile: ./data/ancla.csv
-anchorNumber: 4
+anchorNumber: 2
 versionsFile: ./data/results.csv
 tccFile: data/tcc.csv
 resultsFile: data/results.csv
@@ -15,11 +15,14 @@ verbose: True
 # Parámetros
 forms:
 # Número de versiones para ensamblar
-     F: 10
-# Modelo para el ensamble (ICC, TCC o TC)
-     method: TCC
+     F: 4
+# Modelo para el ensamble (ICC, ICC2, TCC o TC)
+     method: ICC2
 # Número de potencias para el modelo de igualación TCC
      R: 2
-# Puntos en la escala para igualar ncluye puntos de corte)
+# Puntos en la escala para igualar (incluye puntos de corte)
      theta: [-2.2, -1.0, 0.0, 1.0, 2.2]
-     shadowsize: 1
+     shadowSize: 1
+
+     relativeTargetWeights: [4, 8, 5]
+     relativeTargetPoints: [-1.0, 0.0, 1.0]

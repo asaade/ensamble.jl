@@ -67,39 +67,32 @@ information in remaing items from parameters
 function remove_used_items!(parameters::Params, used_items)
     remaining = setdiff(1:length(parameters.bank.CLAVE), used_items)
     parameters.bank = parameters.bank[remaining, :]
-    if parameters.method == "TCC"
-        parameters.p = parameters.p[remaining, :]
-    elseif parameters.method == "ICC"
-        parameters.info = parameters.info[remaining, :]
+    if parameters.method in ["TCC", "ICC", "ICC2"]
+        parameters.method == "TCC" && (parameters.p = parameters.p[remaining, :])
+        parameters.method in ["ICC", "ICC2"] && (parameters.info = parameters.info[remaining, :])
     end
     return parameters
 end
 
 
 """
-    process_and_store_results!(model::Model, parameters::Params, results::DataFrame)
+        process_and_store_results!(model::Model, parameters::Params, results::DataFrame)
 
 Process results after each optimization iteration and store them in a single
 matrix. Used items are excluded from future versions.
 """
 function process_and_store_results!(model::Model, parameters::Params, results::DataFrame)
-    solver_matrix = Array(round.(Int, value.(model[:x])))
+    solver_matrix = value.(model[:x])
     item_codes = parameters.bank.CLAVE
     items = 1:length(item_codes)
-
-    versions = DataFrame(solver_matrix[:, 1:parameters.num_forms], :auto)
-    max_length = parameters.max_items
-
     used_items = Int[]
 
-    for version_name in names(versions)
-        selected_items = items[versions[:, version_name].>0]
+    for version_name in 1:parameters.num_forms
+        selected_items = items[solver_matrix[:, version_name] .> 0]
         item_codes_in_version = item_codes[selected_items]
 
-        padded_item_codes = vcat(item_codes_in_version, fill(missing, max_length - length(item_codes_in_version)))
-
-        new_column_name = generate_unique_column_name(results)
-        results[!, new_column_name] = padded_item_codes
+        padded_item_codes = vcat(item_codes_in_version, fill(missing, parameters.max_items - length(item_codes_in_version)))
+        results[!, generate_unique_column_name(results)] = padded_item_codes
         used_items = vcat(used_items, selected_items)
     end
 
@@ -125,18 +118,16 @@ function handle_anchor_items(parameters::Params, original_parameters::Params)
         anchors = original_parameters.bank[original_parameters.bank.ANCHOR.==parameters.anchor_number, :]
         parameters.bank = vcat(bank, anchors)
 
-        if parameters.method in ["TCC", "ICC"]
+        if parameters.method in ["TCC", "ICC", "ICC2"]
             items = collect(1:size(parameters.bank, 1))
-            a, b, c = get_item_parameters(parameters.bank, items)
             theta = parameters.theta
+            a, b, c = get_item_parameters(parameters.bank, items)
             if parameters.method == "TCC"
                 p = [Pr(t, b, a, c; d=1.0) for t in theta]
                 parameters.p = reduce(hcat, p)
-            elseif parameter.method == "ICC"
+            elseif parameters.method in ["ICC", "ICC2"]
                 info = [item_information(t, b, a, c) for t in theta]
                 parameters.info = reduce(hcat, info)
-            else
-                println("Unknown method trying to add anchor items")
             end
         end
     end
@@ -149,8 +140,6 @@ function main(config_file::String=CONFIG_FILE, solver_type::Symbol=:CPLEX)
     parameters = deepcopy(original_parameters)
     constraints = read_constraints(config.constraints_file)
     parameters.num_forms = 1
-
-    # Initialize an empty DataFrame for storing results
     results = DataFrame()
 
     while parameters.f > 0
