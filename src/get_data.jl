@@ -187,6 +187,7 @@ function get_params(config::Config)::Params
     bank = clean_items_bank!(config, bank)
 
     bank.CLAVE = string.(bank.CLAVE)
+    bank.INDEX = rownumber.(eachrow(bank))
     parms_dict = deepcopy(config.forms)
     parms_dict[:BANK] = unique(bank, [:CLAVE])
     parms_dict[:ANCHOR_NUMBER] = anchor_number

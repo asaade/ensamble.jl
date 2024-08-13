@@ -242,6 +242,26 @@ function objective_match_information_curve!(model::Model, parameters::Params)
     constraint_ICC_shadow_aux(model::Model, parameters::Params)
 end
 
+## Tolerancia de y en todos los puntos k de la función de información
+function objetive_info_relative!(model::Model, parameters::Params)
+    R = parameters.relative_target_weights;
+    K  = length(R)
+    info = parameters.info
+    x, y = model[:x], model[:y]
+    (items, forms)  = size(x)
+
+    shadow = parameters.shadow_test_size
+    forms -= shadow > 0 ? 1 : 0
+
+    @constraint(model, [f=1:forms, k=1:K],
+                sum([info[i, k] * x[i, f] for i in 1:items]) >= R[k] * y);
+
+    shadow > 0 &&  @constraint(model, [k=1:K],
+                               sum([info[i, k] * x[i, forms + 1]
+                                    for i in 1:items]) >= R[k] * y * shadow);
+
+    return model
+end
 
 
 function objective_match_items(model::Model, parameters::Params)
@@ -300,43 +320,3 @@ function constraint_max_use(model::Model, parameters::Params, overlap=0)
     end
     return model
 end
-
-
-## Tolerancia de y en todos los puntos k de la función de información
-function objetive_info_relative!(model::Model, parameters::Params)
-    R = parameters.relative_target_weights;
-    K  = length(R)
-    info = parameters.info
-    x, y = model[:x], model[:y]
-    (items, forms)  = size(x)
-    shadow = parameters.shadow_test_size
-
-    forms -= shadow > 0 ? 1 : 0
-
-    @constraint(model, [f=1:forms, k=1:K],
-                sum([info[i, k] * x[i, f] for i in 1:items]) >= R[k] * y);
-
-    shadow > 0 &&  @constraint(model, [k=1:K],
-                               sum([info[i, k] * x[i, forms + 1]
-                                    for i in 1:items]) >= R[k] * y * shadow);
-
-    return model
-end
-
-# ## Tolerancia de y en todos los puntos k de la función de información
-# function constraint_info(model::Model, parameters::Params)
-#     info = parameters.info;
-#     infoTau = parameters.tau_info;
-#     K = 1:parameters.k;
-#     x = model[:x]
-#     y = model[:y]
-#     (Items, forms)  = size(x)
-
-#     @assert(length(info[:, 1]) == length(x) == Items)
-
-#     @constraint(model, [f=1:forms, k=K],
-#                 sum([info[i, k] * x[i, f] for i in 1:Items]) <= infoTau[k] + y);
-#     @constraint(model, [f=1:forms, k=K],
-#                 sum([info[i, k] * x[i, f] for i in 1:Items]) >= infoTau[k] - y);
-#     return model
-# end

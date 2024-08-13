@@ -10,7 +10,6 @@ include("charts.jl")
 
 const CONFIG_FILE = "data/config.yaml"
 
-
 # Calculate common items between versions
 function calculate_common_items(results::DataFrame)
     num_forms = size(results, 2)
@@ -119,15 +118,10 @@ function handle_anchor_items(parameters::Params, original_parameters::Params)
         parameters.bank = vcat(bank, anchors)
 
         if parameters.method in ["TCC", "ICC", "ICC2"]
-            items = collect(1:size(parameters.bank, 1))
-            theta = parameters.theta
-            a, b, c = get_item_parameters(parameters.bank, items)
             if parameters.method == "TCC"
-                p = [Pr(t, b, a, c; d=1.0) for t in theta]
-                parameters.p = reduce(hcat, p)
+                parameters.p = original_parameters.p[parameters.bank.INDEX, :]
             elseif parameters.method in ["ICC", "ICC2"]
-                info = [item_information(t, b, a, c) for t in theta]
-                parameters.info = reduce(hcat, info)
+                parameters.info = original_parameters.info[parameters.bank.INDEX, :]
             end
         end
     end
@@ -139,10 +133,11 @@ function main(config_file::String=CONFIG_FILE, solver_type::Symbol=:CPLEX)
     config, original_parameters = load_configuration(config_file)
     parameters = deepcopy(original_parameters)
     constraints = read_constraints(config.constraints_file)
-    parameters.num_forms = 1
+    parameters.num_forms = parameters.shadow_test_size > 0 ? 1 : parameters.f
     results = DataFrame()
 
     while parameters.f > 0
+        parameters.num_forms = min(parameters.num_forms, parameters.f)
         parameters.shadow_test_size = max(0, parameters.f - parameters.num_forms)
         handle_anchor_items(parameters, original_parameters)
 
@@ -153,7 +148,7 @@ function main(config_file::String=CONFIG_FILE, solver_type::Symbol=:CPLEX)
         if run_optimization(model)
             results = process_and_store_results!(model, parameters, results)
             display_results(model)
-            parameters.f -= 1
+            parameters.f -= parameters.num_forms
         else
             println("Optimization failed")
             parameters.f = 0

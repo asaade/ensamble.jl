@@ -1,5 +1,6 @@
 # Define a struct for the configuration
 MatrixOrMissing = Union{Matrix{AbstractFloat}, Nothing}
+DataFrameOrMissing = Union{DataFrame, Nothing}
 VectorOrMissing = Union{Vector{AbstractFloat}, Nothing}
 
 
