@@ -1,44 +1,53 @@
 using JuMP
-
-ENV["CPLEX_STUDIO_BINARIES"] = "/home/asaade/.bin/ILOG/CPLEX_Studio/cplex/bin/x86-64_linux/"
+using YAML
 using CPLEX
-function CPLEX_solver(model)
-    println("Configuring solver CPLEX");
-    set_optimizer(model, CPLEX.Optimizer);
-    set_attribute(model, "CPX_PARAM_EPGAP", 0.05);
-    set_attribute(model, "CPX_PARAM_EPAGAP", 0.05);
-    set_attribute(model, "CPX_PARAM_EPINT", 1e-6);
-    set_attribute(model, "CPX_PARAM_PREIND", 1);
-    set_time_limit_sec(model, 90);
-
-    return model
-end
-
-
 using Cbc
-function CBC_solver(model)
-    println("Configuring solver Cbc");
-    set_optimizer(model, Cbc.Optimizer);
-    set_attribute(model, "seconds", "90");
-    set_attribute(model, "allowableGap", 0.05);
-    set_attribute(model, "ratioGap", 0.05);
-    set_attribute(model, "threads", 10);
-    set_attribute(model, "timeMode", "elapsed");
-    set_attribute(model, "logLevel", 1)
-    set_time_limit_sec(model, 120);
+using SCIP
+using GLPK
+using HiGHS
+using SYMPHONY_jll
+using Gurobi
+
+function load_solver_config(yaml_file::String)
+    config = YAML.load_file(yaml_file)
+    return config
+end
+
+function configure_solver!(model::Model, solver_name::String="cplex")
+    config = load_solver_config("data/solver_config.yaml")
+    solver_options = config[solver_name]
+
+    if solver_name == "cplex"
+        set_optimizer(model, CPLEX.Optimizer)
+    elseif solver_name == "cbc"
+        set_optimizer(model, Cbc.Optimizer)
+    elseif solver_name == "scip"
+        set_optimizer(model, SCIP.Optimizer)
+    elseif solver_name == "glpk"
+        set_optimizer(model, GLPK.Optimizer)
+    elseif solver_name == "highs"
+        set_optimizer(model, HiGHS.Optimizer)
+    elseif solver_name == "symphony"
+        set_optimizer(model, SYMPHONY_jll.Optimizer)
+    elseif solver_name == "gurobi"
+        set_optimizer(model, Gurobi.Optimizer)
+    else
+        error("Unsupported solver: $solver_name")
+    end
+
+    # Set common options
+    for (opt, val) in solver_options
+        try
+            set_optimizer_attribute(model, opt, val)
+        catch e
+            @warn "Option $opt not supported by $solver_name solver."
+        end
+    end
+
     return model
 end
 
-function select_solver(model, solverType=:Cbc, verbose=false)
-    if (solverType == :CPLEX)
-        model = CPLEX_solver(model)
-    elseif solverType == :Cbc
-        model = CBC_solver(model)
-    else
-        println("Unknown solver type");
-    end
-    # if !verbose
-    # set_silent(model)
-    # end
-    return model
-end
+# # Example usage:
+
+# model = Model()
+# configure_solver!(model, "scip")

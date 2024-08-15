@@ -12,7 +12,8 @@ function initialize_model!(model::Model, parameters::Params, constraints::Dict{S
 
     @variable(model, y >= 0.0)
     @variable(model, x[1:num_items, 1:num_forms], Bin)
-    if parameters.method == "ICC2"
+
+    if parameters.method in ["ICC2", "ICC3"]
         @objective(model, Max, y)
     else
         @objective(model, Min, y)
@@ -46,6 +47,8 @@ function apply_objective!(model::Model, parameters::Params)
         objective_match_information_curve!(model, parameters)
     elseif parameters.method == "ICC2"
         objetive_info_relative!(model, parameters)
+    elseif parameters.method == "ICC3"
+        objetive_info_relative2!(model, parameters)
     elseif parameters.method == "TC"
         objective_match_items(model, parameters)
     else

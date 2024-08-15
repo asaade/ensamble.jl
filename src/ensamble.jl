@@ -1,3 +1,5 @@
+
+
 using DataFrames
 using JuMP
 
@@ -128,8 +130,21 @@ function handle_anchor_items(parameters::Params, original_parameters::Params)
 end
 
 
+function save_forms(parameters::Params, results::DataFrame, file_name)
+    bank = deepcopy(parameters.bank)
+
+    for v in names(results)
+        bank[!, Symbol(v)] = map(x -> x == 1 ? " ✓" : "", bank.CLAVE .∈ Ref(skipmissing(results[:, v])))
+    end
+    write_results_to_file(bank, file_name)
+
+    # bank = deepcopy(parameters.bank)
+    # dfv = view(bank, bank.CLAVE .∈ Ref(skipmissing(results[:, v])), :)
+    # @. dfv.VERSION = v
+end
+
 # Main function to run the entire process
-function main(config_file::String=CONFIG_FILE, solver_type::Symbol=:CPLEX)
+function main(config_file::String=CONFIG_FILE)
     config, original_parameters = load_configuration(config_file)
     parameters = deepcopy(original_parameters)
     constraints = read_constraints(config.constraints_file)
@@ -142,7 +157,7 @@ function main(config_file::String=CONFIG_FILE, solver_type::Symbol=:CPLEX)
         handle_anchor_items(parameters, original_parameters)
 
         model = Model()
-        model = select_solver(model, solver_type)
+        configure_solver!(model, config.solver)
         initialize_model!(model, parameters, constraints)
 
         if run_optimization(model)
@@ -160,6 +175,8 @@ function main(config_file::String=CONFIG_FILE, solver_type::Symbol=:CPLEX)
 
     # Generate plots
     plot_characteristic_curves_and_simulation(original_parameters, results)
+
+    save_forms(original_parameters, results, "data/versiones.csv")
 end
 
-# main(CONFIG_FILE, :Cbc)
+# main(CONFIG_FILE)

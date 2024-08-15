@@ -18,7 +18,8 @@ function Config(config_dict::Dict{Symbol, Any})
         config_dict[:CONSTRAINTSFILE],
         config_dict[:RESULTSFILE],
         config_dict[:TCCFILE],
-        config_dict[:PLOTFILE]
+        config_dict[:PLOTFILE],
+        config_dict[:SOLVER]
     )
 end
 
@@ -90,7 +91,7 @@ function clean_items_bank!(config::Config, bank::DataFrame)::DataFrame
 
     method = config.forms[:METHOD]
 
-    if method in ["TCC", "ICC", "ICC2"]
+    if method in ["TCC", "ICC", "ICC2", "ICC3"]
         clean_IRT!(bank)
     elseif method == "TC"
         clean_TC!(bank)
@@ -168,15 +169,16 @@ function load_config(inFile::String="data/config.yaml")::Config
     config_dict[:FORMS][:MINN] = lb
     config_dict[:FORMS][:MAXN] = ub
 
-    config_dict[:FORMS][:R] =
-        if config_dict[:FORMS][:N] <= 25
-            4
-        elseif config_dict[:FORMS][:N] <= 50
-            3
-        else
-            2
-        end
-
+    if !haskey(config_dict[:FORMS], :R)
+        config_dict[:FORMS][:R] =
+            if config_dict[:FORMS][:N] <= 25
+                4
+            elseif config_dict[:FORMS][:N] <= 50
+                3
+            else
+                2
+            end
+    end
     return Config(config_dict)
 end
 
@@ -194,13 +196,13 @@ function get_params(config::Config)::Params
 
     method = parms_dict[:METHOD]
 
-    if method =="ICC2"
+    if method in ["ICC2", "ICC3"]
         theta = parms_dict[:RELATIVETARGETPOINTS]
     else
         theta = parms_dict[:THETA]
     end
 
-    if method in ["TCC", "ICC", "ICC2"]
+    if method in ["TCC", "ICC", "ICC2", "ICC3"]
         parms_dict[:THETA] = theta
         a, b, c = bank[!, :A], bank[!, :B], bank[!, :C]
         parms_dict[:K] = length(theta)
@@ -211,7 +213,11 @@ function get_params(config::Config)::Params
         info = [item_information(t, b, a, c) for t in theta]
         parms_dict[:INFO] = reduce(hcat, info)
 
+        if haskey(parms_dict, :TAU)
+            parms_dict[:TAU] = eval(Meta.parse(join(["[", join(parms_dict[:TAU], " "), "]"])))
+        end
         parms_dict[:TAU] = get(parms_dict, :TAU, calc_tau(parms_dict[:P], parms_dict[:R], parms_dict[:K], parms_dict[:N], bank))
+        parms_dict[:R] = min(parms_dict[:R], size(parms_dict[:TAU], 1))
         parms_dict[:TAU_INFO] = get(parms_dict, :TAU_INFO, calc_info_tau(parms_dict[:INFO], parms_dict[:K], parms_dict[:N]))
         parms_dict[:DELTA] = nothing
     elseif method == "TC"

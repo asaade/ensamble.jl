@@ -126,19 +126,12 @@ end
 ## Tolerancia de y en todos los puntos k de la curva característica
 function constraint_TCC_shadow_aux(model::Model, parameters::Params)
     if parameters.shadow_test_size > 0
-        R = 1:parameters.r;
-        K = 1:parameters.k;
-        P = parameters.p;
-        tau = parameters.tau;
-
+        R, K = 1:parameters.r, 1:parameters.k
+        P, tau = parameters.p, parameters.tau
         x, y = model[:x], model[:y]
+        items, zcol = size(x)
 
-        items, zcol = size(x);
         shadow_test_size = parameters.shadow_test_size
-
-        @assert(length(P[:, 1]) == items)
-        @assert(length(P[1, :]) == parameters.k)
-        @assert(parameters.r == length(tau[:, 1]))
 
         # w = [1.0 for _ in R]
         # w = [1.15 - (0.15 * r) for r in R]
@@ -157,17 +150,11 @@ end
 
 ## Tolerancia de y en todos los puntos k de la curva característica
 function constraint_TCC_aux(model::Model, parameters::Params)
-    R = 1:parameters.r;
-    K = 1:parameters.k;
-    P = parameters.p;
-    tau = parameters.tau;
-    x, y = model[:x], model[:y];
+    R, K = 1:parameters.r, 1:parameters.k
+    P, tau = parameters.p, parameters.tau
+    x, y = model[:x], model[:y]
     items, forms = size(x)
     forms -= parameters.shadow_test_size > 0 ? 1 : 0
-
-    @assert(length(P[:, 1]) == items)
-    @assert(length(P[1, :]) == parameters.k)
-    @assert(parameters.r == length(tau[:, 1]))
 
     # w = [1.0 for _ in R]
     # w = [1.15 - (0.15 * (r - 1)) for r in R]
@@ -175,6 +162,7 @@ function constraint_TCC_aux(model::Model, parameters::Params)
 
     @constraint(model, [f=1:forms, k=K, r=R],
                 sum([P[i, k] ^ r * x[i, f] for i in 1:items]) <= tau[r, k] + (w[r] * y));
+
     @constraint(model, [f=1:forms, k=K, r=R],
                 sum([P[i, k] ^ r * x[i, f] for i in 1:items]) >= tau[r, k] - (w[r] * y));
 
@@ -198,9 +186,6 @@ function constraint_ICC_shadow_aux(model::Model, parameters::Params)
         x, y = model[:x], model[:y]
         items, zcol = size(x);
         shadow_test_size = parameters.shadow_test_size
-
-        @assert(length(info[:, 1]) == items)
-        @assert(length(info[1, :]) == parameters.k)
 
         @constraint(model, [k=1:K],
                     sum([info[i, k] * x[i, zcol] for
@@ -245,7 +230,7 @@ end
 ## Tolerancia de y en todos los puntos k de la función de información
 function objetive_info_relative!(model::Model, parameters::Params)
     R = parameters.relative_target_weights;
-    K  = length(R)
+    K = parameters.k
     info = parameters.info
     x, y = model[:x], model[:y]
     (items, forms)  = size(x)
@@ -263,23 +248,27 @@ function objetive_info_relative!(model::Model, parameters::Params)
     return model
 end
 
+## Tolerancia de y en todos los puntos k de la función de información
+function objetive_info_relative2!(model::Model, parameters::Params)
+    R = parameters.relative_target_weights;
+    parameters.k = mod(parameters.k, original_parameters.k) + 1
 
-function objective_match_items(model::Model, parameters::Params)
-    x, y = model[:x], model[:y];
-    items, forms = size(x)
+    k = parameters.k
+    info = parameters.info
+    x, y = model[:x], model[:y]
+    (items, forms)  = size(x)
+    xs = forms
+    shadow = parameters.shadow_test_size
+    forms -= shadow > 0 ? 1 : 0
 
-    @constraint(model, [i=1:items, j=i:items, f=1:forms],
-                x[i, f] * x[j, f] * parameters.delta[i, j] <= y)
+    @constraint(model, [f=1:forms],
+                sum([info[i, k] * x[i, f] for i in 1:items]) >= R[k] * y);
 
-    @constraint(model, [i=1:items, j=i:items, f=1:forms],
-                x[i, f] * x[j, f] * parameters.delta[i, j] >= -y)
+    shadow > 0 &&  @constraint(model,
+                               sum([info[i, k] * x[i, xs]
+                                    for i in 1:items]) >= R[k] * y * shadow);
 
-    @constraint(model, [j=1:items, f=1:forms],
-                sum([x[i, f] * x[j, f] for i in 1:items if i < j] == 1) == 1)
-
-    # @constraint(model, [j=1:items, f=1:forms],
-    #              sum([x[i, f] + x[j, f] for i in 1:items] == 1 if i < j) == 1)
-
+    return model
 end
 
 function constraint_add_anchor!(model::Model, parameters::Params)
@@ -320,3 +309,27 @@ function constraint_max_use(model::Model, parameters::Params, overlap=0)
     end
     return model
 end
+
+
+# function constraint_sets(model::Model, parameters::Params, group_ids, selected, minItems::Int, maxItems::Int=minItems)
+
+
+# function objective_match_items(model::Model, parameters::Params)
+#     x, y = model[:x], model[:y];
+#     items, forms = size(x)
+#     D(I, LL=-1.5, W=3.0, N=parameters.n) = W * (I-1) / ((N-1) - LL)
+#     reference20_80 =
+
+#     @constraint(model, [i=1:items, j=i:(items-1), f=1:forms],
+#                 x[i, f] * x[j, f] * parameters.delta[i, j] <= y)
+
+#     @constraint(model, [i=1:items, j=i:items, f=1:forms],
+#                 x[i, f] * x[j, f] * parameters.delta[i, j] >= -y)
+
+#     @constraint(model, [j=1:items, f=1:forms],
+#                 sum([x[i, f] * x[j, f] for i in 1:items if i < j] == 1) == 1)
+
+#     # @constraint(model, [j=1:items, f=1:forms],
+#     #              sum([x[i, f] + x[j, f] for i in 1:items] == 1 if i < j) == 1)
+
+# end

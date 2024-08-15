@@ -15,6 +15,7 @@ struct Config
     results_file::String
     tcc_file::String
     plot_file::String
+    solver::String
 end
 
 # Define a struct for the parameters

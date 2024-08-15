@@ -94,7 +94,7 @@ function plot_characteristic_curves_and_simulation(parameters, results::DataFram
     simulation_data = generate_results_simulation(parameters, results, Normal(0.0, 1.0))
 
     # Set up the plot aesthetics
-    theme(:mute)
+    theme(:orange)
     gr(size=(900, 750))
 
     # Create subplots
@@ -107,7 +107,7 @@ function plot_characteristic_curves_and_simulation(parameters, results::DataFram
     if parameters.method == "TCC"
         p1 = scatter!(parameters.theta,
                       parameters.tau[1, :],
-                      label="")
+                      label="", markersize=5)
     end
 
     p2 = @df information_curves plot(theta_range, cols(),
@@ -115,14 +115,14 @@ function plot_characteristic_curves_and_simulation(parameters, results::DataFram
                                      xlabel="Theta", ylabel="Information",
                                      linewidth=2, label="",
                                      grid=(:on, :olivedrab, :dot, 1, 0.9),
-                                     tickfontsize=12)
+                                     tickfontsize=11)
 
     p3 = @df simulation_data plot(1:size(simulation_data, 1), cols(),
                                   title="Observed Score Distribution",
                                   xlabel="Item", ylabel="Score",
                                   linewidth=2, label="",
                                   grid=(:on, :olivedrab, :dot, 1, 0.9),
-                                  tickfontsize=12)
+                                  tickfontsize=11)
 
     # Combine the plots into a single image with subplots
     combined_plot = plot(p1, p2, p3, layout=(2, 2), size=(900, 750))
