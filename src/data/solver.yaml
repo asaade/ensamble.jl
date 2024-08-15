@@ -1,0 +1,52 @@
+solvers:
+  cplex:
+    executable: "/home/asaade/.bin/ILOG/CPLEX_Studio/cplex/bin/x86-64_linux/"
+    options:
+      CPX_PARAM_EPGAP: 0.05
+      CPX_PARAM_EPAGAP: 0.05
+      CPX_PARAM_EPINT: 1e-6
+      CPX_PARAM_PREIND: 1
+      time_limit: 90
+  cbc:
+    executable: "cbc"
+    options:
+      seconds: 90
+      allowableGap: 0.05
+      ratioGap: 0.05
+      threads: 10
+      timeMode: "elapsed"
+      logLevel: 1
+      time_limit: 120
+  scip:
+    executable: "scip"
+    options:
+      time_limit: 300
+      heuristics: "aggressive"
+      presolve: "default"
+      display_freq: 10
+  glpk:
+    executable: "glpsol"
+    options:
+      mip_gap: 0.05
+      time_limit: 300
+      presolve: true
+      output_freq: 1000
+  symphony:
+    executable: "symphony"
+    options:
+      gap_limit: 0.05
+      time_limit: 300
+      verbosity: 1
+      random_seed: 42
+      presolve: true
+      heuristics: true
+      node_limit: 1000
+  gurobi:
+    executable: "gurobi"
+    options:
+      MIPGap: 0.01
+      TimeLimit: 300
+      Threads: 8
+      Presolve: 2
+      Method: 2
+      Heuristics: 0.05
