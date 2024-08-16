@@ -1,18 +1,46 @@
-
-
 using DataFrames
 using JuMP
+
 
 # Include external modules
 include("get_data.jl")
 include("solvers.jl")
 include("stats_functions.jl")
-include("constraint_processing.jl")
+include("model_initializer.jl")
 include("charts.jl")
 
+# Constants
 const CONFIG_FILE = "data/config.yaml"
+const CHECKMARK = " ✓"
+const MISSING_VALUE_FILLER = missing
+const COMMON_ITEMS_MATRIX_TITLE = "\nCommon Items Matrix:"
+const OPTIMIZATION_RESULTS_TITLE = "\nOptimization Results:"
+const OPTIMIZATION_FAILED_MESSAGE = "Optimization failed"
+const LOADING_CONFIGURATION_MESSAGE = "Loading configuration..."
+const RUNNING_OPTIMIZATION_MESSAGE = "Running optimization..."
+const VERSIONS_ASSEMBLED_MESSAGE = "Total versions assembled: "
+const TOLERANCE_LABEL = "Tolerance: "
+const SEPARATOR = "====================================="
+const SAVE_FILE_NAME = "data/versiones.csv"
 
-# Calculate common items between versions
+# Print functions
+function print_title_and_separator(title::String)
+    println(title)
+    println(SEPARATOR)
+end
+
+function print_optimization_results(model::Model, parameters::Params)
+    parameters.verbose > 1 && println(solution_summary(model))
+    println(TOLERANCE_LABEL, round(objective_value(model); digits=4))
+    println(SEPARATOR)
+end
+
+"""
+    calculate_common_items(results::DataFrame)
+
+Calculate the number of common items between versions and return a matrix
+where each entry [i, j] indicates the number of common items between version `i` and version `j`.
+"""
 function calculate_common_items(results::DataFrame)
     num_forms = size(results, 2)
     common_items_matrix = zeros(Int, num_forms, num_forms)
@@ -25,74 +53,93 @@ function calculate_common_items(results::DataFrame)
     return common_items_matrix
 end
 
-# Display common items matrix
+"""
+    display_common_items(results::DataFrame)
+
+Display the matrix of common items between versions.
+"""
 function display_common_items(results::DataFrame)
     common_items_matrix = calculate_common_items(results)
-    println("\nCommon Items Matrix:")
+    print_title_and_separator(COMMON_ITEMS_MATRIX_TITLE)
     display(common_items_matrix)
-    println("=====================================")
+    println(SEPARATOR)
     return common_items_matrix
 end
 
-# Display optimization results
-function display_results(model::Model)
-    println("\nOptimization Results:")
-    # println(solution_summary(model))
-    println("Tolerance: ", round(objective_value(model); digits=4))
-    println("=====================================\n")
+function display_final_results(parameters::Params, results::DataFrame)
+    items_used = reduce(vcat, eachcol(results)) |> unique |> length
+    println(VERSIONS_ASSEMBLED_MESSAGE, size(results, 2))
+    println("Items used (without anchor): ", items_used)
+    println("Remaining items (includes anchor): ", length(parameters.bank.CLAVE) - items_used)
+    display_common_items(results)
 end
 
+"""
+    display_results(model::Model)
 
-# Load configuration and parameters from file
+Display the results of the optimization, including the tolerance and objective value.
+"""
+function display_results(model::Model, parameters::Params)
+    print_title_and_separator(OPTIMIZATION_RESULTS_TITLE)
+    print_optimization_results(model, parameters)
+end
+
+"""
+    load_configuration(config_file::String)
+
+Load the configuration and parameters from the specified YAML configuration file.
+"""
 function load_configuration(config_file::String)
-    println("Loading configuration...")
+    println(LOADING_CONFIGURATION_MESSAGE)
     config = load_config(config_file)
     parameters = get_params(config)
     return config, parameters
 end
 
-# Run the optimization solver
+"""
+    run_optimization(model::Model)
+
+Run the optimization solver and check if the model is solved and feasible.
+"""
 function run_optimization(model::Model)
-    println("Running optimization...")
+    println(RUNNING_OPTIMIZATION_MESSAGE)
     optimize!(model)
     return is_solved_and_feasible(model)
 end
 
-
 """
     remove_used_items!(parameters::Params, used_items)
 
-Remove items used in versions from bank and update probability and
-information in remaing items from parameters
+Remove items used in versions from the bank and update probabilities or
+information for the remaining items based on the method used.
 """
 function remove_used_items!(parameters::Params, used_items)
     remaining = setdiff(1:length(parameters.bank.CLAVE), used_items)
     parameters.bank = parameters.bank[remaining, :]
     if parameters.method in ["TCC", "ICC", "ICC2"]
-        parameters.method == "TCC" && (parameters.p = parameters.p[remaining, :])
+        parameters.method in ["TCC"] && (parameters.p = parameters.p[remaining, :])
         parameters.method in ["ICC", "ICC2"] && (parameters.info = parameters.info[remaining, :])
     end
     return parameters
 end
 
-
 """
-        process_and_store_results!(model::Model, parameters::Params, results::DataFrame)
+    process_and_store_results!(model::Model, parameters::Params, results::DataFrame)
 
-Process results after each optimization iteration and store them in a single
-matrix. Used items are excluded from future versions.
+Process the optimization results for each form and store them in a DataFrame.
+Used items are removed from the bank for subsequent forms.
 """
 function process_and_store_results!(model::Model, parameters::Params, results::DataFrame)
     solver_matrix = value.(model[:x])
     item_codes = parameters.bank.CLAVE
     items = 1:length(item_codes)
     used_items = Int[]
+    max_items = parameters.max_items
 
     for version_name in 1:parameters.num_forms
         selected_items = items[solver_matrix[:, version_name] .> 0]
         item_codes_in_version = item_codes[selected_items]
-
-        padded_item_codes = vcat(item_codes_in_version, fill(missing, parameters.max_items - length(item_codes_in_version)))
+        padded_item_codes = vcat(item_codes_in_version, fill(MISSING_VALUE_FILLER, max_items - length(item_codes_in_version)))
         results[!, generate_unique_column_name(results)] = padded_item_codes
         used_items = vcat(used_items, selected_items)
     end
@@ -102,7 +149,11 @@ function process_and_store_results!(model::Model, parameters::Params, results::D
     return results
 end
 
-# Generate a unique column name to avoid clashes
+"""
+    generate_unique_column_name(results::DataFrame)
+
+Generate a unique column name to avoid naming conflicts in the results DataFrame.
+"""
 function generate_unique_column_name(results::DataFrame)
     i = 1
     while "Version_$i" in names(results)
@@ -111,7 +162,12 @@ function generate_unique_column_name(results::DataFrame)
     return "Version_$i"
 end
 
+"""
+    handle_anchor_items(parameters::Params, original_parameters::Params)
 
+Handle anchor items by adjusting the bank and relevant parameters based on the
+specified anchor number.
+"""
 function handle_anchor_items(parameters::Params, original_parameters::Params)
     if parameters.anchor_number > 0
         parameters.anchor_number = mod(parameters.anchor_number, original_parameters.anchor_number) + 1
@@ -119,31 +175,34 @@ function handle_anchor_items(parameters::Params, original_parameters::Params)
         anchors = original_parameters.bank[original_parameters.bank.ANCHOR.==parameters.anchor_number, :]
         parameters.bank = vcat(bank, anchors)
 
-        if parameters.method in ["TCC", "ICC", "ICC2"]
-            if parameters.method == "TCC"
-                parameters.p = original_parameters.p[parameters.bank.INDEX, :]
-            elseif parameters.method in ["ICC", "ICC2"]
-                parameters.info = original_parameters.info[parameters.bank.INDEX, :]
-            end
+        if parameters.method in ["TCC"]
+            parameters.p = original_parameters.p[parameters.bank.INDEX, :]
+        elseif parameters.method in ["ICC", "ICC2"]
+            parameters.info = original_parameters.info[parameters.bank.INDEX, :]
         end
     end
 end
 
+"""
+    save_forms(parameters::Params, results::DataFrame, file_name::String)
 
-function save_forms(parameters::Params, results::DataFrame, file_name)
+Save the forms to a file, marking used items with a checkmark.
+"""
+function save_forms(parameters::Params, results::DataFrame, file_name::String)
     bank = deepcopy(parameters.bank)
 
     for v in names(results)
-        bank[!, Symbol(v)] = map(x -> x == 1 ? " ✓" : "", bank.CLAVE .∈ Ref(skipmissing(results[:, v])))
+        bank[!, Symbol(v)] = map(x -> x == 1 ? CHECKMARK : "", bank.CLAVE .∈ Ref(skipmissing(results[:, v])))
     end
     write_results_to_file(bank, file_name)
-
-    # bank = deepcopy(parameters.bank)
-    # dfv = view(bank, bank.CLAVE .∈ Ref(skipmissing(results[:, v])), :)
-    # @. dfv.VERSION = v
 end
 
-# Main function to run the entire process
+"""
+    main(config_file::String=CONFIG_FILE)
+
+Main function to run the entire optimization process, including loading configurations,
+running the solver, processing results, and saving the output.
+"""
 function main(config_file::String=CONFIG_FILE)
     config, original_parameters = load_configuration(config_file)
     parameters = deepcopy(original_parameters)
@@ -157,26 +216,30 @@ function main(config_file::String=CONFIG_FILE)
         handle_anchor_items(parameters, original_parameters)
 
         model = Model()
-        configure_solver!(model, config.solver)
+        configure_solver!(model, parameters, config.solver)
         initialize_model!(model, parameters, constraints)
 
         if run_optimization(model)
             results = process_and_store_results!(model, parameters, results)
-            display_results(model)
+            display_results(model, parameters)
             parameters.f -= parameters.num_forms
         else
-            println("Optimization failed")
+            println(OPTIMIZATION_FAILED_MESSAGE)
             parameters.f = 0
         end
     end
 
     # Display common items matrix
-    display_common_items(results)
+    if parameters.verbose > 0
+        # display_common_items(results)
+        display_final_results(original_parameters, results)
+    end
 
     # Generate plots
     plot_characteristic_curves_and_simulation(original_parameters, results)
 
-    save_forms(original_parameters, results, "data/versiones.csv")
+    save_forms(original_parameters, results, SAVE_FILE_NAME)
 end
 
+# Uncomment to run the main function
 # main(CONFIG_FILE)

@@ -19,7 +19,8 @@ function Config(config_dict::Dict{Symbol, Any})
         config_dict[:RESULTSFILE],
         config_dict[:TCCFILE],
         config_dict[:PLOTFILE],
-        config_dict[:SOLVER]
+        config_dict[:SOLVER],
+        config_dict[:VERBOSE]
     )
 end
 
@@ -38,12 +39,13 @@ function Params(parms_dict::Dict{Symbol, Any})
         parms_dict[:ANCHOR_NUMBER],
         parms_dict[:THETA],
         parms_dict[:P],
-        parms_dict[:INFO],
+        get(parms_dict, :INFO, nothing),
         parms_dict[:TAU],
-        parms_dict[:TAU_INFO],
+        get(parms_dict, :TAU_INFO, nothing),
         parms_dict[:RELATIVETARGETWEIGHTS],
         parms_dict[:RELATIVETARGETPOINTS],
-        get(parms_dict, :DELTA, nothing)
+        get(parms_dict, :DELTA, nothing),
+        parms_dict[:VERBOSE]
     )
 end
 
@@ -193,7 +195,7 @@ function get_params(config::Config)::Params
     parms_dict = deepcopy(config.forms)
     parms_dict[:BANK] = unique(bank, [:CLAVE])
     parms_dict[:ANCHOR_NUMBER] = anchor_number
-
+    parms_dict[:VERBOSE] = config.verbose
     method = parms_dict[:METHOD]
 
     if method in ["ICC2", "ICC3"]
@@ -206,19 +208,21 @@ function get_params(config::Config)::Params
         parms_dict[:THETA] = theta
         a, b, c = bank[!, :A], bank[!, :B], bank[!, :C]
         parms_dict[:K] = length(theta)
-
         p = [Pr(t, b, a, c; d=1.0) for t in theta]
         parms_dict[:P] = reduce(hcat, p)
-
-        info = [item_information(t, b, a, c) for t in theta]
-        parms_dict[:INFO] = reduce(hcat, info)
 
         if haskey(parms_dict, :TAU)
             parms_dict[:TAU] = eval(Meta.parse(join(["[", join(parms_dict[:TAU], " "), "]"])))
         end
         parms_dict[:TAU] = get(parms_dict, :TAU, calc_tau(parms_dict[:P], parms_dict[:R], parms_dict[:K], parms_dict[:N], bank))
         parms_dict[:R] = min(parms_dict[:R], size(parms_dict[:TAU], 1))
-        parms_dict[:TAU_INFO] = get(parms_dict, :TAU_INFO, calc_info_tau(parms_dict[:INFO], parms_dict[:K], parms_dict[:N]))
+
+        if method in ["ICC", "ICC2", "ICC3"]
+           info = [item_information(t, b, a, c) for t in theta]
+           parms_dict[:INFO] = reduce(hcat, info)
+           parms_dict[:TAU_INFO] = get(parms_dict, :TAU_INFO, calc_info_tau(parms_dict[:INFO], parms_dict[:K], parms_dict[:N]))
+        end
+
         parms_dict[:DELTA] = nothing
     elseif method == "TC"
         # parms_dict[:DELTA] = delta(bank[!, :DIF], bank[!, :CORR])

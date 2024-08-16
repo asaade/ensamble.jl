@@ -13,12 +13,12 @@ solver: cplex
 anchorNumber: 4
 
 # Cantidad de información que imprime el programa
-verbose: True
+verbose: 1
 
 # Parámetros
 forms:
 # Número de versiones para ensamblar
-     F: 10
+     F: 8
 # Modelo para el ensamble (ICC, ICC2, TCC o TC)
      method: TCC
 # Número de potencias para el modelo de igualación TCC

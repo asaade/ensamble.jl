@@ -6,18 +6,6 @@ function constraint_items_per_version(model::Model, parameters::Params, minItems
 end
 
 
-function constraint_prevent_overlap!(model::Model, parameters::Params)
-    if parameters.anchor_number == 0
-        x = model[:x]
-        items, forms = size(x)
-        if forms > 1
-            @constraint(model, [i=1:items], sum([x[i, f] for f in 1:forms]) <= 1);
-        end
-    end
-    return model
-end
-
-
 ## Incluye un número de reactivos ente minItems y maxItems de la lista para la prueba sombra
 function constraint_item_count_shadow_aux(model::Model, parameters::Params, selected, minItems::Int, maxItems::Int=minItems)
     shadow_test_size = parameters.shadow_test_size
@@ -296,15 +284,26 @@ function constraint_add_anchor!(model::Model, parameters::Params)
 end
 
 
+function constraint_prevent_overlap!(model::Model, parameters::Params)
+    if parameters.anchor_number == 0
+        x = model[:x]
+        items, forms = size(x)
+        if forms > 1
+            @constraint(model, [i=1:items], sum([x[i, f] for f in 1:forms]) <= 1);
+        end
+    end
+    return model
+end
 
-function constraint_max_use(model::Model, parameters::Params, overlap=0)
+
+function constraint_max_use(model::Model, parameters::Params, overlap=1)
     if parameters.anchor_number == 0
         x = model[:x]
         items, forms = size(x)
         forms -= parameters.shadow_test_size > 0 ? 1 : 0
 
         if forms > 1
-            @constraint(model, [i=1:items], sum([x[i, f] for f in 1:forms]) <= 1 + overlap);
+            @constraint(model, [i=1:items], sum([x[i, f] for f in 1:forms]) <= overlap);
         end
     end
     return model

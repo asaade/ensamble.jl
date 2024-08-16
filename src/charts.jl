@@ -91,10 +91,12 @@ function plot_characteristic_curves_and_simulation(parameters, results::DataFram
     # Generate the plot data
     characteristic_curves = generate_characteristic_curves(parameters, results, theta_range)
     information_curves = generate_information_curves(parameters, results, theta_range)
-    simulation_data = generate_results_simulation(parameters, results, Normal(0.0, 1.0))
+    simulation_data1 = generate_results_simulation(parameters, results, Normal(0.0, 1.0))
+    simulation_data2 = generate_results_simulation(parameters, results, Normal(-1.0, 1.0))
+    simulation_data3 = generate_results_simulation(parameters, results, Normal(1.0, 0.5))
 
     # Set up the plot aesthetics
-    theme(:orange)
+    theme(:ggplot2)
     gr(size=(900, 750))
 
     # Create subplots
@@ -117,12 +119,18 @@ function plot_characteristic_curves_and_simulation(parameters, results::DataFram
                                      grid=(:on, :olivedrab, :dot, 1, 0.9),
                                      tickfontsize=11)
 
-    p3 = @df simulation_data plot(1:size(simulation_data, 1), cols(),
-                                  title="Observed Score Distribution",
-                                  xlabel="Item", ylabel="Score",
-                                  linewidth=2, label="",
-                                  grid=(:on, :olivedrab, :dot, 1, 0.9),
-                                  tickfontsize=11)
+    p3 = @df simulation_data1 plot(1:size(simulation_data1, 1), cols(),
+                                   title="Expected Observed Scores\nfor N(-1, 1), N(0, 1), N(1, 0.5)",
+                                   xlabel="Item", ylabel="Score",
+                                   linewidth=3, label="",
+                                   grid=(:on, :olivedrab, :dot, 1, 0.9),
+                                   tickfontsize=11)
+    p3 = @df simulation_data2 plot!(1:size(simulation_data2, 1), cols(),
+                                  linewidth=1, label="")
+
+    p3 = @df simulation_data3 plot!(1:size(simulation_data3, 1), cols(),
+                                  linewidth=1, label="")
+
 
     # Combine the plots into a single image with subplots
     combined_plot = plot(p1, p2, p3, layout=(2, 2), size=(900, 750))

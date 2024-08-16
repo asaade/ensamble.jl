@@ -16,6 +16,7 @@ struct Config
     tcc_file::String
     plot_file::String
     solver::String
+    verbose::Int
 end
 
 # Define a struct for the parameters
@@ -38,6 +39,7 @@ mutable struct Params
     relative_target_weights::VectorOrMissing
     relative_target_points::VectorOrMissing
     delta::MatrixOrMissing
+    verbose::Int
 end
 
 # struct Config

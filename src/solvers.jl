@@ -13,7 +13,7 @@ function load_solver_config(yaml_file::String)
     return config
 end
 
-function configure_solver!(model::Model, solver_name::String="cplex")
+function configure_solver!(model::Model, parameters::Params, solver_name::String="cplex")
     config = load_solver_config("data/solver_config.yaml")
     solver_options = config[solver_name]
 
@@ -44,10 +44,12 @@ function configure_solver!(model::Model, solver_name::String="cplex")
         end
     end
 
+    parameters.verbose <= 1 && set_silent(model)
+
     return model
 end
 
 # # Example usage:
 
 # model = Model()
-# configure_solver!(model, "scip")
+# configure_solver!(model, parameters, "scip")
