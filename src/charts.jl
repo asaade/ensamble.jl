@@ -96,13 +96,15 @@ function plot_characteristic_curves_and_simulation(parameters, results::DataFram
     simulation_data3 = generate_results_simulation(parameters, results, Normal(1.0, 0.5))
 
     # Set up the plot aesthetics
-    theme(:ggplot2)
-    gr(size=(900, 750))
+    theme(:sand)
+    gr(size=(900, 550))
+
+    versions = size(results, 2)
 
     # Create subplots
     p1 = @df characteristic_curves plot(theta_range, cols(),
-                                        title="Characteristic Curves",
-                                        xlabel="Theta", ylabel="Score",
+                                        title="Characteristic Curves for $versions versions",
+                                        xlabel="θ", ylabel="Score",
                                         linewidth=2, label="",
                                         grid=(:on, :olivedrab, :dot, 1, 0.9),
                                         tickfontsize=12)
@@ -111,25 +113,26 @@ function plot_characteristic_curves_and_simulation(parameters, results::DataFram
                       parameters.tau[1, :],
                       label="", markersize=5)
     end
-
     p2 = @df information_curves plot(theta_range, cols(),
                                      title="Information Curves",
-                                     xlabel="Theta", ylabel="Information",
+                                     xlabel="θ", ylabel="Information",
                                      linewidth=2, label="",
                                      grid=(:on, :olivedrab, :dot, 1, 0.9),
                                      tickfontsize=11)
 
     p3 = @df simulation_data1 plot(1:size(simulation_data1, 1), cols(),
                                    title="Expected Observed Scores\nfor N(-1, 1), N(0, 1), N(1, 0.5)",
-                                   xlabel="Item", ylabel="Score",
+                                   xlabel="Items", ylabel="Percentage",
                                    linewidth=3, label="",
                                    grid=(:on, :olivedrab, :dot, 1, 0.9),
                                    tickfontsize=11)
-    p3 = @df simulation_data2 plot!(1:size(simulation_data2, 1), cols(),
-                                  linewidth=1, label="")
+    if parameters.method != "ICC3"
+        p3 = @df simulation_data2 plot!(1:size(simulation_data2, 1), cols(),
+                                        linewidth=1, label="")
 
-    p3 = @df simulation_data3 plot!(1:size(simulation_data3, 1), cols(),
-                                  linewidth=1, label="")
+        p3 = @df simulation_data3 plot!(1:size(simulation_data3, 1), cols(),
+                                        linewidth=1, label="")
+    end
 
 
     # Combine the plots into a single image with subplots
@@ -139,4 +142,5 @@ function plot_characteristic_curves_and_simulation(parameters, results::DataFram
 
     # Save the combined plot
     savefig(combined_plot, plot_file)
+    display(combined_plot)
 end

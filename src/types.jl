@@ -24,6 +24,7 @@ mutable struct Params
     n::Int
     num_forms::Int
     max_items::Int
+    # item_max_use::VectorOrMissing
     f::Int
     k::Int
     r::Int

@@ -55,7 +55,10 @@ end
 Initialize the optimization model, adding variables, the objective function,
 and constraints based on the provided parameters.
 """
-function initialize_model!(model::Model, parameters::Params, constraints::Dict{String, Constraint})
+function initialize_model!(model::Model,
+                           parameters::Params,
+                           original_parameters::Params,
+                           constraints::Dict{String, Constraint})
     println(INITIALIZING_MODEL_MESSAGE)
     num_items = size(parameters.bank, 1)
     num_forms = parameters.num_forms + (parameters.shadow_test_size > 0 ? 1 : 0)
@@ -64,7 +67,7 @@ function initialize_model!(model::Model, parameters::Params, constraints::Dict{S
     @variable(model, x[1:num_items, 1:num_forms], Bin)
 
     set_objective!(model, parameters)
-    apply_constraints!(model, parameters, constraints)
+    apply_constraints!(model, parameters, original_parameters, constraints)
     write_to_file(model, MODEL_FILE)
 
     return model
@@ -75,8 +78,11 @@ end
 
 Apply the constraints from the configuration to the optimization model.
 """
-function apply_constraints!(model::Model, parameters::Params, constraints::Dict{String, Constraint})
-    apply_objective!(model, parameters)
+function apply_constraints!(model::Model,
+                            parameters::Params,
+                            original_parameters::Params,
+                            constraints::Dict{String, Constraint})
+    apply_objective!(model, parameters, original_parameters)
     constraint_prevent_overlap!(model, parameters)
     constraint_add_anchor!(model, parameters)
 
@@ -103,19 +109,19 @@ function set_objective!(model::Model, parameters::Params)
 end
 
 """
-    apply_objective!(model::Model, parameters::Params)
+    apply_objective!(model::Model, parameters::Params, original_parameters)
 
 Apply the objective function specific to the method being used.
 """
-function apply_objective!(model::Model, parameters::Params)
+function apply_objective!(model::Model, parameters::Params, original_parameters::Params)
     if parameters.method in ["TCC"]
         objective_match_characteristic_curve!(model, parameters)
     elseif parameters.method in ["ICC"]
         objective_match_information_curve!(model, parameters)
     elseif parameters.method == "ICC2"
-        objective_info_relative!(model, parameters)
+        objective_info_relative(model, parameters)
     elseif parameters.method == "ICC3"
-        objective_info_relative2!(model, parameters)
+        objective_info_relative2(model, parameters, original_parameters)
     elseif parameters.method == "TC"
         objective_match_items(model, parameters)
     else

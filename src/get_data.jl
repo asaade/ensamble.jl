@@ -30,6 +30,7 @@ function Params(parms_dict::Dict{Symbol, Any})
         parms_dict[:N],
         parms_dict[:F],
         parms_dict[:MAXN],
+        # zeros(size(parms_dict[:BANK], 1)),
         parms_dict[:F],
         parms_dict[:K],
         parms_dict[:R],

@@ -19,7 +19,7 @@ const OPTIMIZATION_FAILED_MESSAGE = "Optimization failed"
 const LOADING_CONFIGURATION_MESSAGE = "Loading configuration..."
 const RUNNING_OPTIMIZATION_MESSAGE = "Running optimization..."
 const VERSIONS_ASSEMBLED_MESSAGE = "Total versions assembled: "
-const TOLERANCE_LABEL = "Tolerance: "
+const TOLERANCE_LABEL = "Value: "
 const SEPARATOR = "====================================="
 const SAVE_FILE_NAME = "data/versiones.csv"
 
@@ -116,9 +116,9 @@ information for the remaining items based on the method used.
 function remove_used_items!(parameters::Params, used_items)
     remaining = setdiff(1:length(parameters.bank.CLAVE), used_items)
     parameters.bank = parameters.bank[remaining, :]
-    if parameters.method in ["TCC", "ICC", "ICC2"]
+    if parameters.method in ["TCC", "ICC", "ICC2", "ICC3"]
         parameters.method in ["TCC"] && (parameters.p = parameters.p[remaining, :])
-        parameters.method in ["ICC", "ICC2"] && (parameters.info = parameters.info[remaining, :])
+        parameters.method in ["ICC", "ICC2", "ICC3"] && (parameters.info = parameters.info[remaining, :])
     end
     return parameters
 end
@@ -177,7 +177,7 @@ function handle_anchor_items(parameters::Params, original_parameters::Params)
 
         if parameters.method in ["TCC"]
             parameters.p = original_parameters.p[parameters.bank.INDEX, :]
-        elseif parameters.method in ["ICC", "ICC2"]
+        elseif parameters.method in ["ICC", "ICC2", "ICC3"]
             parameters.info = original_parameters.info[parameters.bank.INDEX, :]
         end
     end
@@ -195,6 +195,7 @@ function save_forms(parameters::Params, results::DataFrame, file_name::String)
         bank[!, Symbol(v)] = map(x -> x == 1 ? CHECKMARK : "", bank.CLAVE .∈ Ref(skipmissing(results[:, v])))
     end
     write_results_to_file(bank, file_name)
+    write_results_to_file(results, "data/results.csv")
 end
 
 """
@@ -217,7 +218,7 @@ function main(config_file::String=CONFIG_FILE)
 
         model = Model()
         configure_solver!(model, parameters, config.solver)
-        initialize_model!(model, parameters, constraints)
+        initialize_model!(model, parameters, original_parameters, constraints)
 
         if run_optimization(model)
             results = process_and_store_results!(model, parameters, results)

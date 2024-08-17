@@ -216,7 +216,7 @@ function objective_match_information_curve!(model::Model, parameters::Params)
 end
 
 ## Tolerancia de y en todos los puntos k de la función de información
-function objetive_info_relative!(model::Model, parameters::Params)
+function objective_info_relative(model::Model, parameters::Params)
     R = parameters.relative_target_weights;
     K = parameters.k
     info = parameters.info
@@ -236,12 +236,14 @@ function objetive_info_relative!(model::Model, parameters::Params)
     return model
 end
 
-## Tolerancia de y en todos los puntos k de la función de información
-function objetive_info_relative2!(model::Model, parameters::Params)
+## Tolerancia de y en puntos variables k de la función de información
+function objective_info_relative2(model::Model,
+                                  parameters::Params,
+                                  original_parameters::Params)
     R = parameters.relative_target_weights;
-    parameters.k = mod(parameters.k, original_parameters.k) + 1
+    k = mod(parameters.k, original_parameters.k) + 1
 
-    k = parameters.k
+    parameters.k = k
     info = parameters.info
     x, y = model[:x], model[:y]
     (items, forms)  = size(x)
