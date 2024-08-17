@@ -15,15 +15,6 @@ const MODEL_FILE = "data/model.lp"
 const INITIALIZING_MODEL_MESSAGE = "Initializing optimization model..."
 const APPLYING_CONSTRAINT_MESSAGE = "Applying constraint: "
 
-# Define a struct for holding constraint information
-struct Constraint
-    id::String
-    type::InlineString
-    condition::Function
-    lb::Int
-    ub::Int
-end
-
 """
     read_constraints(file_path::String) -> Dict{String, Constraint}
 
@@ -101,7 +92,7 @@ Set the objective function based on the method provided in parameters.
 """
 function set_objective!(model::Model, parameters::Params)
     y = model[:y]
-    if parameters.method in ["ICC2", "ICC3"]
+    if parameters.method in ["TIC2", "TIC3"]
         @objective(model, Max, y)
     else
         @objective(model, Min, y)
@@ -116,11 +107,11 @@ Apply the objective function specific to the method being used.
 function apply_objective!(model::Model, parameters::Params, original_parameters::Params)
     if parameters.method in ["TCC"]
         objective_match_characteristic_curve!(model, parameters)
-    elseif parameters.method in ["ICC"]
+    elseif parameters.method in ["TIC"]
         objective_match_information_curve!(model, parameters)
-    elseif parameters.method == "ICC2"
+    elseif parameters.method == "TIC2"
         objective_info_relative(model, parameters)
-    elseif parameters.method == "ICC3"
+    elseif parameters.method == "TIC3"
         objective_info_relative2(model, parameters, original_parameters)
     elseif parameters.method == "TC"
         objective_match_items(model, parameters)

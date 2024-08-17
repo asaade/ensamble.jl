@@ -1,5 +1,34 @@
 using JuMP
 
+# Define a struct for holding constraint information
+struct Constraint
+    id::String
+    type::InlineString
+    condition::Function
+    lb::Int
+    ub::Int
+end
+
+function apply_individual_constraint!(model::Model, parameters::Params, constraint::Constraint)
+    lb, ub = constraint.lb, constraint.ub
+    bank = parameters.bank
+    items = 1:size(bank, 1)
+
+    if constraint.type == "TEST"
+        constraint_items_per_version(model, parameters, lb, ub)
+    elseif constraint.type == "NUMBER"
+        condition = Base.invokelatest(constraint.condition, bank)
+        selected_items = items[condition]
+        constraint_item_count(model, parameters, selected_items, lb, ub)
+    elseif constraint.type == "SUM"
+        item_vals = Base.invokelatest(constraint.condition, bank)
+        constraint_item_sum(model, parameters, item_vals, lb, ub)
+    else
+        error("Unknown constraint type: ", constraint.type)
+    end
+end
+
+
 ## Número de reactivos totales (Items) en cada versión (forms)
 function constraint_items_per_version(model::Model, parameters::Params, minItems::Int64, maxItems::Int64=minItems)
     constraint_item_count(model::Model, parameters::Params, 1:size(parameters.bank, 1), minItems::Int64, maxItems::Int64)

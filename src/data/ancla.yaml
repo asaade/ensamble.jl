@@ -16,7 +16,7 @@ forms:
   F: 4
   # Número de reactivos totales por versión
   N: 24
-  # Modelo para el ensamble (ICC, TCC o TC)
+  # Modelo para el ensamble (TIC, TCC o TC)
   method: TCC
   # Número de potencias para el modelo de igualación TCC
   R: 3

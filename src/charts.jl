@@ -93,11 +93,11 @@ function plot_characteristic_curves_and_simulation(parameters, results::DataFram
     information_curves = generate_information_curves(parameters, results, theta_range)
     simulation_data1 = generate_results_simulation(parameters, results, Normal(0.0, 1.0))
     simulation_data2 = generate_results_simulation(parameters, results, Normal(-1.0, 1.0))
-    simulation_data3 = generate_results_simulation(parameters, results, Normal(1.0, 0.5))
+    simulation_data3 = generate_results_simulation(parameters, results, Normal(1.0, 0.7))
 
     # Set up the plot aesthetics
     theme(:sand)
-    gr(size=(900, 550))
+    gr(size=(900, 700))
 
     versions = size(results, 2)
 
@@ -121,22 +121,22 @@ function plot_characteristic_curves_and_simulation(parameters, results::DataFram
                                      tickfontsize=11)
 
     p3 = @df simulation_data1 plot(1:size(simulation_data1, 1), cols(),
-                                   title="Expected Observed Scores\nfor N(-1, 1), N(0, 1), N(1, 0.5)",
+                                   title="Expected Observed Scores\nfor N(-1, 1), N(0, 1), N(1, 0.7)",
                                    xlabel="Items", ylabel="Percentage",
-                                   linewidth=3, label="",
+                                   linewidth=2, label="",
                                    grid=(:on, :olivedrab, :dot, 1, 0.9),
                                    tickfontsize=11)
-    if parameters.method != "ICC3"
+    if parameters.method != "TIC3"
         p3 = @df simulation_data2 plot!(1:size(simulation_data2, 1), cols(),
-                                        linewidth=1, label="")
+                                        linewidth=2, label="")
 
         p3 = @df simulation_data3 plot!(1:size(simulation_data3, 1), cols(),
-                                        linewidth=1, label="")
+                                        linewidth=2, label="")
     end
 
 
     # Combine the plots into a single image with subplots
-    combined_plot = plot(p1, p2, p3, layout=(2, 2), size=(900, 750))
+    combined_plot = plot(p1, p2, p3, layout=(2, 2), size=(900, 700))
 
     write_results_to_file(hcat(theta_range, characteristic_curves))
 

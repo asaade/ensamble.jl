@@ -8,20 +8,8 @@ include("solvers.jl")
 include("stats_functions.jl")
 include("model_initializer.jl")
 include("charts.jl")
+include("constants.jl")
 
-# Constants
-const CONFIG_FILE = "data/config.yaml"
-const CHECKMARK = " ✓"
-const MISSING_VALUE_FILLER = missing
-const COMMON_ITEMS_MATRIX_TITLE = "\nCommon Items Matrix:"
-const OPTIMIZATION_RESULTS_TITLE = "\nOptimization Results:"
-const OPTIMIZATION_FAILED_MESSAGE = "Optimization failed"
-const LOADING_CONFIGURATION_MESSAGE = "Loading configuration..."
-const RUNNING_OPTIMIZATION_MESSAGE = "Running optimization..."
-const VERSIONS_ASSEMBLED_MESSAGE = "Total versions assembled: "
-const TOLERANCE_LABEL = "Value: "
-const SEPARATOR = "====================================="
-const SAVE_FILE_NAME = "data/versiones.csv"
 
 # Print functions
 function print_title_and_separator(title::String)
@@ -69,8 +57,8 @@ end
 function display_final_results(parameters::Params, results::DataFrame)
     items_used = reduce(vcat, eachcol(results)) |> unique |> length
     println(VERSIONS_ASSEMBLED_MESSAGE, size(results, 2))
-    println("Items used (without anchor): ", items_used)
-    println("Remaining items (includes anchor): ", length(parameters.bank.CLAVE) - items_used)
+    println(ITEMS_USED_MESSAGE, items_used)
+    println(REMAINING_ITEMS_MESSAGE, length(parameters.bank.CLAVE) - items_used)
     display_common_items(results)
 end
 
@@ -116,9 +104,9 @@ information for the remaining items based on the method used.
 function remove_used_items!(parameters::Params, used_items)
     remaining = setdiff(1:length(parameters.bank.CLAVE), used_items)
     parameters.bank = parameters.bank[remaining, :]
-    if parameters.method in ["TCC", "ICC", "ICC2", "ICC3"]
+    if parameters.method in ["TCC", "TIC", "TIC2", "TIC3"]
         parameters.method in ["TCC"] && (parameters.p = parameters.p[remaining, :])
-        parameters.method in ["ICC", "ICC2", "ICC3"] && (parameters.info = parameters.info[remaining, :])
+        parameters.method in ["TIC", "TIC2", "TIC3"] && (parameters.info = parameters.info[remaining, :])
     end
     return parameters
 end
@@ -177,7 +165,7 @@ function handle_anchor_items(parameters::Params, original_parameters::Params)
 
         if parameters.method in ["TCC"]
             parameters.p = original_parameters.p[parameters.bank.INDEX, :]
-        elseif parameters.method in ["ICC", "ICC2", "ICC3"]
+        elseif parameters.method in ["TIC", "TIC2", "TIC3"]
             parameters.info = original_parameters.info[parameters.bank.INDEX, :]
         end
     end

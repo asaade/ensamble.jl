@@ -94,7 +94,7 @@ function clean_items_bank!(config::Config, bank::DataFrame)::DataFrame
 
     method = config.forms[:METHOD]
 
-    if method in ["TCC", "ICC", "ICC2", "ICC3"]
+    if method in ["TCC", "TIC", "TIC2", "TIC3"]
         clean_IRT!(bank)
     elseif method == "TC"
         clean_TC!(bank)
@@ -199,13 +199,13 @@ function get_params(config::Config)::Params
     parms_dict[:VERBOSE] = config.verbose
     method = parms_dict[:METHOD]
 
-    if method in ["ICC2", "ICC3"]
+    if method in ["TIC2", "TIC3"]
         theta = parms_dict[:RELATIVETARGETPOINTS]
     else
         theta = parms_dict[:THETA]
     end
 
-    if method in ["TCC", "ICC", "ICC2", "ICC3"]
+    if method in ["TCC", "TIC", "TIC2", "TIC3"]
         parms_dict[:THETA] = theta
         a, b, c = bank[!, :A], bank[!, :B], bank[!, :C]
         parms_dict[:K] = length(theta)
@@ -218,7 +218,7 @@ function get_params(config::Config)::Params
         parms_dict[:TAU] = get(parms_dict, :TAU, calc_tau(parms_dict[:P], parms_dict[:R], parms_dict[:K], parms_dict[:N], bank))
         parms_dict[:R] = min(parms_dict[:R], size(parms_dict[:TAU], 1))
 
-        if method in ["ICC", "ICC2", "ICC3"]
+        if method in ["TIC", "TIC2", "TIC3"]
            info = [item_information(t, b, a, c) for t in theta]
            parms_dict[:INFO] = reduce(hcat, info)
            parms_dict[:TAU_INFO] = get(parms_dict, :TAU_INFO, calc_info_tau(parms_dict[:INFO], parms_dict[:K], parms_dict[:N]))

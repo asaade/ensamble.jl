@@ -18,9 +18,9 @@ verbose: 1
 # Parámetros
 forms:
 # Número de versiones para ensamblar
-     F: 3
-# Modelo para el ensamble (ICC, ICC2, TCC o TC)
-     method: ICC3
+     F: 10
+# Modelo para el ensamble (TIC, TIC2, TCC o TC)
+     method: TCC
 # Número de potencias para el modelo de igualación TCC
      R: 2
 # Puntos en la escala para igualar (incluye puntos de corte)
