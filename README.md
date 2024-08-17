@@ -4,13 +4,13 @@ Automatic Test Assembly (ATA)  in julia and a MIP solver
 
 ## The Software
 
-This repository presents an example of how the process of selecting items for a test can be implemented using free software. For now, it is only an example and is not recommended for use in high-stakes applications.
+This repository presents an example of how the process of selecting items for a test can be implemented using free software. For now, it is only an early and incomplete example and is not recommended for use in high-stakes applications.
 
 ## Overview
 
 In the psychometric tradition of standardized testing, a single version of a test is often deemed sufficient. This is "the" test, the result of months or even years of research, trial, and error. Once this test is approved, it is administered to a reference population and a standard is established, which further serves to classify individuals relative to this original population, the "normative" group. However, there are numerous reasons why this approach may not be practical in educational contexts. Consider the implications if the same version of the SAT were used repeatedly—year after year, or for every new cohort of students.
 
-Assembling two or more versions of a test is exponentially more complex than creating just one. Not only must the content specifications be meticulously adhered to —already a contentious task— but the difficulty levels of the items must also be comparable. Otherwise, one version may be easier than another, with potentially severe consequences for test-takers. It would be highly inequitable for a student's score to depend on which version they received, as it is simply unfair for one to fail entry into a university because they took the harder version.
+Assembling two or more forms of a test is exponentially more complex than creating just one. Not only must the content specifications be meticulously adhered to —already a contentious task— but the difficulty levels of the items must also be comparable. Otherwise, one form may be easier than another, with potentially severe consequences for test-takers. It would be highly inequitable for a student's score to depend on which version they received, as it is simply unfair for one to fail entry into a university because they took the harder version.
 
 Item Response Theory (IRT) offers a common solution to this problem, Once the statistical characteristics of the items are known from prior testing, their future performance can be predicted with some accuracy. This allows for the assembly of a new test version with a reasonably clear idea of how it will perform. Classical Test Theory can also be used, but it is more challenging to obtain difficulty estimates on the same scale, leading to potentially unexpected results.
 
@@ -38,11 +38,11 @@ The idea is that if the test constructor defines the desired characteristics of 
 
 ## Disadvantages
 
-- Rigorous Specifications Required: Although specification tables and assembly rules should always exist, they are sometimes incomplete or allow too much discretion to the test constructor. While this flexibility is appreciated by many who view test assembly as an art, automated assembly eliminates this margin. Significant effort is required to ensure that all rules are well-defined, detailed, and codified so that the machine can process them effectively. Even tolerances must be explicit.
+- Rigorous Specifications Required: Although specification tables and assembly rules should always exist, they are sometimes incomplete or allow too much discretion to the test constructor. While this flexibility is appreciated by many who view test assembly as an art, automated assembly eliminates this margin. Good or bad as this may be, significant effort is required in ATA to ensure that all rules are well-defined, detailed, and codified so that the machine can process them effectively. Even tolerances must be explicit.
 
 - Possible Non-Solutions: The program may not always find a satisfactory solution, especially when assembly conditions are highly complex or the rules are contradictory, which happens often. In such cases, additional effort is needed to identify and correct the problems after each failed attempt.
 
-- Uncertain Outcomes: Like manual processes, the final versions do not always perform exactly as expected in operational use. Whether manual or automatic, assembly is not a magical, infallible solution, and post-application checks, as well as routine scaling or equating procedures, are always necessary.
+- Uncertain Outcomes: Like manual processes, the final versions do not always perform as expected in operational use. Whether manual or automatic, assembly is not a magical, infallible solution, and quality assurance methods and post-application checks, as well as routine scaling or equating procedures, are always necessary.
 
 ## Calibrating the Item Bank
 
@@ -50,11 +50,13 @@ This step is not strictly part of the assembly process, but it is a fundamental 
 
 ## Optimization
 
-There is specialized optimization software that can be relatively easily adapted for our needs. The most common technique is "Mixed-Integer Programming" (MIP), which is used here. This software tends to find the best combinations, although in complex cases it may take longer or fail to reach a solution. For this reason, other methodologies are also sometimes used, such as "simulated annealing," genetic algorithms, constraint programming, network-flow algorithms, and even others that use Markov chains. Linear optimization programs tend to be more precise, especially when additional constraints are involved (such as including various topics, item types, or considering the presence of friend and enemy items).
+There is a number of general optimization software that can be easily adapted for our needs. The most common technique is "Mixed-Integer Programming" (MIP), which is used here. This software tends to find the best combinations, although in complex cases it may take too long or fail to reach a solution. For this reason, other methodologies are sometimes used, such as simulated annealing, genetic algorithms, constraint programming, network-flow algorithms, and even  Markov chains. Linear optimization programs tend to be more precise and efficient, especially when additional constraints are involved (such as including various topics, item types, or considering the presence of friend and enemy items).
 
 ## Julia and JuMP
 
-Julia is a high-level language that compiles to very efficient code and can be used interactively, which facilitates work. JuMP, on the other hand, is a Julia-based package that provides tools for formulating optimization models to be used with a long list of solvers (commercial and open source). In this case, the models were tested with almost identical results using:
+Julia is a high-level language that compiles to very efficient code and can be used interactively, which facilitates work. It can be compared to Python in simplicty and easy of use and, in many situations, it has a performance similar to the fastes compiled programs. It is well suited for use in numerical and data analysis problems.
+
+JuMP, on the other hand, is a Julia-based package that provides tools for formulating optimization models to be used with a long list of solvers (commercial and open source). In this case, the models were tested with almost identical results using:
 
 - IBM CPLEX
 - Cbc (coin-or)
@@ -62,4 +64,8 @@ Julia is a high-level language that compiles to very efficient code and can be u
 - GLPK
 - HiGHS
 
-There are other ways to achieve this. In R, for example, the package TestDesign seems to be a good solution that saves several steps and requires little programming. Other examples include eatATA, ATA, xxIRT, dexterMST, catR, mstR—all of them in R, perhaps the most popular language for this purpose. Some of these packages are designed for assembling adaptive tests. In Julia, Python, and SAS, there are interesting, though somewhat unpolished, solutions that require at least basic knowledge of the underlying programming languages. In a way, these can be considered experimental libraries. Major testing and assessment agencies typically develop their own in-house solutions.
+## Alternatives
+
+There are other ways to achieve this. In R, for example, the package TestDesign seems to be a good solution that saves several steps and requires little programming. Other examples include eatATA, ATA, xxIRT, dexterMST, catR, mstR —all of them in R, perhaps the most popular language for this purpose. Some of these packages are designed for assembling adaptive tests.
+
+In Julia, Python, and SAS, there are interesting, though somewhat unpolished, solutions that require at least basic knowledge of the underlying programming languages. In a way, these can be considered experimental libraries. Major testing and assessment agencies typically develop their own in-house solutions.
