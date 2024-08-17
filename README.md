@@ -1,73 +1,65 @@
 # ensamble.jl
+
 Automatic Test Assembly (ATA)  in julia and a MIP solver
 
-## Presentación {#presentación}
+## The Software
 
-En la tradición psicométrica de los exámenes estandarizados, una versión de prueba es suficiente. Esta es "la" prueba, resultado de meses o años de estudios, de intentos y de errores. Cuando "la" prueba finalmentes está lista, se aplica a una población de referencia y se establece un estándar, la "norma", que servirá para clasificar a quienes la usan con respecto a esa población original. Sin embargo, hay muchas razones que inhiben esta práctica cuando se trabaja en un contexto educativo. Imaginemos lo que pasaría si usáramos la misma versión de prueba siempre; que con ella evaluáramos a los estudiantes que egresan cada año o a los que quieren ingresar en cada generación.
+This repository presents an example of how the process of selecting items for a test can be implemented using free software. For now, it is only an example and is not recommended for use in high-stakes applications.
 
-Ensamblar dos o más versiones de una prueba es exponencialmente más complicado que hacer una sola. No solamente hay que completar correctamente la tabla de contenidos conforme al diseño, lo cual en sí mismo controvertido, sino que también hay que procurar que las dificultades de sus reactivos sean comparables entre sí. De otra manera, tendremos una prueba más fácil que otra, con consecuencias que pueden llegar a ser muy graves para los sustentantes. Sería muy poco equitativo que la calificación de cada uno dependiera de la versión que le tocó, pues es sencillamente injusto que un sustentante no logre entrar a la universidad porque respondió la versión difícil.
+## Overview
 
-La Teoría de Respuesta al Ítem o al reactivo (IRT, por sus siglas en inglés o TRI en español) es una solución común para resolver esto, pues una vez que se conocen las características estadísticas de los reactivos a partir de ensayos anteriores, se puede anticipar cómo funcionarán en el futuro. Con esto se puede ensamblar una versión con una idea más o menos clara de cómo funcionará. La Teoría Clásica de las pruebas puede servir, pero es más difícil contar con estimaciones de dificultad en la misma escala, por lo que el resultado puede diferir de lo esperado. Una vez calibrado el banco de reactivos, en un proceso de prueba y error, se van combinando hasta llegar al objetivo de tener versiones iguales dentro de cierto margen de tolerancia.
+In the psychometric tradition of standardized testing, a single version of a test is often deemed sufficient. This is "the" test, the result of months or even years of research, trial, and error. Once this test is approved, it is administered to a reference population and a standard is established, which further serves to classify individuals relative to this original population, the "normative" group. However, there are numerous reasons why this approach may not be practical in educational contexts. Consider the implications if the same version of the SAT were used repeatedly—year after year, or for every new cohort of students.
 
-Para lograr versiones similares, el procedimiento tradicional es iterativo, combinando los reactivos disponibles en el banco, como piezas de rompecabezas, de acuerdo con sus contenidos y dificultades previamente estimadas, hasta lograr el objetivo.
+Assembling two or more versions of a test is exponentially more complex than creating just one. Not only must the content specifications be meticulously adhered to —already a contentious task— but the difficulty levels of the items must also be comparable. Otherwise, one version may be easier than another, with potentially severe consequences for test-takers. It would be highly inequitable for a student's score to depend on which version they received, as it is simply unfair for one to fail entry into a university because they took the harder version.
 
-Aquí también las computadoras han traído ventajas. El proceso manual es tedioso; puede tardar varias horas y en algunos casos hasta días, especialmente cuando se intenta ensamblar varios cuadernillos con decenas de reactivos cada uno, poniendo y quitando hasta lograr lo que se busca. Para facilitar el trabajo, y de paso minimizar los errores que resultan de hacerlo a mano, de un tiempo para acá se ha aprovechado el  poder de los métodos de "optimización" que hacen posible hacer el ensamble de las versiones de una manera relativamente automática[^fn:1].
+Item Response Theory (IRT) offers a common solution to this problem, Once the statistical characteristics of the items are known from prior testing, their future performance can be predicted with some accuracy. This allows for the assembly of a new test version with a reasonably clear idea of how it will perform. Classical Test Theory can also be used, but it is more challenging to obtain difficulty estimates on the same scale, leading to potentially unexpected results.
 
-La idea es que si el elaborador establece de manera detallada las características que se desean en la prueba, incluyendo los temas y contenidos necesarios, se puede dejar que la máquina elija entre las mejores combinaciones.
+Traditionally, this process is iterative —manually combining available items from the bank like puzzle pieces according to their content and estimated difficulties, until the objective is met.
 
+Computers have also brought significant advantages to this process. Manual assembly is tedious; it can take hours, or even days in some cases, especially when assembling multiple booklets with dozens of items each. This involves a process of adding and removing items until the desired outcome is reached. To ease this burden and minimize the errors that result from manual processes, optimization methods have increasingly been used to enable the relatively automatic assembly of test versions.
 
-## Ventajas del ensamble automático {#ventajas-del-ensamble-automático}
+The idea is that if the test constructor defines the desired characteristics of the test in detail, including the necessary topics and content, the machine can select the best combinations.
 
--   El ensamble en sí mismo se convierte en un procedimiento mucho más rápido y menos tedioso.
+(A key reference for this methodology is the book Linear Models for Optimal Test Design by Wim Van der Linden (2005). This book discusses the models covered here, as well as others applicable to different scenarios, from assembling a single test version to designing block-sampling for evaluating entire populations, and even constructing item banks for an assessment program and adaptive test design.)
 
--   Obliga a contar con especificaciones correctamente definidas y detalladas. Esto hace el proceso más objetivo y reproducible.
+## Advantages of Automatic Assembly
 
--   Permite ensamblar varias versiones simultáneamente, en vez de tener que comparar una a una. Esto también promueve un mejor aprovechamiento de los reactivos.
+- Speed and Efficiency: Test assembly becomes a much faster and less tedious process.
 
--   El proceso es lo bastante poderoso como para cumplir _objetivamente_ con _todas las restricciones_, incluso con tablas de especificaciones complejas.
+- Objective and Reproducible: It forces the creation of well-defined and detailed specifications, making the process more objective and reproducible.
 
--   Es posible ensamblar versiones específicas según las necesidades de cada aplicación. En algunos casos, incluso es posible crear y modificar la versión "al vuelo" para cada sustentante, es decir, adaptando el contenido de la prueba conforme se responde.
+- Simultaneous Version Assembly: Multiple versions can be assembled simultaneously. This also promotes better use of items.
 
--   Hace posible contar también con reportes de ensamble detallados y rápidos de un modo también automático.
+- Powerful Constraints Management: The process is robust enough to meet all constraints objectively, even with complex specification tables.
 
+- Customizable: It is possible to assemble specific versions according to the needs of each application. In some cases, it is even possible to create and modify the test version "on the fly" for each test-taker, adapting the content as they respond.
 
-## Desventajas {#desventajas}
+- Automatic Reporting: The system can generate detailed and fast assembly reports automatically.
 
--   Aunque la tabla de especificaciones y las reglas de ensamble deben existir siempre, a veces no se hace así o se deja, indebidamente, un margen de maniobra para el elaborador de la prueba. Aunque esto no es "objetivo", muchas personas encargadas de ensamblar lo aprecian y consideran que es un arte. En el caso del ensamble automático no hay este margen y debe hacerse un esfuerzo significativo para contar con todas las reglas, bien detalladas y codificadas, para que la máquina las procese y la técnica funcione. Incluso las tolerancias deben ser explícitas.
+## Disadvantages
 
--   Siempre es posible que el programa no encuentre una solución satisfactoria, sobre todo cuando las condiciones de ensamble son muy complejas o las reglas resultan contradictorias, como sucede muchas veces. En estos casos, hace falta de un esfuerzo adicional para identificar y corregir los problemas después de cada intento fallido.
+- Rigorous Specifications Required: Although specification tables and assembly rules should always exist, they are sometimes incomplete or allow too much discretion to the test constructor. While this flexibility is appreciated by many who view test assembly as an art, automated assembly eliminates this margin. Significant effort is required to ensure that all rules are well-defined, detailed, and codified so that the machine can process them effectively. Even tolerances must be explicit.
 
--   Al igual que el proceso manual, las versiones finales no siempre se comportan exactamente como se espera en la aplicación operativa. El ensamble, automático o manual, no es una solución mágica e infalible, y en todos los casos hay que llevar a cabo una comprobación después de la aplicación, así como los procedimientos de escalamiento o equiparación de rutina.
+- Possible Non-Solutions: The program may not always find a satisfactory solution, especially when assembly conditions are highly complex or the rules are contradictory, which happens often. In such cases, additional effort is needed to identify and correct the problems after each failed attempt.
 
+- Uncertain Outcomes: Like manual processes, the final versions do not always perform exactly as expected in operational use. Whether manual or automatic, assembly is not a magical, infallible solution, and post-application checks, as well as routine scaling or equating procedures, are always necessary.
 
-## El software {#el-software}
+## Calibrating the Item Bank
 
-Aquí se presenta un ejemplo de cómo puede hacerse esto con software gratuito. Por ahora no es más que un ejemplo y no se recomienda usar.
+This step is not strictly part of the assembly process, but it is a fundamental prerequisite; you cannot proceed without a well-calibrated item bank with sufficient sample data. Various specialized software packages can be used for item calibration. Some, like Winsteps, Facets, or ConQuest for the Rasch model family, have a long history in the market. For Item Response Theory, other options include Bilog, Parscale, Multilog, or FlexMIRT. There is also a growing number of packages for exploring new models, primarily developed for the R programming language, such as TAM, SIRT, MIRT, ErM, and many others available on CRAN.
 
+## Optimization
 
-### Software {#software}
+There is specialized optimization software that can be relatively easily adapted for our needs. The most common technique is "Mixed-Integer Programming" (MIP), which is used here. This software tends to find the best combinations, although in complex cases it may take longer or fail to reach a solution. For this reason, other methodologies are also sometimes used, such as "simulated annealing," genetic algorithms, constraint programming, network-flow algorithms, and even others that use Markov chains. Linear optimization programs tend to be more precise, especially when additional constraints are involved (such as including various topics, item types, or considering the presence of friend and enemy items).
 
+## Julia and JuMP
 
-#### Para calibrar el banco {#para-calibrar-el-banco}
+Julia is a high-level language that compiles to very efficient code and can be used interactively, which facilitates work. JuMP, on the other hand, is a Julia-based package that provides tools for formulating optimization models to be used with a long list of solvers (commercial and open source). In this case, the models were tested with almost identical results using:
 
-Esto no es estrictamente parte del proceso de ensamblado, pero es un requisito básico; no se puede seguir adelante sin un banco de reactivos bien calibrado con muestras suficientes. Para esto se puede utilizar cualquiera de los varios paquetes especializados para la calibración de reactivos. Algunos cuentan con una larga historia en el mercado, como Winsteps, Facets o ConQuest para la familia de modelos de Rasch. En el ámbito de la Teoría de Respuesta al Item están, entre otros, Bilog, Parscale, Multilog o FlexMIRT.  Incluso hay un número creciente de paquetes para sustituirlos y explorar nuevos modelos, principalmente los elaborados para el lenguaje estadístico R, como TAM, SIRT, MIRT, ErM y una larga lista siempre en aumento que puede encontrarse en [CRAN](https://cran.r-project.org/web/views/Psychometrics.html).
+- IBM CPLEX
+- Cbc (coin-or)
+- SCIP
+- GLPK
+- HiGHS
 
-
-#### Para la optimización {#para-la-optimización}
-
-Existe software especializado en la optimización que puede adaptarse con cierta facilidad a nuestro caso. La técnica más común se basa en la "programación mixta de enteros" (MIP en inglés), que es la que se utiliza aquí. Este software tiende a lograr las mejores combinaciones, aunque en casos complicados puede tardar más tiempo o no llegar a una solución. Es por eso que en algunos casos también se utilizan otras metodologías, como el "templado simulado" (_simulated annealing_), algoritmos genéticos, programación con restricciones (constraint programming), algoritmos para resolver flujos de redes (_network-flow problems_) e incluso otros que usan cadenas de Markov. Los programas de optimización lineal tienden a ser más precisos, sobre todo cuando se utilizan otras _restricciones_ (como incluir diversos temas, tipos de reactivos o cuando hay que considerar la existencia de reactivos _amigos_ y _enemigos_).
-
-En este ejemplo se utiliza [Cbc](https://www.coin-or.org) (Coin-or branch and cut), un software gratuito, de código abierto y que ofrece una licencia muy permisiva. Algunos optimizadores comerciales suelen ser relativamente más poderosos, aunque tienden a ser costosos.
-
-
-#### Julia y JuMP {#julia-y-jump}
-
-Julia es un lenguage de alto nivel, que se compila a código muy eficiente y puede utilizarse interactivamente, lo que facilita el trabajo. Por su parte, JuMP es un paquete basado en Julia que ofrece herramientas para formular  modelos de optimización para usar con una larga lista de optimizadores. En este caso, los modelos se probaron con resultados casi indistintos con:
-
--   IBM CPLEX
--   Cbc (coin-or)
--   SICP
--   GLPK
--   HiGHS
-
-También hay otras formas de hacer esto. En el lenguaje _R_, por ejemplo, el paquete TestDesign parece ser una buena solución que ahorra varios pasos y no requiere demasiada programación. Otros ejemplos de programas más o menos integrados para hacer estas cosas, además de TestDesign, son los paquetes eatATA, ATA, xxIRT, dexterMST, catR, mstR, todos ellos en R, quizá el lenguaje más popular para esto. Algunos de estos paquetes están pensados para ensamblar exámenes adaptativos. En Julia, Python y SAS hay soluciones interesantes, aunque poco pulidas para el usuario, quien debe tener al menos un conocimiento básico de los lenguajes que dan forma a estos sistemas. En cierto modo, puede decirse que son librerías experimentales. Las grandes agencias de evaluación y aplicación generalmente desarrollan sus propias soluciones en casa.
+There are other ways to achieve this. In R, for example, the package TestDesign seems to be a good solution that saves several steps and requires little programming. Other examples include eatATA, ATA, xxIRT, dexterMST, catR, mstR—all of them in R, perhaps the most popular language for this purpose. Some of these packages are designed for assembling adaptive tests. In Julia, Python, and SAS, there are interesting, though somewhat unpolished, solutions that require at least basic knowledge of the underlying programming languages. In a way, these can be considered experimental libraries. Major testing and assessment agencies typically develop their own in-house solutions.
