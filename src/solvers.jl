@@ -5,7 +5,6 @@ using Cbc
 using SCIP
 using GLPK
 using HiGHS
-using SYMPHONY_jll
 using Gurobi
 
 function load_solver_config(yaml_file::String)
@@ -27,8 +26,6 @@ function configure_solver!(model::Model, parameters::Params, solver_name::String
         set_optimizer(model, GLPK.Optimizer)
     elseif solver_name == "highs"
         set_optimizer(model, HiGHS.Optimizer)
-    elseif solver_name == "symphony"
-        set_optimizer(model, SYMPHONY_jll.Optimizer)
     elseif solver_name == "gurobi"
         set_optimizer(model, Gurobi.Optimizer)
     else

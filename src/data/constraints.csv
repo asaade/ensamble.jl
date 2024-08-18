@@ -1,7 +1,7 @@
 ,CONSTRAINT_ID,TYPE,WHAT,CONDITION,LB,UB,ONOFF
-1,C1,Test,Item,,60,60,NA
-2,C2,Number,Item,AREA == 1,14,16,NA
-3,C3,Number,Item,AREA == 2,14,16,NA
-4,C4,Number,Item,AREA == 3,14,16,NA
-5,C5,Number,Item,AREA == 4,14,16,NA
-6,C6,Sum,Item,Palabras, 2200,2600,NA
+1,C1,Test,Item,,60,60,ON
+2,C2,Number,Item,AREA == 1,14,16,ON
+3,C3,Number,Item,AREA == 2,14,16,ON
+4,C4,Number,Item,AREA == 3,14,16,ON
+5,C5,Number,Item,AREA == 4,14,16,ON
+6,C6,Sum,Item,Palabras, 2200,2600,ON

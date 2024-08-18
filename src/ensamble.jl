@@ -6,9 +6,9 @@ using JuMP
 include("get_data.jl")
 include("solvers.jl")
 include("stats_functions.jl")
-include("model_initializer.jl")
 include("charts.jl")
 include("constants.jl")
+include("model_initializer.jl")
 
 
 # Print functions

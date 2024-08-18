@@ -1,12 +1,15 @@
 using JuMP
+using InlineStrings
+
+include("types.jl")
 
 # Define a struct for holding constraint information
 struct Constraint
     id::String
     type::InlineString
     condition::Function
-    lb::Int
-    ub::Int
+    lb::Number
+    ub::Number
 end
 
 function apply_individual_constraint!(model::Model, parameters::Params, constraint::Constraint)
@@ -30,8 +33,8 @@ end
 
 
 ## Número de reactivos totales (Items) en cada versión (forms)
-function constraint_items_per_version(model::Model, parameters::Params, minItems::Int64, maxItems::Int64=minItems)
-    constraint_item_count(model::Model, parameters::Params, 1:size(parameters.bank, 1), minItems::Int64, maxItems::Int64)
+function constraint_items_per_version(model::Model, parameters::Params, minItems::Int, maxItems::Int=minItems)
+    constraint_item_count(model::Model, parameters::Params, 1:size(parameters.bank, 1), minItems::Int, maxItems::Int)
 end
 
 
@@ -56,7 +59,7 @@ end
 
 
 ## Incluye un número de reactivos ente minItems y maxItems] de la lista "selected" en cada prueba(F)
-function constraint_item_count_aux(model::Model, parameters::Params, selected, minItems::Int64, maxItems::Int64=minItems)
+function constraint_item_count_aux(model::Model, parameters::Params, selected, minItems::Int, maxItems::Int=minItems)
     x = model[:x]
     forms = size(x, 2)
     forms -= parameters.shadow_test_size > 0 ? 1 : 0
@@ -74,9 +77,9 @@ function constraint_item_count_aux(model::Model, parameters::Params, selected, m
 end
 
 
-function constraint_item_count(model::Model, parameters::Params, selected, minItems::Int64, maxItems::Int64=minItems)
-    constraint_item_count_aux(model::Model, parameters::Params, selected, minItems::Int64, maxItems::Int64)
-    constraint_item_count_shadow_aux(model::Model, parameters::Params, selected, minItems::Int64, maxItems::Int64)
+function constraint_item_count(model::Model, parameters::Params, selected, minItems::Int, maxItems::Int=minItems)
+    constraint_item_count_aux(model::Model, parameters::Params, selected, minItems::Int, maxItems::Int)
+    constraint_item_count_shadow_aux(model::Model, parameters::Params, selected, minItems::Int, maxItems::Int)
     return model
 end
 

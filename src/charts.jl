@@ -48,7 +48,7 @@ function generate_results_simulation(parameters::Params, results::DataFrame, abi
 end
 
 # Generate characteristic curves for each version
-function generate_characteristic_curves(parameters, results::DataFrame, theta_range::AbstractVector, r::Int=1)
+function generate_characteristic_curves(parameters::Params, results::DataFrame, theta_range::AbstractVector, r::Int=1)
     bank = parameters.bank
     num_versions = size(results, 2)
     curves = DataFrame()

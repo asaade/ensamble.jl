@@ -41,15 +41,6 @@ highs:
   mip_abs_gap: 0.05
   parallel: on
 
-symphony:
-  gap_limit: 0.05
-  time_limit: 60
-  verbosity: 1
-  random_seed: 42
-  presolve: true
-  heuristics: true
-  node_limit: 1000
-
 gurobi:
   MIPGap: 0.05                      # Relative MIP gap tolerance
   TimeLimit: 60                     # Time limit in seconds

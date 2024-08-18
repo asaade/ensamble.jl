@@ -3,25 +3,27 @@ Some utility functions, mostly adapted from the Advent of Code
 utilities by Peter Norvig
 """
 
+using DataFrames
+
 isiterable(f) = applicable(foreach, f)
 isnumeric(s)  = tryparse(Float64, s) !== nothing
-isint(s)      = tryparse(Int64, s) !== nothing
-to_int(s) = parse(Int64, s)
+isint(s)      = tryparse(Int, s) !== nothing
+to_int(s) = parse(Int, s)
 
 
 # char = String # Intended as the type of a one-character string
-Atom = Union{String, Float64, Int64} # The type of a string or number
+Atom = Union{String, Float64, Int} # The type of a string or number
 
 ##"""A tuple of all the integers in text, ignoring non-number characters."""
-ints(text) = map(x -> tryparse(Int64, x.match), eachmatch(r"-?\d+", text))
+ints(text) = map(x -> tryparse(Int, x.match), eachmatch(r"-?\d+", text))
 
 ## """A tuple of all the integers in text, ignoring non-number characters.## """
-pos_ints(text) = map(x -> tryparse(Int64, x.match), eachmatch(r"[0-9]+", text))
+pos_ints(text) = map(x -> tryparse(Int, x.match), eachmatch(r"[0-9]+", text))
 
 ## """A tuple of all the digits in text (as ints 0–9), ignoring non-digit characters.## """
-digits(text) = map(x -> tryparse(Int64, x.match), eachmatch(r"[0-9]", text))
+digits(text) = map(x -> tryparse(Int, x.match), eachmatch(r"[0-9]", text))
 
-## """A tuple of all the alphabetic words in text, ignoring non-letters.## """
+## """A tuple of all the alphabetic words in text.## """
 words(text) = map(x -> string(x.match), eachmatch(r"\w+", text))
 
 function atom(text)

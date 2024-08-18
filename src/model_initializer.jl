@@ -2,13 +2,16 @@ using JuMP
 using CSV
 using DataFrames
 using InlineStrings
-using CSV
-using DataFrames
 
 # Include external modules
 include("utils.jl")
-include("expression_parser.jl")
+
+# include("expression_parser.jl")
 include("constraints.jl")
+include("types.jl")
+
+include("CriteriaParser.jl")
+# using .CriteriaParser
 
 # Module constants
 const MODEL_FILE = "data/model.lp"
@@ -22,7 +25,7 @@ Read constraints from a CSV file, returning a dictionary of Constraint objects.
 """
 function read_constraints(file_path::String)
     df = CSV.read(file_path, DataFrame, missingstring=nothing)
-    constraints = Dict{String, Constraint}()
+    constraints = Dict{String,Constraint}()
 
     for row in eachrow(df)
         if row[:ONOFF] != "OFF"
@@ -32,7 +35,7 @@ function read_constraints(file_path::String)
             condition_expr = row[:CONDITION]
             lb = row[:LB]
             ub = row[:UB]
-            condition = strip(condition_expr) == "" ? Meta.parse("df -> true") : parse_criteria(condition_expr)
+            condition = strip(condition_expr) == "" ? Meta.parse("df -> true") : CriteriaParser.parse_criteria(condition_expr)
             constraints[cond_id] = Constraint(cond_id, type, eval(condition), lb, ub)
         end
     end
@@ -47,9 +50,9 @@ Initialize the optimization model, adding variables, the objective function,
 and constraints based on the provided parameters.
 """
 function initialize_model!(model::Model,
-                           parameters::Params,
-                           original_parameters::Params,
-                           constraints::Dict{String, Constraint})
+    parameters::Params,
+    original_parameters::Params,
+    constraints::Dict{String,Constraint})
     println(INITIALIZING_MODEL_MESSAGE)
     num_items = size(parameters.bank, 1)
     num_forms = parameters.num_forms + (parameters.shadow_test_size > 0 ? 1 : 0)
@@ -70,9 +73,9 @@ end
 Apply the constraints from the configuration to the optimization model.
 """
 function apply_constraints!(model::Model,
-                            parameters::Params,
-                            original_parameters::Params,
-                            constraints::Dict{String, Constraint})
+    parameters::Params,
+    original_parameters::Params,
+    constraints::Dict{String,Constraint})
     apply_objective!(model, parameters, original_parameters)
     constraint_prevent_overlap!(model, parameters)
     constraint_add_anchor!(model, parameters)
