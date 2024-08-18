@@ -1,0 +1,15 @@
+# Constants
+const CONFIG_FILE = "data/config.yaml"
+const CHECKMARK = " ✓"
+const MISSING_VALUE_FILLER = missing
+const COMMON_ITEMS_MATRIX_TITLE = "\nCommon Items Matrix:"
+const OPTIMIZATION_RESULTS_TITLE = "\nOptimization Results:"
+const OPTIMIZATION_FAILED_MESSAGE = "Optimization failed"
+const LOADING_CONFIGURATION_MESSAGE = "Loading configuration..."
+const RUNNING_OPTIMIZATION_MESSAGE = "Running optimization..."
+const VERSIONS_ASSEMBLED_MESSAGE = "Total versions assembled: "
+const ITEMS_USED_MESSAGE = "Items used (without anchor): "
+const REMAINING_ITEMS_MESSAGE = "Remaining items (includes anchor): "
+const TOLERANCE_LABEL = "Value: "
+const SEPARATOR = "====================================="
+const SAVE_FILE_NAME = "data/versiones.csv"
