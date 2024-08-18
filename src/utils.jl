@@ -1,4 +1,7 @@
-
+"""
+Some utility functions, mostly adapted from the Advent of Code
+utilities by Peter Norvig
+"""
 
 isiterable(f) = applicable(foreach, f)
 isnumeric(s)  = tryparse(Float64, s) !== nothing
