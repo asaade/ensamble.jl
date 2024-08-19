@@ -6,7 +6,7 @@ include("types.jl")
 include("stats_functions.jl")
 
 # Function to extract a, b, c parameters from the bank based on selected items
-function get_item_parameters(bank::DataFrame, selected_items::Vector{Union{Missing, String}})
+function get_item_parameters(bank::DataFrame, selected_items::Vector{Union{String, Missing}})
     # items = in(skipmissing(selected_items)).(bank.CLAVE)
     items = bank.CLAVE .∈ Ref(skipmissing(selected_items))
     return get_item_parameters(bank, items)
@@ -96,8 +96,8 @@ function plot_characteristic_curves_and_simulation(parameters, results::DataFram
     simulation_data3 = generate_results_simulation(parameters, results, Normal(1.0, 0.7))
 
     # Set up the plot aesthetics
-    theme(:sand)
-    gr(size=(900, 700))
+    theme(:dao)
+    gr(size=(900, 900))
 
     versions = size(results, 2)
 
@@ -136,7 +136,7 @@ function plot_characteristic_curves_and_simulation(parameters, results::DataFram
 
 
     # Combine the plots into a single image with subplots
-    combined_plot = plot(p1, p2, p3, layout=(2, 2), size=(900, 700))
+    combined_plot = plot(p1, p2, p3, layout=(2, 2), size=(900, 900))
 
     write_results_to_file(hcat(theta_range, characteristic_curves))
 
