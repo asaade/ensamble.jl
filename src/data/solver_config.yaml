@@ -36,7 +36,7 @@ glpk:
 
 highs:
   presolve: on
-  time_limit: 60
+  # time_limit: 60                 # Not recognized by solver. Posible bug
   mip_rel_gap: 0.05
   mip_abs_gap: 0.05
   parallel: on

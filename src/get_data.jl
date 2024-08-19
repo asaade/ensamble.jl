@@ -170,7 +170,7 @@ function load_config(inFile::String="data/config.yaml")::Config
     lb, ub = find_total_items(config_dict[:CONSTRAINTSFILE])
     config_dict[:FORMS][:N] = (lb + ub) ÷ 2
     config_dict[:FORMS][:MINN] = lb
-    config_dict[:FORMS][:MAXN] = ub
+    config_dict[:FORMS][:MAXN] = max(lb, ub)
 
     if !haskey(config_dict[:FORMS], :R)
         config_dict[:FORMS][:R] =

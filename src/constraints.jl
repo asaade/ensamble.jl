@@ -65,7 +65,7 @@ function constraint_item_count_aux(model::Model, parameters::Params, selected, m
     forms -= parameters.shadow_test_size > 0 ? 1 : 0
 
     if minItems == maxItems && minItems >= 0
-        @constraint(model, [f=1:forms], sum(x[i, f] for i in selected) == maxItems);
+        @constraint(model, [f=1:forms], sum(x[i, f] for i in selected) == minItems);
     elseif minItems < maxItems
         @constraint(model, [f=1:forms], sum(x[i, f] for i in selected) <= maxItems);
         @constraint(model, [f=1:forms], sum(x[i, f] for i in selected) >= minItems);

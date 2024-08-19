@@ -26,6 +26,7 @@ function configure_solver!(model::Model, parameters::Params, solver_name::String
         set_optimizer(model, GLPK.Optimizer)
     elseif solver_name == "highs"
         set_optimizer(model, HiGHS.Optimizer)
+        set_time_limit_sec(model, 120);
     elseif solver_name == "gurobi"
         set_optimizer(model, Gurobi.Optimizer)
     else

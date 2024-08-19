@@ -81,7 +81,7 @@ function apply_constraints!(model::Model,
     constraint_add_anchor!(model, parameters)
 
     for (constraint_id, constraint) in constraints
-        parameters.verbose > 0 && println(APPLYING_CONSTRAINT_MESSAGE, constraint_id)
+        parameters.verbose > 1 && println(APPLYING_CONSTRAINT_MESSAGE, constraint_id)
         apply_individual_constraint!(model, parameters, constraint)
     end
 
@@ -136,11 +136,11 @@ function apply_individual_constraint!(model::Model, parameters::Params, constrai
     if constraint.type == "TEST"
         constraint_items_per_version(model, parameters, lb, ub)
     elseif constraint.type == "NUMBER"
-        condition = Base.invokelatest(constraint.condition, bank)
+        condition = constraint.condition(bank)
         selected_items = items[condition]
         constraint_item_count(model, parameters, selected_items, lb, ub)
     elseif constraint.type == "SUM"
-        item_vals = Base.invokelatest(constraint.condition, bank)
+        item_vals = constraint.condition(bank)
         constraint_item_sum(model, parameters, item_vals, lb, ub)
     else
         error("Unknown constraint type: ", constraint.type)
