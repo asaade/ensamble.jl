@@ -1,7 +1,6 @@
 using DataFrames
 using JuMP
 
-
 # Include external modules
 include("get_data.jl")
 include("solvers.jl")
@@ -125,13 +124,19 @@ function process_and_store_results!(model::Model, parameters::Params, results::D
     max_items = parameters.max_items
 
     for version_name in 1:parameters.num_forms
-        selected_items = items[solver_matrix[:, version_name] .> 0]
+        selected_items = items[solver_matrix[:, version_name] .> 0.5]
         item_codes_in_version = item_codes[selected_items]
-        padded_item_codes = vcat(item_codes_in_version, fill(MISSING_VALUE_FILLER, max_items - length(item_codes_in_version)))
+        version_length = length(item_codes_in_version)
+        pad = max_items - version_length
+        padded_item_codes = if pad > 0
+            vcat(item_codes_in_version, fill(MISSING_VALUE_FILLER, pad))
+            else
+            item_codes_in_version
+        end
+
         results[!, generate_unique_column_name(results)] = padded_item_codes
         used_items = vcat(used_items, selected_items)
     end
-
     used_items = sort(unique(used_items))
     remove_used_items!(parameters, used_items)
     return results
@@ -172,18 +177,18 @@ function handle_anchor_items(parameters::Params, original_parameters::Params)
 end
 
 """
-    save_forms(parameters::Params, results::DataFrame, file_name::String)
+    save_forms(parameters::Params, results::DataFrame, config::Config)
 
 Save the forms to a file, marking used items with a checkmark.
 """
-function save_forms(parameters::Params, results::DataFrame, file_name::String)
+function save_forms(parameters::Params, results::DataFrame, config)
     bank = deepcopy(parameters.bank)
 
     for v in names(results)
         bank[!, Symbol(v)] = map(x -> x == 1 ? CHECKMARK : "", bank.CLAVE .∈ Ref(skipmissing(results[:, v])))
     end
-    write_results_to_file(bank, file_name)
-    write_results_to_file(results, "data/results.csv")
+    write_results_to_file(bank, config.versions_file)
+    write_results_to_file(results, config.results_file)
 end
 
 """
@@ -227,7 +232,7 @@ function main(config_file::String=CONFIG_FILE)
     # Generate plots
     plot_characteristic_curves_and_simulation(original_parameters, results)
 
-    save_forms(original_parameters, results, SAVE_FILE_NAME)
+    save_forms(original_parameters, results, config)
 end
 
 # Uncomment to run the main function

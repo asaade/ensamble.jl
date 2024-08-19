@@ -1,34 +1,65 @@
+## Inputs
+itemsFile: ./data/items.csv               # Item bank data file
+constraintsFile: ./data/constraints.csv   # Constraints file
+anchorFile: ./data/ancla.csv              # Anchor items file
 
-# Archivo con los datos del banco
-itemsFile: ./data/items.csv
-constraintsFile: ./data/constraints.csv
-anchorFile: ./data/ancla.csv
-versionsFile: ./data/results.csv
-tccFile: data/tcc.csv
-resultsFile: data/results.csv
-plotFile: data/tcc.png
+## Outputs
+versionsFile: ./data/results/versions.csv # File to store assembled test versions
+tccFile: ./data/results/tcc.csv           # Test Characteristic Curve (TCC) file
+resultsFile: ./data/results/results.csv   # File to store final results
+plotFile: ./data/results/chart.png        # Plot output file
 
+## Optimization engine selection
+## Currently configured options:
+## CPLEX, Cbc, SCIP, HiGHS, and GLPK
 solver: cplex
 
-anchorNumber: 3
+## Number of anchor tests to alternate from those
+## included in the anchorFile. If an acchor test is not
+## included, the items are reused as standard items.
+anchorNumber: 4
 
-# Cantidad de información que imprime el programa
+## Verbosity level of the program's output
 verbose: 1
 
-# Parámetros
+## Parameters
+##
 forms:
-# Número de versiones para ensamblar
-     F: 10
-# Modelo para el ensamble (TIC, TIC2, TCC o TC)
+     F: 8           # Number of test versions to assemble
+
+## Assembly model (TIC, TIC2, TCC, or CTT)
+## TIC  - Test Information with absolute target at K points in theta
+## TIC2 - Maximize relative information at specified points
+## TIC3 - Maximize relative target, one per test
+## TCC  - Test Characteristic Curve, absolute at Theta/Tau
+## CTT  - Classic Test Theory (currently not functional)
      method: TCC
-# Número de potencias para el modelo de igualación TCC
-     R: 2
-# Puntos en la escala para igualar (incluye puntos de corte)
-     theta: [-1.5, 0.0, 1.5]
 
-     # tau: [15.18 24.32 34.05 43.46 51.81; 4.82 11.85 21.72 33.39 45.64]
+## Number of powers for the TCC equating model
+     R: 3
 
+## Points on the scale for equating (including cut points)
+     theta: [-2.5, -1.2, 0.0, 1.2, 2.5]
+
+## Score probabilities in the reference test to match at K theta points
+## If tau is not set, it will be calculated as the average from the
+## item bank. The number of rows should be the same as R, all separated by
+## a semicolon.
+     ## tau: [15.18 24.32 34.05 43.46 51.81; 4.82 11.85 21.72 33.39 45.64]
+
+## Information in the reference test to match at K theta points
+## If tau_info is not set, it will be calculated as the average from the
+## item bank
+     ## tau_info: []
+
+
+## Use Big Shadow Test heuristic; assemble one test at a time
+## insted of all test simultaneously (shadowSize: 0) to easy
+## Recommended as defaut, specially for big or complex models.
+## Required if TCC3 method is selected to alternate forms
      shadowSize: 1
 
+## Points and weights to maximize for relative target models
+## TIC2 and TIC3
      relativeTargetWeights: [1, 1, 1]
      relativeTargetPoints: [-1.0, 0.0, 1.0]
