@@ -3,7 +3,6 @@ MatrixOrMissing = Union{Matrix{AbstractFloat}, Nothing}
 DataFrameOrMissing = Union{DataFrame, Nothing}
 VectorOrMissing = Union{Vector{AbstractFloat}, Nothing}
 
-
 # Define a struct for the configuration
 struct Config
     forms::Dict{Symbol, Any}
@@ -41,4 +40,13 @@ mutable struct Params
     relative_target_points::VectorOrMissing
     delta::MatrixOrMissing
     verbose::Int
+end
+
+# Define a struct for holding constraint information
+struct Constraint
+    id::String
+    type::InlineString
+    condition::Function
+    lb::Number
+    ub::Number
 end

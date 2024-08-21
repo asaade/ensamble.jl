@@ -4,19 +4,19 @@ Automatic Test Assembly (ATA)  in julia and a MIP solver
 
 ## The Software
 
-This repository presents an example of how the process of selecting items for a test can be implemented using free software. For now, it is only an early and incomplete example and is not recommended for use in high-stakes applications.
+This repository presents an example of how the process of selecting items for a test may be implemented using free software. For now, it is only an early and incomplete example and is not recommended for use in high-stakes applications.
 
 ## Overview
 
 In the psychometric tradition of standardized testing, a single version of a test is often deemed sufficient. This is "the" test, the result of months or even years of research, trial, and error. Once this test is approved, it is administered to a reference population and a standard is established, which further serves to classify individuals relative to this original population, the "normative" group. However, there are numerous reasons why this approach may not be practical in educational contexts. Consider the implications if the same version of the SAT were used repeatedly—year after year, or for every new cohort of students.
 
-Assembling two or more forms of a test is exponentially more complex than creating just one. Not only must the content specifications be meticulously adhered to —already a contentious task— but the difficulty levels of the items must also be comparable. Otherwise, one form may be easier than another, with potentially severe consequences for test-takers. It would be highly inequitable for a student's score to depend on which version they received, as it is simply unfair for one to fail entry into a university because they took the harder version.
+Assembling two or more forms of a test is exponentially more complex than creating just one. Not only must the content specifications be meticulously adhered to —already a hard task— but the difficulty or information levels of the items must also be comparable. Otherwise, one form may be easier or noisier than another, with potentially severe consequences for test-takers. It would be highly inequitable for a student's score to depend on which version they received, as it is simply unfair for one to fail entry into a university because they took the harder version.
 
-Item Response Theory (IRT) offers a common solution to this problem, Once the statistical characteristics of the items are known from prior testing, their future performance can be predicted with some accuracy. This allows for the assembly of a new test version with a reasonably clear idea of how it will perform. Classical Test Theory can also be used, but it is more challenging to obtain difficulty estimates on the same scale, leading to potentially unexpected results.
+Item Response Theory (IRT) offers a common solution to this problem, Once the statistical characteristics of the items are known from prior testing, their future performance can be predicted with some high accuracy. This allows for the assembly of a new test version with a reasonably clear idea of how it will perform operationally. Classical Test Theory can also be used, but it is more challenging to obtain difficulty estimates on the same scale, leading to potentially unexpected results.
 
-Traditionally, this process is iterative —manually combining available items from the bank like puzzle pieces according to their content and estimated difficulties, until the objective is met.
+Traditionally, this process is iterative —manually combining available items from the bank like puzzle pieces according to their content and estimated difficulties, until the objective is met. Manual assembly is tedious; it can take hours, or even days in some cases, especially when assembling multiple booklets with dozens of items each. This involves a process of adding and removing items until the desired outcome is reached.
 
-Computers have also brought significant advantages to this process. Manual assembly is tedious; it can take hours, or even days in some cases, especially when assembling multiple booklets with dozens of items each. This involves a process of adding and removing items until the desired outcome is reached. To ease this burden and minimize the errors that result from manual processes, optimization methods have increasingly been used to enable the relatively automatic assembly of test versions.
+Computers have brought significant advantages to this process. To ease this burden and minimize the errors that result from manual processes, optimization methods have increasingly been used to enable the relatively automatic assembly of test versions.
 
 The idea is that if the test constructor defines the desired characteristics of the test in detail, including the necessary topics and content, the machine can select the best combinations.
 

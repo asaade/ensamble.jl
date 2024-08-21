@@ -5,49 +5,44 @@ include("stats_functions.jl")
 include("types.jl")
 include("utils.jl")
 
-
 # Function to convert a dictionary to a Config struct
 function Config(config_dict::Dict{Symbol, Any})
     forms_data = Dict(Symbol(k) => v for (k, v) in config_dict[:FORMS])
-    return Config(
-        forms_data,
-        config_dict[:ITEMSFILE],
-        config_dict[:ANCHORFILE],
-        config_dict[:ANCHORNUMBER],
-        config_dict[:VERSIONSFILE],
-        config_dict[:CONSTRAINTSFILE],
-        config_dict[:RESULTSFILE],
-        config_dict[:TCCFILE],
-        config_dict[:PLOTFILE],
-        config_dict[:SOLVER],
-        config_dict[:VERBOSE]
-    )
+    return Config(forms_data,
+                  config_dict[:ITEMSFILE],
+                  config_dict[:ANCHORFILE],
+                  config_dict[:ANCHORNUMBER],
+                  config_dict[:VERSIONSFILE],
+                  config_dict[:CONSTRAINTSFILE],
+                  config_dict[:RESULTSFILE],
+                  config_dict[:TCCFILE],
+                  config_dict[:PLOTFILE],
+                  config_dict[:SOLVER],
+                  config_dict[:VERBOSE])
 end
 
 # Function to convert a dictionary to a Params struct
 function Params(parms_dict::Dict{Symbol, Any})
-    return Params(
-        parms_dict[:N],
-        parms_dict[:F],
-        parms_dict[:MAXN],
-        # zeros(size(parms_dict[:BANK], 1)),
-        parms_dict[:F],
-        parms_dict[:K],
-        parms_dict[:R],
-        parms_dict[:SHADOWSIZE],
-        parms_dict[:METHOD],
-        parms_dict[:BANK],
-        parms_dict[:ANCHOR_NUMBER],
-        parms_dict[:THETA],
-        parms_dict[:P],
-        get(parms_dict, :INFO, nothing),
-        parms_dict[:TAU],
-        get(parms_dict, :TAU_INFO, nothing),
-        parms_dict[:RELATIVETARGETWEIGHTS],
-        parms_dict[:RELATIVETARGETPOINTS],
-        get(parms_dict, :DELTA, nothing),
-        parms_dict[:VERBOSE]
-    )
+    return Params(parms_dict[:N],
+                  parms_dict[:F],
+                  parms_dict[:MAXN],
+                  # zeros(size(parms_dict[:BANK], 1)),
+                  parms_dict[:F],
+                  parms_dict[:K],
+                  parms_dict[:R],
+                  parms_dict[:SHADOWSIZE],
+                  parms_dict[:METHOD],
+                  parms_dict[:BANK],
+                  parms_dict[:ANCHOR_NUMBER],
+                  parms_dict[:THETA],
+                  parms_dict[:P],
+                  get(parms_dict, :INFO, nothing),
+                  parms_dict[:TAU],
+                  get(parms_dict, :TAU_INFO, nothing),
+                  parms_dict[:RELATIVETARGETWEIGHTS],
+                  parms_dict[:RELATIVETARGETPOINTS],
+                  get(parms_dict, :DELTA, nothing),
+                  parms_dict[:VERBOSE])
 end
 
 # Error handling for reading CSV files
@@ -65,9 +60,13 @@ function clean_IRT!(bank::DataFrame)::DataFrame
     dropmissing!(bank, :B)
     bank[!, :A] .= coalesce.(bank[!, :A], 1.0)
     bank[!, :C] .= coalesce.(bank[!, :C], 0.0)
-    filter!(row -> (row.A >= 0.0 && row.A < 3.0 &&
-                    row.B > -4.0 && row.B < 4.0 &&
-                    row.C >= 0.0 && row.C < 0.5), bank)
+    filter!(row -> (row.A >= 0.0 &&
+                    row.A < 3.0 &&
+                    row.B > -4.0 &&
+                    row.B < 4.0 &&
+                    row.C >= 0.0 &&
+                    row.C < 0.5),
+            bank)
     return bank
 end
 
@@ -78,8 +77,8 @@ function clean_TC!(bank::DataFrame)::DataFrame
     if mean(bank.DIF) > 2.0
         bank.DIF = bank.DIF / 100
     end
-    filter!(row -> (row.DIF > 0.1 && row.DIF < 0.9 &&
-                    row.CORR >= 0.15 && row.CORR <= 0.65), bank)
+    filter!(row -> (row.DIF > 0.1 && row.DIF < 0.9 && row.CORR >= 0.15 && row.CORR <= 0.65),
+            bank)
     return bank
 end
 
@@ -98,8 +97,8 @@ function clean_items_bank!(config::Config, bank::DataFrame)::DataFrame
         clean_IRT!(bank)
     elseif method == "TC"
         clean_TC!(bank)
-    # else
-    #     error("Unknown method: $method")
+        # else
+        #     error("Unknown method: $method")
     end
 
     println(original_size - size(bank, 1), " items in bank are invalid.")
@@ -163,8 +162,8 @@ function find_total_items(file_path::String)::Tuple{Int, Int}
 end
 
 # Function to load configuration from a YAML file
-function load_config(inFile::String="data/config.yaml")::Config
-    config_data = YAML.load_file(inFile; dicttype=Dict{Symbol, Any})
+function load_config(inFile::String = "data/config.yaml")::Config
+    config_data = YAML.load_file(inFile; dicttype = Dict{Symbol, Any})
     config_dict = Dict(upSymbol(k) => v for (k, v) in config_data)
     config_dict[:FORMS] = Dict(upSymbol(k) => v for (k, v) in config_dict[:FORMS])
     lb, ub = find_total_items(config_dict[:CONSTRAINTSFILE])
@@ -173,14 +172,13 @@ function load_config(inFile::String="data/config.yaml")::Config
     config_dict[:FORMS][:MAXN] = max(lb, ub)
 
     if !haskey(config_dict[:FORMS], :R)
-        config_dict[:FORMS][:R] =
-            if config_dict[:FORMS][:N] <= 25
-                4
-            elseif config_dict[:FORMS][:N] <= 50
-                3
-            else
-                2
-            end
+        config_dict[:FORMS][:R] = if config_dict[:FORMS][:N] <= 25
+            4
+        elseif config_dict[:FORMS][:N] <= 50
+            3
+        else
+            2
+        end
     end
     return Config(config_dict)
 end
@@ -209,19 +207,25 @@ function get_params(config::Config)::Params
         parms_dict[:THETA] = theta
         a, b, c = bank[!, :A], bank[!, :B], bank[!, :C]
         parms_dict[:K] = length(theta)
-        p = [Pr(t, b, a, c; d=1.0) for t in theta]
+        p = [Pr(t, b, a, c; d = 1.0) for t in theta]
         parms_dict[:P] = reduce(hcat, p)
 
         if haskey(parms_dict, :TAU)
             parms_dict[:TAU] = eval(Meta.parse(join(["[", join(parms_dict[:TAU], " "), "]"])))
         end
-        parms_dict[:TAU] = get(parms_dict, :TAU, calc_tau(parms_dict[:P], parms_dict[:R], parms_dict[:K], parms_dict[:N], bank))
+        parms_dict[:TAU] = get(parms_dict,
+                               :TAU,
+                               calc_tau(parms_dict[:P], parms_dict[:R], parms_dict[:K],
+                                        parms_dict[:N], bank))
         parms_dict[:R] = min(parms_dict[:R], size(parms_dict[:TAU], 1))
 
         if method in ["TIC", "TIC2", "TIC3"]
-           info = [item_information(t, b, a, c) for t in theta]
-           parms_dict[:INFO] = reduce(hcat, info)
-           parms_dict[:TAU_INFO] = get(parms_dict, :TAU_INFO, calc_info_tau(parms_dict[:INFO], parms_dict[:K], parms_dict[:N]))
+            info = [item_information(t, b, a, c) for t in theta]
+            parms_dict[:INFO] = reduce(hcat, info)
+            parms_dict[:TAU_INFO] = get(parms_dict,
+                                        :TAU_INFO,
+                                        calc_info_tau(parms_dict[:INFO], parms_dict[:K],
+                                                      parms_dict[:N]))
         end
 
         parms_dict[:DELTA] = nothing

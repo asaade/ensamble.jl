@@ -6,7 +6,8 @@ include("types.jl")
 include("stats_functions.jl")
 
 # Function to extract a, b, c parameters from the bank based on selected items
-function get_item_parameters(bank::DataFrame, selected_items::Vector{Union{String, Missing}})
+function get_item_parameters(bank::DataFrame,
+                             selected_items::Vector{Union{String, Missing}})
     # items = in(skipmissing(selected_items)).(bank.CLAVE)
     items = bank.CLAVE .∈ Ref(skipmissing(selected_items))
     return get_item_parameters(bank, items)
@@ -27,7 +28,9 @@ function get_item_parameters(bank::DataFrame, selected_items::Vector{Int})
 end
 
 # Generate results simulation based on ability distribution
-function generate_results_simulation(parameters::Params, results::DataFrame, ability_dist::Distribution = Normal(0.0, 1.0))
+function generate_results_simulation(parameters::Params,
+                                     results::DataFrame,
+                                     ability_dist::Distribution = Normal(0.0, 1.0))
     bank = parameters.bank
     observed_dist = DataFrame()
     max_length, num_versions = size(results)
@@ -48,7 +51,10 @@ function generate_results_simulation(parameters::Params, results::DataFrame, abi
 end
 
 # Generate characteristic curves for each version
-function generate_characteristic_curves(parameters::Params, results::DataFrame, theta_range::AbstractVector, r::Int=1)
+function generate_characteristic_curves(parameters::Params,
+                                        results::DataFrame,
+                                        theta_range::AbstractVector,
+                                        r::Int = 1)
     bank = parameters.bank
     num_versions = size(results, 2)
     curves = DataFrame()
@@ -57,14 +63,16 @@ function generate_characteristic_curves(parameters::Params, results::DataFrame, 
         selected_items = results[:, i]
         a, b, c = get_item_parameters(bank, selected_items)
         scores = map(theta -> sum(Pr.(theta, b, a, c) .^ r), theta_range)
-        curves[!, names(results)[i]] = round.(scores, digits=2)
+        curves[!, names(results)[i]] = round.(scores, digits = 2)
     end
 
     return curves
 end
 
 # Generate characteristic curves for each version
-function generate_information_curves(parameters, results::DataFrame, theta_range::AbstractVector)
+function generate_information_curves(parameters,
+                                     results::DataFrame,
+                                     theta_range::AbstractVector)
     bank = parameters.bank
     num_versions = size(results, 2)
     curves = DataFrame()
@@ -73,21 +81,23 @@ function generate_information_curves(parameters, results::DataFrame, theta_range
         selected_items = results[:, i]
         a, b, c = get_item_parameters(bank, selected_items)
         information = map(theta -> sum(item_information.(theta, b, a, c)), theta_range)
-        curves[!, names(results)[i]] = round.(information, digits=2)
+        curves[!, names(results)[i]] = round.(information, digits = 2)
     end
 
     return curves
 end
 
 # Function to write results to file
-function write_results_to_file(curve_data, output_file="data/tcc.csv")
+function write_results_to_file(curve_data, output_file = "data/tcc.csv")
     println("Writing results to file: ", output_file)
-    CSV.write(output_file, curve_data)
+    return CSV.write(output_file, curve_data)
 end
 
-
 # Generate characteristic curves and observed score distribution plots
-function plot_characteristic_curves_and_simulation(parameters, results::DataFrame, theta_range::AbstractVector = -3.0:0.1:3.0, plot_file::String = "data/combined_plot.png")
+function plot_characteristic_curves_and_simulation(parameters,
+                                                   results::DataFrame,
+                                                   theta_range::AbstractVector = -3.0:0.1:3.0,
+                                                   plot_file::String = "data/combined_plot.png")
     # Generate the plot data
     characteristic_curves = generate_characteristic_curves(parameters, results, theta_range)
     information_curves = generate_information_curves(parameters, results, theta_range)
@@ -97,50 +107,60 @@ function plot_characteristic_curves_and_simulation(parameters, results::DataFram
 
     # Set up the plot aesthetics
     theme(:dao)
-    gr(size=(900, 900))
+    gr(; size = (900, 900))
 
     versions = size(results, 2)
 
     # Create subplots
-    p1 = @df characteristic_curves plot(theta_range, cols(),
-                                        title="Characteristic Curves for $versions versions",
-                                        xlabel="θ", ylabel="Score",
-                                        linewidth=2, label="",
-                                        grid=(:on, :olivedrab, :dot, 1, 0.9),
-                                        tickfontsize=12)
+    p1 = @df characteristic_curves plot(theta_range,
+                                        cols(),
+                                        title = "Characteristic Curves for $versions versions",
+                                        xlabel = "θ",
+                                        ylabel = "Score",
+                                        linewidth = 2,
+                                        label = "",
+                                        grid = (:on, :olivedrab, :dot, 1, 0.9),
+                                        tickfontsize = 12)
     if parameters.method == "TCC"
-        p1 = scatter!(parameters.theta,
-                      parameters.tau[1, :],
-                      label="", markersize=5)
+        p1 = scatter!(parameters.theta, parameters.tau[1, :]; label = "", markersize = 5)
     end
-    p2 = @df information_curves plot(theta_range, cols(),
-                                     title="Information Curves",
-                                     xlabel="θ", ylabel="Information",
-                                     linewidth=2, label="",
-                                     grid=(:on, :olivedrab, :dot, 1, 0.9),
-                                     tickfontsize=11)
+    p2 = @df information_curves plot(theta_range,
+                                     cols(),
+                                     title = "Information Curves",
+                                     xlabel = "θ",
+                                     ylabel = "Information",
+                                     linewidth = 2,
+                                     label = "",
+                                     grid = (:on, :olivedrab, :dot, 1, 0.9),
+                                     tickfontsize = 11)
 
-    p3 = @df simulation_data1 plot(1:size(simulation_data1, 1), cols(),
-                                   title="Expected Observed Scores\nfor N(-1, 1), N(0, 1), N(1, 0.7)",
-                                   xlabel="Items", ylabel="Percentage",
-                                   linewidth=2, label="",
-                                   grid=(:on, :olivedrab, :dot, 1, 0.9),
-                                   tickfontsize=11)
+    p3 = @df simulation_data1 plot(1:size(simulation_data1, 1),
+                                   cols(),
+                                   title = "Expected Observed Scores\nfor N(-1, 1), N(0, 1), N(1, 0.7)",
+                                   xlabel = "Items",
+                                   ylabel = "Percentage",
+                                   linewidth = 2,
+                                   label = "",
+                                   grid = (:on, :olivedrab, :dot, 1, 0.9),
+                                   tickfontsize = 11)
     if parameters.method != "TIC3"
-        p3 = @df simulation_data2 plot!(1:size(simulation_data2, 1), cols(),
-                                        linewidth=2, label="")
+        p3 = @df simulation_data2 plot!(1:size(simulation_data2, 1),
+                                        cols(),
+                                        linewidth = 2,
+                                        label = "")
 
-        p3 = @df simulation_data3 plot!(1:size(simulation_data3, 1), cols(),
-                                        linewidth=2, label="")
+        p3 = @df simulation_data3 plot!(1:size(simulation_data3, 1),
+                                        cols(),
+                                        linewidth = 2,
+                                        label = "")
     end
-
 
     # Combine the plots into a single image with subplots
-    combined_plot = plot(p1, p2, p3, layout=(2, 2), size=(900, 900))
+    combined_plot = plot(p1, p2, p3; layout = (2, 2), size = (900, 900))
 
     write_results_to_file(hcat(theta_range, characteristic_curves))
 
     # Save the combined plot
     savefig(combined_plot, plot_file)
-    display(combined_plot)
+    return display(combined_plot)
 end

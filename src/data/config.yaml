@@ -25,7 +25,7 @@ verbose: 1
 ## Parameters
 ##
 forms:
-     F: 8           # Number of test versions to assemble
+     F: 2           # Number of test versions to assemble
 
 ## Assembly model (TIC, TIC2, TCC, or CTT)
 ## TIC  - Test Information with absolute target at K points in theta

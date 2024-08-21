@@ -12,7 +12,7 @@ function load_solver_config(yaml_file::String)
     return config
 end
 
-function configure_solver!(model::Model, parameters::Params, solver_name::String="cplex")
+function configure_solver!(model::Model, parameters::Params, solver_name::String = "cplex")
     config = load_solver_config("data/solver_config.yaml")
     solver_options = config[solver_name]
 
@@ -26,7 +26,7 @@ function configure_solver!(model::Model, parameters::Params, solver_name::String
         set_optimizer(model, GLPK.Optimizer)
     elseif solver_name == "highs"
         set_optimizer(model, HiGHS.Optimizer)
-        set_time_limit_sec(model, 120);
+        set_time_limit_sec(model, 120)
     elseif solver_name == "gurobi"
         set_optimizer(model, Gurobi.Optimizer)
     else

@@ -24,8 +24,8 @@ const APPLYING_CONSTRAINT_MESSAGE = "Applying constraint: "
 Read constraints from a CSV file, returning a dictionary of Constraint objects.
 """
 function read_constraints(file_path::String)
-    df = CSV.read(file_path, DataFrame, missingstring=nothing)
-    constraints = Dict{String,Constraint}()
+    df = CSV.read(file_path, DataFrame; missingstring = nothing)
+    constraints = Dict{String, Constraint}()
 
     for row in eachrow(df)
         if row[:ONOFF] != "OFF"
@@ -35,7 +35,11 @@ function read_constraints(file_path::String)
             condition_expr = row[:CONDITION]
             lb = row[:LB]
             ub = row[:UB]
-            condition = strip(condition_expr) == "" ? Meta.parse("df -> true") : CriteriaParser.parse_criteria(condition_expr)
+            condition = if strip(condition_expr) == ""
+                Meta.parse("df -> true")
+            else
+                CriteriaParser.parse_criteria(condition_expr)
+            end
             constraints[cond_id] = Constraint(cond_id, type, eval(condition), lb, ub)
         end
     end
@@ -50,14 +54,14 @@ Initialize the optimization model, adding variables, the objective function,
 and constraints based on the provided parameters.
 """
 function initialize_model!(model::Model,
-    parameters::Params,
-    original_parameters::Params,
-    constraints::Dict{String,Constraint})
+                           parameters::Params,
+                           original_parameters::Params,
+                           constraints::Dict{String, Constraint})
     println(INITIALIZING_MODEL_MESSAGE)
     num_items = size(parameters.bank, 1)
     num_forms = parameters.num_forms + (parameters.shadow_test_size > 0 ? 1 : 0)
 
-    @variable(model, y >= 0.0)
+    @variable(model, y>=0.0)
     @variable(model, x[1:num_items, 1:num_forms], Bin)
 
     set_objective!(model, parameters)
@@ -73,9 +77,9 @@ end
 Apply the constraints from the configuration to the optimization model.
 """
 function apply_constraints!(model::Model,
-    parameters::Params,
-    original_parameters::Params,
-    constraints::Dict{String,Constraint})
+                            parameters::Params,
+                            original_parameters::Params,
+                            constraints::Dict{String, Constraint})
     apply_objective!(model, parameters, original_parameters)
     constraint_prevent_overlap!(model, parameters)
     constraint_add_anchor!(model, parameters)
@@ -128,7 +132,9 @@ end
 
 Apply an individual constraint to the model based on the constraint type.
 """
-function apply_individual_constraint!(model::Model, parameters::Params, constraint::Constraint)
+function apply_individual_constraint!(model::Model,
+                                      parameters::Params,
+                                      constraint::Constraint)
     lb, ub = constraint.lb, constraint.ub
     bank = parameters.bank
     items = 1:size(bank, 1)
@@ -142,6 +148,10 @@ function apply_individual_constraint!(model::Model, parameters::Params, constrai
     elseif constraint.type == "SUM"
         item_vals = constraint.condition(bank)
         constraint_item_sum(model, parameters, item_vals, lb, ub)
+    elseif constraint.type == "ENEMIES"
+        condition = constraint.condition(bank)
+        #  selected_items = items[condition]
+        constraint_enemies_in_version(model, parameters, condition)
     else
         error("Unknown constraint type: ", constraint.type)
     end

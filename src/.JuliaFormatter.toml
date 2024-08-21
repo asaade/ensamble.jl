@@ -1,0 +1,4 @@
+style = "sciml"
+short_to_long_function_def = true
+yas_style_nesting = true
+annotate_untyped_fields_with_any = true

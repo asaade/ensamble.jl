@@ -6,10 +6,9 @@ utilities by Peter Norvig
 using DataFrames
 
 isiterable(f) = applicable(foreach, f)
-isnumeric(s)  = tryparse(Float64, s) !== nothing
-isint(s)      = tryparse(Int, s) !== nothing
+isnumeric(s) = tryparse(Float64, s) !== nothing
+isint(s) = tryparse(Int, s) !== nothing
 to_int(s) = parse(Int, s)
-
 
 # char = String # Intended as the type of a one-character string
 Atom = Union{String, Float64, Int} # The type of a string or number
@@ -32,7 +31,7 @@ function atom(text)
         r = parse(Float64, text)
         return isinteger(r) >= 0 ? Int(r) : r
     catch _
-        return(String(strip(text)))
+        return (String(strip(text)))
     end
 end
 
@@ -40,11 +39,13 @@ function atom_constraint(text)::String
     ## """Parse text into a single float or int or str.## """
     try
         r = parse(Float64, text)
-        if isinteger(r) r = Int(r) end
+        if isinteger(r)
+            r = Int(r)
+        end
         return r
     catch _
         r = string("\"", text, "\"")::String
-        return(r)
+        return (r)
     end
 end
 
@@ -66,13 +67,16 @@ end
 
 upSymbol(y::Symbol) = Symbol(uppercase(string(y)))
 
-
 function upcase!(df::DataFrame)
     _helper(c) = nothing
-    _helper(c::AbstractVector{T} where T<:AbstractString) = c .= strip.(uppercase.(c))
+    _helper(c::AbstractVector{T} where {T <: AbstractString}) = c .= strip.(uppercase.(c))
     foreach(_helper, eachcol(df))
     return df
 end
 
-
-up!(x) = try uppercase(strip(x)) catch _ return x end
+up!(x) =
+    try
+        uppercase(strip(x))
+    catch _
+        return x
+    end
