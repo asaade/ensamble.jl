@@ -2,73 +2,14 @@ using DataFrames
 using JuMP
 
 # Include external modules
+include("constants.jl")
+include("display_results.jl")
 include("get_data.jl")
+include("model_initializer.jl")
 include("solvers.jl")
 include("stats_functions.jl")
-include("charts.jl")
-include("constants.jl")
-include("model_initializer.jl")
 
-# Print functions
-function print_title_and_separator(title::String)
-    println(title)
-    return println(SEPARATOR)
-end
 
-function print_optimization_results(model::Model, parameters::Params)
-    parameters.verbose > 1 && println(solution_summary(model))
-    println(TOLERANCE_LABEL, round(objective_value(model); digits = 4))
-    return println(SEPARATOR)
-end
-
-"""
-    calculate_common_items(results::DataFrame)
-
-Calculate the number of common items between versions and return a matrix
-where each entry [i, j] indicates the number of common items between version `i` and version `j`.
-"""
-function calculate_common_items(results::DataFrame)
-    num_forms = size(results, 2)
-    common_items_matrix = zeros(Int, num_forms, num_forms)
-
-    for i in 1:num_forms, j in 1:num_forms
-        common = in(skipmissing(results[:, i])).(skipmissing(results[:, j]))
-        common_items_matrix[i, j] = sum(common)
-    end
-
-    return common_items_matrix
-end
-
-"""
-    display_common_items(results::DataFrame)
-
-Display the matrix of common items between versions.
-"""
-function display_common_items(results::DataFrame)
-    common_items_matrix = calculate_common_items(results)
-    print_title_and_separator(COMMON_ITEMS_MATRIX_TITLE)
-    display(common_items_matrix)
-    println(SEPARATOR)
-    return common_items_matrix
-end
-
-function display_final_results(parameters::Params, results::DataFrame)
-    items_used = length(unique(reduce(vcat, eachcol(results))))
-    println(VERSIONS_ASSEMBLED_MESSAGE, size(results, 2))
-    println(ITEMS_USED_MESSAGE, items_used)
-    println(REMAINING_ITEMS_MESSAGE, length(parameters.bank.CLAVE) - items_used)
-    return display_common_items(results)
-end
-
-"""
-    display_results(model::Model)
-
-Display the results of the optimization, including the tolerance and objective value.
-"""
-function display_results(model::Model, parameters::Params)
-    print_title_and_separator(OPTIMIZATION_RESULTS_TITLE)
-    return print_optimization_results(model, parameters)
-end
 
 """
     load_configuration(config_file::String)
@@ -111,6 +52,20 @@ function remove_used_items!(parameters::Params, used_items)
 end
 
 """
+    generate_unique_column_name(results::DataFrame)
+
+Generate a unique column name to avoid naming conflicts in the results DataFrame.
+"""
+function generate_unique_column_name(results::DataFrame)
+    i = 1
+    while "Version_$i" in names(results)
+        i += 1
+    end
+    return "Version_$i"
+end
+
+
+"""
     process_and_store_results!(model::Model, parameters::Params, results::DataFrame)
 
 Process the optimization results for each form and store them in a DataFrame.
@@ -136,19 +91,6 @@ function process_and_store_results!(model::Model, parameters::Params, results::D
     used_items = sort(unique(used_items))
     remove_used_items!(parameters, used_items)
     return results
-end
-
-"""
-    generate_unique_column_name(results::DataFrame)
-
-Generate a unique column name to avoid naming conflicts in the results DataFrame.
-"""
-function generate_unique_column_name(results::DataFrame)
-    i = 1
-    while "Version_$i" in names(results)
-        i += 1
-    end
-    return "Version_$i"
 end
 
 """
@@ -200,7 +142,6 @@ function main(config_file::String = CONFIG_FILE)
     config, original_parameters = load_configuration(config_file)
     parameters = deepcopy(original_parameters)
     constraints = read_constraints(config.constraints_file)
-    parameters.num_forms = parameters.shadow_test_size > 0 ? 1 : parameters.f
     results = DataFrame()
 
     while parameters.f > 0
@@ -218,20 +159,13 @@ function main(config_file::String = CONFIG_FILE)
             parameters.f -= parameters.num_forms
         else
             println(OPTIMIZATION_FAILED_MESSAGE)
+            # parameters.verbose > 0 && conflicting_constraints(model)
             parameters.f = 0
         end
     end
 
-    # Display common items matrix
-    if parameters.verbose > 0
-        # display_common_items(results)
-        display_final_results(original_parameters, results)
-    end
-
-    # Generate plots
-    plot_characteristic_curves_and_simulation(original_parameters, results)
-
-    return save_forms(original_parameters, results, config)
+    ## Display results and save
+    return final_report(original_parameters, results, config)
 end
 
 # Uncomment to run the main function
