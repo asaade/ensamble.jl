@@ -5,6 +5,7 @@ using DataFrames
 
 # Helper function to normalize the input string
 function normalize(input_str::String)
+    input_str = uppercase(input_str)
     input_str = replace(input_str, r"\s*([!=<>]=?|in|\&|\|)\s*" => s" \1 ")
     input_str = replace(input_str, r"\s*,\s*" => ",")
     return input_str
@@ -30,10 +31,6 @@ function apply_condition(op::String, lhs::Symbol, rhs, df::DataFrame)
         return lhs_col .> rhs
     elseif op == "!="
         return lhs_col .!= rhs
-    elseif op == "in"
-        return lhs_col .∈ Ref(rhs)
-    elseif op == "!in"
-        return lhs_col .∉ Ref(rhs)
     elseif op == "IN"
         return lhs_col .∈ Ref(rhs)
     elseif op == "!IN"
