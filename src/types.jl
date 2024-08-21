@@ -9,7 +9,7 @@ struct Config
     items_file::String
     anchor_items_file::Union{String, Missing}
     anchor_number::Int
-    versions_file::String
+    forms_file::String
     constraints_file::String
     results_file::String
     tcc_file::String
@@ -27,7 +27,7 @@ mutable struct Params
     f::Int
     k::Int
     r::Int
-    shadow_test_size::Int
+    shadow_test::Int
     method::String
     bank::DataFrame
     anchor_number::Int
@@ -45,7 +45,7 @@ end
 # Define a struct for holding constraint information
 struct Constraint
     id::String
-    type::InlineString
+    type::AbstractString
     condition::Function
     lb::Number
     ub::Number
