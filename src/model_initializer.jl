@@ -152,6 +152,10 @@ function apply_individual_constraint!(model::Model,
         condition = constraint.condition(bank)
         #  selected_items = items[condition]
         constraint_enemies_in_version(model, parameters, condition)
+    elseif constraint.type == "FRIENDS"
+        condition = constraint.condition(bank)
+        #  selected_items = items[condition]
+        constraint_friends_in_version(model, parameters, condition)
     else
         error("Unknown constraint type: ", constraint.type)
     end

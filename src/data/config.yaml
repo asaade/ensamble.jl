@@ -20,12 +20,12 @@ solver: cplex
 anchorNumber: 4
 
 ## Verbosity level of the program's output
-verbose: 1
+verbose: 2
 
 ## Parameters
 ##
 forms:
-     F: 2           # Number of test versions to assemble
+     F: 6           # Number of test versions to assemble
 
 ## Assembly model (TIC, TIC2, TCC, or CTT)
 ## TIC  - Test Information with absolute target at K points in theta
@@ -36,7 +36,7 @@ forms:
      method: TCC
 
 ## Number of powers for the TCC equating model
-     R: 3
+     R: 2
 
 ## Points on the scale for equating (including cut points)
      theta: [-2.5, -1.2, 0.0, 1.2, 2.5]

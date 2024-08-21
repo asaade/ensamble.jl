@@ -38,6 +38,34 @@ function constraint_enemies_in_version(model::Model,
     end
 end
 
+
+## Enemies
+function constraint_friends_in_version(model::Model,
+                                       parameters::Params,
+                                       selected)
+    x = model[:x]
+    forms = size(x, 2)
+    forms -= parameters.shadow_test_size > 0 ? 1 : 0
+
+    data = DataFrame(selected = selected, index = 1:length(selected))
+    dropmissing!(data, :selected)
+    if isa(selected, BitVector)
+        data = data[data.selected, :]
+    end
+    groups = groupby(data, :selected, sort = false, skipmissing = true)
+    for group in groups
+        items = group[!, :index]
+        pivot = items[1]
+        cnt = length(items)
+        if length(items) > 1
+            @constraint(model, [f = 1:forms],
+                        sum(x[i, f] for i in items) == cnt * x[pivot, f])
+            # @constraint(model, [f = 1:forms],
+            #             sum(x[i, f] for i in items) >= cnt * x[pivot, f])
+        end
+    end
+end
+
 ## Incluye un número de reactivos ente minItems y maxItems de la lista para la prueba sombra
 function constraint_item_count_shadow_aux(model::Model,
                                           parameters::Params,
@@ -364,29 +392,22 @@ function constraint_add_anchor!(model::Model, parameters::Params)
     return model
 end
 
-function constraint_prevent_overlap!(model::Model, parameters::Params)
-    if parameters.anchor_number == 0
-        x = model[:x]
-        items, forms = size(x)
-        if forms > 1
-            @constraint(model, [i = 1:items], sum([x[i, f] for f in 1:forms])<=1)
-        end
-    end
-    return model
-end
-
 function constraint_max_use(model::Model, parameters::Params, overlap = 1)
     if parameters.anchor_number == 0
         x = model[:x]
         items, forms = size(x)
-        forms -= parameters.shadow_test_size > 0 ? 1 : 0
-
+        # forms -= parameters.shadow_test_size > 0 ? 1 : 0
         if forms > 1
             @constraint(model, [i = 1:items], sum([x[i, f] for f in 1:forms])<=overlap)
         end
     end
     return model
 end
+
+function constraint_prevent_overlap!(model::Model, parameters::Params)
+    return constraint_max_use(model, parameters)
+end
+
 
 # function constraint_sets(model::Model, parameters::Params, group_ids, selected, minItems::Int, maxItems::Int=minItems)
 
