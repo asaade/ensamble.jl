@@ -1,7 +1,6 @@
 using JuMP
 using CSV
 using DataFrames
-using InlineStrings
 
 # Include external modules
 include("utils.jl")
@@ -59,7 +58,7 @@ function initialize_model!(model::Model,
                            constraints::Dict{String, Constraint})
     println(INITIALIZING_MODEL_MESSAGE)
     num_items = size(parameters.bank, 1)
-    num_forms = parameters.num_forms + (parameters.shadow_test_size > 0 ? 1 : 0)
+    num_forms = parameters.num_forms + (parameters.shadow_test > 0 ? 1 : 0)
 
     @variable(model, y>=0.0)
     @variable(model, x[1:num_items, 1:num_forms], Bin)
@@ -140,7 +139,7 @@ function apply_individual_constraint!(model::Model,
     items = 1:size(bank, 1)
 
     if constraint.type == "TEST"
-        constraint_items_per_version(model, parameters, lb, ub)
+        constraint_items_per_form(model, parameters, lb, ub)
     elseif constraint.type == "NUMBER"
         condition = constraint.condition(bank)
         selected_items = items[condition]
@@ -151,11 +150,11 @@ function apply_individual_constraint!(model::Model,
     elseif constraint.type == "ENEMIES"
         condition = constraint.condition(bank)
         #  selected_items = items[condition]
-        constraint_enemies_in_version(model, parameters, condition)
+        constraint_enemies_in_form(model, parameters, condition)
     elseif constraint.type == "FRIENDS"
         condition = constraint.condition(bank)
         #  selected_items = items[condition]
-        constraint_friends_in_version(model, parameters, condition)
+        constraint_friends_in_form(model, parameters, condition)
     else
         error("Unknown constraint type: ", constraint.type)
     end

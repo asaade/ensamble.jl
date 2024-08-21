@@ -1,10 +1,9 @@
 using JuMP
-using InlineStrings
 
 include("types.jl")
 
-## Número de reactivos totales (Items) en cada versión (forms)
-function constraint_items_per_version(model::Model,
+## Number of items in forms
+function constraint_items_per_form(model::Model,
                                       parameters::Params,
                                       minItems::Int,
                                       maxItems::Int = minItems)
@@ -16,12 +15,12 @@ function constraint_items_per_version(model::Model,
 end
 
 ## Enemies
-function constraint_enemies_in_version(model::Model,
+function constraint_enemies_in_form(model::Model,
                                        parameters::Params,
                                        selected)
     x = model[:x]
     forms = size(x, 2)
-    forms -= parameters.shadow_test_size > 0 ? 1 : 0
+    forms -= parameters.shadow_test > 0 ? 1 : 0
 
     data = DataFrame(selected = selected, index = 1:length(selected))
     dropmissing!(data, :selected)
@@ -40,12 +39,12 @@ end
 
 
 ## Enemies
-function constraint_friends_in_version(model::Model,
+function constraint_friends_in_form(model::Model,
                                        parameters::Params,
                                        selected)
     x = model[:x]
     forms = size(x, 2)
-    forms -= parameters.shadow_test_size > 0 ? 1 : 0
+    forms -= parameters.shadow_test > 0 ? 1 : 0
 
     data = DataFrame(selected = selected, index = 1:length(selected))
     dropmissing!(data, :selected)
@@ -72,20 +71,20 @@ function constraint_item_count_shadow_aux(model::Model,
                                           selected,
                                           minItems::Int,
                                           maxItems::Int = minItems)
-    shadow_test_size = parameters.shadow_test_size
+    shadow_test = parameters.shadow_test
 
-    if shadow_test_size > 0
+    if shadow_test > 0
         x = model[:x]
         zcol = size(x, 2)
 
         if minItems == maxItems && minItems >= 0
             @constraint(model,
-                        sum(x[i, zcol] for i in selected)==minItems * shadow_test_size)
+                        sum(x[i, zcol] for i in selected)==minItems * shadow_test)
         elseif minItems < maxItems
             @constraint(model,
-                        sum(x[i, zcol] for i in selected)>=minItems * shadow_test_size)
+                        sum(x[i, zcol] for i in selected)>=minItems * shadow_test)
             @constraint(model,
-                        sum(x[i, zcol] for i in selected)<=maxItems * shadow_test_size)
+                        sum(x[i, zcol] for i in selected)<=maxItems * shadow_test)
         end
     end
 
@@ -100,7 +99,7 @@ function constraint_item_count_aux(model::Model,
                                    maxItems::Int = minItems)
     x = model[:x]
     forms = size(x, 2)
-    forms -= parameters.shadow_test_size > 0 ? 1 : 0
+    forms -= parameters.shadow_test > 0 ? 1 : 0
 
     if minItems == maxItems && minItems >= 0
         @constraint(model, [f = 1:forms], sum(x[i, f] for i in selected)==minItems)
@@ -138,8 +137,8 @@ function constraint_item_sum_shadow_aux(model::Model,
                                         vals,
                                         minVal,
                                         maxVal = minVal)
-    shadow_test_size = parameters.shadow_test_size
-    if shadow_test_size > 0
+    shadow_test = parameters.shadow_test
+    if shadow_test > 0
         x = model[:x]
         items, zcol = size(x)
 
@@ -152,15 +151,18 @@ function constraint_item_sum_shadow_aux(model::Model,
 
         if minVal == maxVal && minVal >= 0
             @constraint(model,
-                        sum([x[i, zcol] * vals[i] for i in 1:items if cond[1]])==minVal *
-                                                                                 shadow_test_size)
+                        sum([x[i, zcol] * vals[i]
+                             for i in 1:items if cond[1]])==verminVal *
+                                 shadow_test)
         elseif minVal < maxVal
             @constraint(model,
-                        sum([x[i, zcol] * vals[i] for i in 1:items if cond[1]])>=minVal *
-                                                                                 shadow_test_size)
+                        sum([x[i, zcol] * vals[i]
+                             for i in 1:items if cond[1]])>=minVal *
+                                 shadow_test)
             @constraint(model,
-                        sum([x[i, zcol] * vals[i] for i in 1:items if cond[1]])<=maxVal *
-                                                                                 shadow_test_size)
+                        sum([x[i, zcol] * vals[i]
+                             for i in 1:items if cond[1]])<=maxVal *
+                                 shadow_test)
         end
     end
 
@@ -182,7 +184,7 @@ function constraint_item_sum_aux(model::Model,
     end
 
     items, forms = size(x)
-    forms -= parameters.shadow_test_size > 0 ? 1 : 0
+    forms -= parameters.shadow_test > 0 ? 1 : 0
 
     if minVal == maxVal && minVal >= 0
         @constraint(model,
@@ -214,13 +216,13 @@ end
 
 ## Tolerancia de y en todos los puntos k de la curva característica
 function constraint_TCC_shadow_aux(model::Model, parameters::Params)
-    if parameters.shadow_test_size > 0
+    if parameters.shadow_test > 0
         R, K = 1:(parameters.r), 1:(parameters.k)
         P, tau = parameters.p, parameters.tau
         x, y = model[:x], model[:y]
         items, zcol = size(x)
 
-        shadow_test_size = parameters.shadow_test_size
+        shadow_test = parameters.shadow_test
 
         # w = [1.0 for _ in R]
         # w = [1.15 - (0.15 * r) for r in R]
@@ -230,12 +232,12 @@ function constraint_TCC_shadow_aux(model::Model, parameters::Params)
                     [k = K, r = R],
                     sum([P[i, k]^r * x[i, zcol] for i in 1:items])<=((tau[r, k] +
                                                                       (w[r] * y)) *
-                                                                     shadow_test_size))
+                                                                     shadow_test))
         @constraint(model,
                     [k = K, r = R],
                     sum([P[i, k]^r * x[i, zcol] for i in 1:items])>=((tau[r, k] -
                                                                       (w[r] * y)) *
-                                                                     shadow_test_size))
+                                                                     shadow_test))
     end
     return model
 end
@@ -246,7 +248,7 @@ function constraint_TCC_aux(model::Model, parameters::Params)
     P, tau = parameters.p, parameters.tau
     x, y = model[:x], model[:y]
     items, forms = size(x)
-    forms -= parameters.shadow_test_size > 0 ? 1 : 0
+    forms -= parameters.shadow_test > 0 ? 1 : 0
 
     # w = [1.0 for _ in R]
     # w = [1.15 - (0.15 * (r - 1)) for r in R]
@@ -270,24 +272,24 @@ end
 
 ## Tolerancia de y en todos los puntos k de la curva característica
 function constraint_ICC_shadow_aux(model::Model, parameters::Params)
-    if parameters.shadow_test_size > 0
+    if parameters.shadow_test > 0
         K = parameters.k
         info = parameters.info
         tau_info = parameters.tau_info
 
         x, y = model[:x], model[:y]
         items, zcol = size(x)
-        shadow_test_size = parameters.shadow_test_size
+        shadow_test = parameters.shadow_test
 
         @constraint(model,
                     [k = 1:K],
                     sum([info[i, k] * x[i, zcol] for i in 1:items])<=(tau_info[k] + y) *
-                                                                     shadow_test_size)
+                                                                     shadow_test)
 
         @constraint(model,
                     [k = 1:K],
                     sum([info[i, k] * x[i, zcol] for i in 1:items])>=(tau_info[k] - y) *
-                                                                     shadow_test_size)
+                                                                     shadow_test)
     end
     return model
 end
@@ -300,7 +302,7 @@ function constraint_ICC_aux(model::Model, parameters::Params)
 
     x, y = model[:x], model[:y]
     items, forms = size(x)
-    forms -= parameters.shadow_test_size > 0 ? 1 : 0
+    forms -= parameters.shadow_test > 0 ? 1 : 0
 
     @assert(length(info[:, 1])==items)
     @assert(length(info[1, :])==parameters.k)
@@ -329,7 +331,7 @@ function objective_info_relative(model::Model, parameters::Params)
     x, y = model[:x], model[:y]
     (items, forms) = size(x)
 
-    shadow = parameters.shadow_test_size
+    shadow = parameters.shadow_test
     forms -= shadow > 0 ? 1 : 0
 
     @constraint(model,
@@ -355,7 +357,7 @@ function objective_info_relative2(model::Model,
     x, y = model[:x], model[:y]
     (items, forms) = size(x)
     xs = forms
-    shadow = parameters.shadow_test_size
+    shadow = parameters.shadow_test
     forms -= shadow > 0 ? 1 : 0
 
     @constraint(model,
@@ -381,7 +383,7 @@ function constraint_add_anchor!(model::Model, parameters::Params)
             @constraint(model, [i = bank_items], sum([x[i, f] for f in 1:forms])<=1)
         end
 
-        forms -= parameters.shadow_test_size > 0 ? 1 : 0
+        forms -= parameters.shadow_test > 0 ? 1 : 0
 
         for f in 1:forms
             for i in anchor_items
@@ -396,7 +398,7 @@ function constraint_max_use(model::Model, parameters::Params, overlap = 1)
     if parameters.anchor_number == 0
         x = model[:x]
         items, forms = size(x)
-        # forms -= parameters.shadow_test_size > 0 ? 1 : 0
+        # forms -= parameters.shadow_test > 0 ? 1 : 0
         if forms > 1
             @constraint(model, [i = 1:items], sum([x[i, f] for f in 1:forms])<=overlap)
         end

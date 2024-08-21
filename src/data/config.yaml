@@ -1,10 +1,10 @@
 ## Inputs
 itemsFile: ./data/items.csv               # Item bank data file
 constraintsFile: ./data/constraints.csv   # Constraints file
-anchorFile: ./data/ancla.csv              # Anchor items file
+anchorFile: ./data/anchor.csv              # Anchor items file
 
 ## Outputs
-versionsFile: ./data/results/versions.csv # File to store assembled test versions
+formsFile: ./data/results/forms.csv # File to store assembled test forms
 tccFile: ./data/results/tcc.csv           # Test Characteristic Curve (TCC) file
 resultsFile: ./data/results/results.csv   # File to store final results
 plotFile: ./data/results/chart.png        # Plot output file
@@ -14,18 +14,18 @@ plotFile: ./data/results/chart.png        # Plot output file
 ## CPLEX, Cbc, SCIP, HiGHS, and GLPK
 solver: cplex
 
-## Number of anchor tests to alternate from those
+## Number of anchor tests to alternate in forms from those
 ## included in the anchorFile. If an acchor test is not
-## included, the items are reused as standard items.
+## included, the items are excluded from assembly.
 anchorNumber: 4
 
 ## Verbosity level of the program's output
-verbose: 2
+verbose: 1
 
 ## Parameters
 ##
 forms:
-     F: 6           # Number of test versions to assemble
+     F: 6           # Number of test forms to assemble
 
 ## Assembly model (TIC, TIC2, TCC, or CTT)
 ## TIC  - Test Information with absolute target at K points in theta
@@ -54,10 +54,12 @@ forms:
 
 
 ## Use Big Shadow Test heuristic; assemble one test at a time
-## insted of all test simultaneously (shadowSize: 0) to easy
+## insted of all test simultaneously (shadowTest: 0) to easy
 ## Recommended as defaut, specially for big or complex models.
 ## Required if TCC3 method is selected to alternate forms
-     shadowSize: 1
+## 1 use Big Shadow Test sequential assembly
+## 0 simultaneous assembly
+     shadowTest: 1
 
 ## Points and weights to maximize for relative target models
 ## TIC2 and TIC3

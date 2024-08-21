@@ -37,7 +37,7 @@ end
 """
     remove_used_items!(parameters::Params, used_items)
 
-Remove items used in versions from the bank and update probabilities or
+Remove items used in forms from the bank and update probabilities or
 information for the remaining items based on the method used.
 """
 function remove_used_items!(parameters::Params, used_items)
@@ -58,10 +58,10 @@ Generate a unique column name to avoid naming conflicts in the results DataFrame
 """
 function generate_unique_column_name(results::DataFrame)
     i = 1
-    while "Version_$i" in names(results)
+    while "Form_$i" in names(results)
         i += 1
     end
-    return "Version_$i"
+    return "Form_$i"
 end
 
 
@@ -78,12 +78,12 @@ function process_and_store_results!(model::Model, parameters::Params, results::D
     used_items = Int[]
     max_items = parameters.max_items
 
-    for version_name in 1:(parameters.num_forms)
-        selected_items = items[solver_matrix[:, version_name] .> 0.5]
-        item_codes_in_version = item_codes[selected_items]
-        version_length = length(item_codes_in_version)
-        pad = max_items - version_length
-        padded_item_codes = vcat(item_codes_in_version, fill(MISSING_VALUE_FILLER, pad))
+    for form_name in 1:(parameters.num_forms)
+        selected_items = items[solver_matrix[:, form_name] .> 0.5]
+        item_codes_in_form = item_codes[selected_items]
+        form_length = length(item_codes_in_form)
+        pad = max_items - form_length
+        padded_item_codes = vcat(item_codes_in_form, fill(MISSING_VALUE_FILLER, pad))
 
         results[!, generate_unique_column_name(results)] = padded_item_codes
         used_items = vcat(used_items, selected_items)
@@ -117,22 +117,6 @@ function handle_anchor_items(parameters::Params, original_parameters::Params)
 end
 
 """
-    save_forms(parameters::Params, results::DataFrame, config::Config)
-
-Save the forms to a file, marking used items with a checkmark.
-"""
-function save_forms(parameters::Params, results::DataFrame, config)
-    bank = deepcopy(parameters.bank)
-
-    for v in names(results)
-        bank[!, Symbol(v)] = map(x -> x == 1 ? CHECKMARK : "",
-                                 bank.CLAVE .∈ Ref(skipmissing(results[:, v])))
-    end
-    write_results_to_file(bank, config.versions_file)
-    return write_results_to_file(results, config.results_file)
-end
-
-"""
     main(config_file::String=CONFIG_FILE)
 
 Main function to run the entire optimization process, including loading configurations,
@@ -146,7 +130,7 @@ function main(config_file::String = CONFIG_FILE)
 
     while parameters.f > 0
         parameters.num_forms = min(parameters.num_forms, parameters.f)
-        parameters.shadow_test_size = max(0, parameters.f - parameters.num_forms)
+        parameters.shadow_test = max(0, parameters.f - parameters.num_forms)
         handle_anchor_items(parameters, original_parameters)
 
         model = Model()

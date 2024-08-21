@@ -12,7 +12,7 @@ function Config(config_dict::Dict{Symbol, Any})
                   config_dict[:ITEMSFILE],
                   config_dict[:ANCHORFILE],
                   config_dict[:ANCHORNUMBER],
-                  config_dict[:VERSIONSFILE],
+                  config_dict[:FORMSFILE],
                   config_dict[:CONSTRAINTSFILE],
                   config_dict[:RESULTSFILE],
                   config_dict[:TCCFILE],
@@ -24,13 +24,13 @@ end
 # Function to convert a dictionary to a Params struct
 function Params(parms_dict::Dict{Symbol, Any})
     return Params(parms_dict[:N],
-                  parms_dict[:SHADOWSIZE] > 0 ? 1 : parms_dict[:F],
+                  parms_dict[:SHADOWTEST] > 0 ? 1 : parms_dict[:F],
                   parms_dict[:MAXN],
                   # zeros(size(parms_dict[:BANK], 1)),
                   parms_dict[:F],
                   parms_dict[:K],
                   parms_dict[:R],
-                  parms_dict[:SHADOWSIZE],
+                  parms_dict[:SHADOWTEST],
                   parms_dict[:METHOD],
                   parms_dict[:BANK],
                   parms_dict[:ANCHOR_NUMBER],
@@ -116,16 +116,16 @@ end
 # Function to add anchor labels to the bank
 function add_anchor_labels!(config::Config, bank::DataFrame)
     anchor_items = read_anchor_file(config)
-    anchor_versions = 0
+    anchor_forms = 0
     if !isempty(anchor_items)
         println("Loaded valid anchor data file")
         anchor_tests = size(anchor_items, 2)
         if anchor_tests > 0
-            anchor_versions = min(config.anchor_number, anchor_tests)
+            anchor_forms = min(config.anchor_number, anchor_tests)
 
             bank[!, "ANCHOR"] = fill(0, size(bank, 1))
 
-            for i in 1:anchor_versions
+            for i in 1:anchor_forms
                 dfv = view(bank, bank.CLAVE .∈ Ref(anchor_items[:, i]), :)
                 @. dfv.ANCHOR = i
             end
@@ -133,7 +133,7 @@ function add_anchor_labels!(config::Config, bank::DataFrame)
     else
         println("Anchor file missing or empty")
     end
-    return bank, anchor_versions
+    return bank, anchor_forms
 end
 
 # Function to read bank file and handle errors

@@ -2,19 +2,19 @@
 # Archivo con los datos del banco
 itemsFile: ../data/items.csv
 
-# Archivo con versiones ancla armadas previamente
+# File with previously prepared anchor tests
 # anchorFile: ../data/ancla.csv
 
-versionsFile: ../data/ancla.csv
+formsFile: ../data/anchor.csv
 
 # Cantidad de información que imprime el programa
 verbose: True
 
 # Parámetros
 forms:
-  # Número de versiones para ensamblar
+  # Number of forms to assemble
   F: 4
-  # Número de reactivos totales por versión
+  # Total items per form
   N: 24
   # Modelo para el ensamble (TIC, TCC o TC)
   method: TCC

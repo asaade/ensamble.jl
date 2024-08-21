@@ -33,11 +33,11 @@ function generate_results_simulation(parameters::Params,
                                      ability_dist::Distribution = Normal(0.0, 1.0))
     bank = parameters.bank
     observed_dist = DataFrame()
-    max_length, num_versions = size(results)
+    max_length, num_forms = size(results)
     max_length += 1
     column_names = names(results)
 
-    for i in 1:num_versions
+    for i in 1:num_forms
         selected_items = results[:, i]
         a, b, c = get_item_parameters(bank, selected_items)
 
@@ -50,16 +50,16 @@ function generate_results_simulation(parameters::Params,
     return observed_dist
 end
 
-# Generate characteristic curves for each version
+# Generate characteristic curves for each form
 function generate_characteristic_curves(parameters::Params,
                                         results::DataFrame,
                                         theta_range::AbstractVector,
                                         r::Int = 1)
     bank = parameters.bank
-    num_versions = size(results, 2)
+    num_forms = size(results, 2)
     curves = DataFrame()
 
-    for i in 1:num_versions
+    for i in 1:num_forms
         selected_items = results[:, i]
         a, b, c = get_item_parameters(bank, selected_items)
         scores = map(theta -> sum(Pr.(theta, b, a, c) .^ r), theta_range)
@@ -69,15 +69,15 @@ function generate_characteristic_curves(parameters::Params,
     return curves
 end
 
-# Generate characteristic curves for each version
+# Generate characteristic curves for each form
 function generate_information_curves(parameters,
                                      results::DataFrame,
                                      theta_range::AbstractVector)
     bank = parameters.bank
-    num_versions = size(results, 2)
+    num_forms = size(results, 2)
     curves = DataFrame()
 
-    for i in 1:num_versions
+    for i in 1:num_forms
         selected_items = results[:, i]
         a, b, c = get_item_parameters(bank, selected_items)
         information = map(theta -> sum(item_information.(theta, b, a, c)), theta_range)
@@ -88,9 +88,9 @@ function generate_information_curves(parameters,
 end
 
 # Function to write results to file
-function write_results_to_file(curve_data, output_file = "data/tcc.csv")
-    println("Writing results to file: ", output_file)
-    return CSV.write(output_file, curve_data)
+function write_results_to_file(curve_data, output_file = "data/results/tcc.csv")
+    # println("Writing results to file: ", output_file)
+    CSV.write(output_file, curve_data)
 end
 
 # Generate characteristic curves and observed score distribution plots
@@ -109,12 +109,12 @@ function plot_characteristic_curves_and_simulation(parameters,
     theme(:dao)
     gr(; size = (900, 900))
 
-    versions = size(results, 2)
+    forms = size(results, 2)
 
     # Create subplots
     p1 = @df characteristic_curves plot(theta_range,
                                         cols(),
-                                        title = "Characteristic Curves for $versions versions",
+                                        title = "Characteristic Curves for $forms forms",
                                         xlabel = "θ",
                                         ylabel = "Score",
                                         linewidth = 2,

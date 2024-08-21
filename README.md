@@ -16,7 +16,7 @@ Item Response Theory (IRT) offers a common solution to this problem, Once the st
 
 Traditionally, this process is iterative —manually combining available items from the bank like puzzle pieces according to their content and estimated difficulties, until the objective is met. Manual assembly is tedious; it can take hours, or even days in some cases, especially when assembling multiple booklets with dozens of items each. This involves a process of adding and removing items until the desired outcome is reached.
 
-Computers have brought significant advantages to this process. To ease this burden and minimize the errors that result from manual processes, optimization methods have increasingly been used to enable the relatively automatic assembly of test versions.
+Computers have brought significant advantages to this process. To ease this burden and minimize the errors that result from manual processes, optimization methods have increasingly been used to enable the relatively automatic assembly of test forms.
 
 The idea is that if the test constructor defines the desired characteristics of the test in detail, including the necessary topics and content, the machine can select the best combinations.
 
@@ -28,11 +28,11 @@ The idea is that if the test constructor defines the desired characteristics of 
 
 - Objective and Reproducible: It forces the creation of well-defined and detailed specifications, making the process more objective and reproducible.
 
-- Simultaneous Version Assembly: Multiple versions can be assembled simultaneously. This also promotes better use of items.
+- Simultaneous Form Assembly: Multiple forms can be assembled simultaneously. This also promotes better use of items.
 
 - Powerful Constraints Management: The process is robust enough to meet all constraints objectively, even with complex specification tables.
 
-- Customizable: It is possible to assemble specific versions according to the needs of each application. In some cases, it is even possible to create and modify the test version "on the fly" for each test-taker, adapting the content as they respond.
+- Customizable: It is possible to assemble specific forms according to the needs of each application. In some cases, it is even possible to create and modify the test form "on the fly" for each test-taker, adapting the content as they respond.
 
 - Automatic Reporting: The system can generate detailed and fast assembly reports automatically.
 
