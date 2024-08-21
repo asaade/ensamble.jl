@@ -47,6 +47,20 @@ function configure_solver!(model::Model, parameters::Params, solver_name::String
     return model
 end
 
+function conflicting_constraints(model)
+    list_of_conflicting_constraints = ConstraintRef[]
+
+    for (F, S) in list_of_constraint_types(model)
+        for con in all_constraints(model, F, S)
+            if get_attribute(con, MOI.ConstraintConflictStatus()) == MOI.IN_CONFLICT
+                push!(list_of_conflicting_constraints, con)
+            end
+        end
+    end
+
+    return list_of_conflicting_constraints
+end
+
 # # Example usage:
 
 # model = Model()

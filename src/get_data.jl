@@ -24,7 +24,7 @@ end
 # Function to convert a dictionary to a Params struct
 function Params(parms_dict::Dict{Symbol, Any})
     return Params(parms_dict[:N],
-                  parms_dict[:F],
+                  parms_dict[:SHADOWSIZE] > 0 ? 1 : parms_dict[:F],
                   parms_dict[:MAXN],
                   # zeros(size(parms_dict[:BANK], 1)),
                   parms_dict[:F],
