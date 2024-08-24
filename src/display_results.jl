@@ -4,8 +4,6 @@ include("charts.jl")
 include("constants.jl")
 include("types.jl")
 
-
-
 # Print functions
 function print_title_and_separator(title::String)
     println(title)
@@ -14,7 +12,7 @@ end
 
 function print_optimization_results(model::Model, parameters::Params)
     parameters.verbose > 1 && println(solution_summary(model))
-    println(TOLERANCE_LABEL, round(objective_value(model); digits = 4))
+    println(TOLERANCE_LABEL, round(objective_value(model); digits=4))
     return println(SEPARATOR)
 end
 
@@ -67,7 +65,6 @@ function display_results(model::Model, parameters::Params)
     return print_optimization_results(model, parameters)
 end
 
-
 """
     save_forms(parameters::Params, results::DataFrame, config::Config)
 
@@ -81,9 +78,8 @@ function save_forms(parameters::Params, results::DataFrame, config)
                                  bank.CLAVE .∈ Ref(skipmissing(results[:, v])))
     end
     write_results_to_file(bank, config.forms_file)
-    write_results_to_file(results, config.results_file)
+    return write_results_to_file(results, config.results_file)
 end
-
 
 function final_report(original_parameters::Params, results::DataFrame, config::Config)
     # Display common items matrix
@@ -91,7 +87,7 @@ function final_report(original_parameters::Params, results::DataFrame, config::C
     display_final_results(original_parameters, results)
 
     # Generate plots
-    plot_characteristic_curves_and_simulation(original_parameters, results)
+    plot_results_and_simulation(original_parameters, results)
 
-    save_forms(original_parameters, results, config)
+    return save_forms(original_parameters, results, config)
 end

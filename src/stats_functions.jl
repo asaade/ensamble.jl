@@ -16,16 +16,13 @@ for one or many parameters or ability points (vectors)
 # Returns
 - The calculated probability.
 """
-function Pr(θ::Float64, b::Float64, a::Float64, c::Float64; d::Float64 = 1.0)
+function Pr(θ::Float64, b::Float64, a::Float64, c::Float64; d::Float64=1.0)
     return c + (1 - c) / (1 + exp(-d * a * (θ - b)))
 end
 
 # Overload to handle scalar inputs for b, a, and c
-function Pr(θ::Float64,
-            b::AbstractVector,
-            a::AbstractVector,
-            c::AbstractVector;
-            d::Float64 = 1.0,)
+function Pr(θ::Float64, b::AbstractVector, a::AbstractVector, c::AbstractVector;
+            d::Float64=1.0)
     return c .+ (1 .- c) ./ (1 .+ exp.(-d .* a .* (θ .- b)))
 end
 
@@ -44,18 +41,15 @@ Calculates the item information using the given parameters.
 # Returns
 - The item information rounded to 4 decimal places.
 """
-function item_information(θ::Float64,
-                          b::AbstractVector,
-                          a::AbstractVector,
-                          c::AbstractVector;
-                          d::Float64 = 1.0,)
-    p = Pr.(θ, b, a, c; d = d)
+function item_information(θ::Float64, b::AbstractVector, a::AbstractVector,
+                          c::AbstractVector; d::Float64=1.0)
+    p = Pr.(θ, b, a, c; d=d)
     q = 1 .- p
     return (d .* a) .^ 2 .* (p .- c) .^ 2 .* q ./ ((1 .- c) .^ 2 .* p)
 end
 
-function item_information(θ::Float64, b::Float64, a::Float64, c::Float64; d::Float64 = 1.0)
-    p = Pr.(θ, b, a, c; d = d)
+function item_information(θ::Float64, b::Float64, a::Float64, c::Float64; d::Float64=1.0)
+    p = Pr.(θ, b, a, c; d=d)
     q = 1 - p
     return (d * a)^2 * (p - c)^2 * q / ((1 - c)^2 * p)
 end
@@ -153,7 +147,7 @@ end
 # println("Score distribution: ", score_distribution)
 
 # Simulate a group of students with abilities drawn from a normal distribution N(0, 1)
-function simulate_abilities(num_examinees::Int, mean::Float64 = 0.0, stddev::Float64 = 1.0)
+function simulate_abilities(num_examinees::Int, mean::Float64=0.0, stddev::Float64=1.0)
     dist = Normal(mean, stddev)
     return rand(dist, num_examinees)
 end
@@ -189,8 +183,7 @@ end
 
 # Function to calculate the observed score distribution using numerical integration
 function observed_score_distribution_continuous(item_params::Matrix{Float64},
-                                                ability_dist::Normal;
-                                                num_points::Int = 100,)
+                                                ability_dist::Normal; num_points::Int=100)
     num_items = size(item_params, 2)
 
     # Function to calculate f(x|θ) * ψ(θ)
@@ -202,7 +195,7 @@ function observed_score_distribution_continuous(item_params::Matrix{Float64},
     # Integrate for each score using Gaussian quadrature
     observed_dist = zeros(Float64, num_items + 1)
     for x in 0:num_items
-        observed_dist[x + 1] = quadgk(θ -> integrand(θ, x), -Inf, Inf; order = num_points)[1]
+        observed_dist[x + 1] = quadgk(θ -> integrand(θ, x), -Inf, Inf; order=num_points)[1]
     end
 
     return observed_dist
@@ -216,7 +209,7 @@ function euclidian_distance(x::Number, y::Number)
     return sqrt.((x .- y) .^ 2)
 end
 
-function delta(q1::Vector{T}, q2::Vector{T}) where {T <: Number}
+function delta(q1::Vector{T}, q2::Vector{T}) where {T<:Number}
     items = size(q1, 1)
     v = sqrt.([(q1[i] - q1[j]) .^ 2 for i in 1:items for j in 1:items] .+
               [(q2[i] - q2[j]) .^ 2 for i in 1:items for j in 1:items])

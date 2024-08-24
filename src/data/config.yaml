@@ -17,15 +17,15 @@ solver: cplex
 ## Number of anchor tests to alternate in forms from those
 ## included in the anchorFile. If an acchor test is not
 ## included, the items are excluded from assembly.
-anchorNumber: 4
+anchorNumber: 2
 
 ## Verbosity level of the program's output
-verbose: 1
+verbose: 2
 
 ## Parameters
 ##
 forms:
-     F: 6           # Number of test forms to assemble
+     F: 4           # Number of test forms to assemble
 
 ## Assembly model (TIC, TIC2, TCC, or CTT)
 ## TIC  - Test Information with absolute target at K points in theta
@@ -64,4 +64,4 @@ forms:
 ## Points and weights to maximize for relative target models
 ## TIC2 and TIC3
      relativeTargetWeights: [1, 1, 1]
-     relativeTargetPoints: [-1.0, 0.0, 1.0]
+     relativeTargetPoints: [-1.0, 0.0, 1.5]

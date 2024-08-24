@@ -11,7 +11,7 @@ isint(s) = tryparse(Int, s) !== nothing
 to_int(s) = parse(Int, s)
 
 # char = String # Intended as the type of a one-character string
-Atom = Union{String, Float64, Int} # The type of a string or number
+Atom = Union{String,Float64,Int} # The type of a string or number
 
 ##"""A tuple of all the integers in text, ignoring non-number characters."""
 ints(text) = map(x -> tryparse(Int, x.match), eachmatch(r"-?\d+", text))
@@ -69,7 +69,7 @@ upSymbol(y::Symbol) = Symbol(uppercase(string(y)))
 
 function upcase!(df::DataFrame)
     _helper(c) = nothing
-    _helper(c::AbstractVector{T} where {T <: AbstractString}) = c .= strip.(uppercase.(c))
+    _helper(c::AbstractVector{T} where {T<:AbstractString}) = c .= strip.(uppercase.(c))
     foreach(_helper, eachcol(df))
     return df
 end

@@ -3,17 +3,13 @@ using CSV
 using DataFrames
 
 # Include external modules
-include("utils.jl")
-
-# include("expression_parser.jl")
+include("CriteriaParser.jl")
 include("constraints.jl")
 include("types.jl")
-
-include("CriteriaParser.jl")
-# using .CriteriaParser
+include("utils.jl")
 
 # Module constants
-const MODEL_FILE = "data/model.lp"
+const MODEL_FILE = "./data/model.mps"
 const INITIALIZING_MODEL_MESSAGE = "Initializing optimization model..."
 const APPLYING_CONSTRAINT_MESSAGE = "Applying constraint: "
 
@@ -23,8 +19,8 @@ const APPLYING_CONSTRAINT_MESSAGE = "Applying constraint: "
 Read constraints from a CSV file, returning a dictionary of Constraint objects.
 """
 function read_constraints(file_path::String)
-    df = CSV.read(file_path, DataFrame; missingstring = nothing)
-    constraints = Dict{String, Constraint}()
+    df = CSV.read(file_path, DataFrame; missingstring=nothing)
+    constraints = Dict{String,Constraint}()
 
     for row in eachrow(df)
         if row[:ONOFF] != "OFF"
@@ -55,12 +51,12 @@ and constraints based on the provided parameters.
 function initialize_model!(model::Model,
                            parameters::Params,
                            original_parameters::Params,
-                           constraints::Dict{String, Constraint})
+                           constraints::Dict{String,Constraint})
     println(INITIALIZING_MODEL_MESSAGE)
     num_items = size(parameters.bank, 1)
     num_forms = parameters.num_forms + (parameters.shadow_test > 0 ? 1 : 0)
 
-    @variable(model, y>=0.0)
+    @variable(model, y >= 0.0)
     @variable(model, x[1:num_items, 1:num_forms], Bin)
 
     set_objective!(model, parameters)
@@ -78,7 +74,7 @@ Apply the constraints from the configuration to the optimization model.
 function apply_constraints!(model::Model,
                             parameters::Params,
                             original_parameters::Params,
-                            constraints::Dict{String, Constraint})
+                            constraints::Dict{String,Constraint})
     apply_objective!(model, parameters, original_parameters)
     constraint_prevent_overlap!(model, parameters)
     constraint_add_anchor!(model, parameters)
@@ -116,7 +112,7 @@ function apply_objective!(model::Model, parameters::Params, original_parameters:
     elseif parameters.method in ["TIC"]
         objective_match_information_curve!(model, parameters)
     elseif parameters.method == "TIC2"
-        objective_info_relative(model, parameters)
+        objective_max_info(model, parameters)
     elseif parameters.method == "TIC3"
         objective_info_relative2(model, parameters, original_parameters)
     elseif parameters.method == "TC"
@@ -131,8 +127,7 @@ end
 
 Apply an individual constraint to the model based on the constraint type.
 """
-function apply_individual_constraint!(model::Model,
-                                      parameters::Params,
+function apply_individual_constraint!(model::Model, parameters::Params,
                                       constraint::Constraint)
     lb, ub = constraint.lb, constraint.ub
     bank = parameters.bank

@@ -82,7 +82,7 @@ function parse_criteria(input_str::String)
 
     # Check for comma-separated columns, but only if not within a collection
     if contains(normalized_str, r",") && !occursin(r"\[.*\]", normalized_str)
-        col_expr, condition_expr = split(normalized_str, ","; limit = 2)
+        col_expr, condition_expr = split(normalized_str, ","; limit=2)
         col_expr = strip(col_expr)
 
         condition_parts = split(condition_expr, r"\s+")

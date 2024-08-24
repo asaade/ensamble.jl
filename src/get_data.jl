@@ -6,7 +6,7 @@ include("types.jl")
 include("utils.jl")
 
 # Function to convert a dictionary to a Config struct
-function Config(config_dict::Dict{Symbol, Any})
+function Config(config_dict::Dict{Symbol,Any})
     forms_data = Dict(Symbol(k) => v for (k, v) in config_dict[:FORMS])
     return Config(forms_data,
                   config_dict[:ITEMSFILE],
@@ -22,7 +22,7 @@ function Config(config_dict::Dict{Symbol, Any})
 end
 
 # Function to convert a dictionary to a Params struct
-function Params(parms_dict::Dict{Symbol, Any})
+function Params(parms_dict::Dict{Symbol,Any})
     return Params(parms_dict[:N],
                   parms_dict[:SHADOWTEST] > 0 ? 1 : parms_dict[:F],
                   parms_dict[:MAXN],
@@ -148,7 +148,7 @@ function read_bank_file(config::Config)::DataFrame
 end
 
 # Function to find total items in constraints file
-function find_total_items(file_path::String)::Tuple{Int, Int}
+function find_total_items(file_path::String)::Tuple{Int,Int}
     df = safe_read_csv(file_path)
 
     for row in eachrow(df)
@@ -162,8 +162,8 @@ function find_total_items(file_path::String)::Tuple{Int, Int}
 end
 
 # Function to load configuration from a YAML file
-function load_config(inFile::String = "data/config.yaml")::Config
-    config_data = YAML.load_file(inFile; dicttype = Dict{Symbol, Any})
+function load_config(inFile::String="data/config.yaml")::Config
+    config_data = YAML.load_file(inFile; dicttype=Dict{Symbol,Any})
     config_dict = Dict(upSymbol(k) => v for (k, v) in config_data)
     config_dict[:FORMS] = Dict(upSymbol(k) => v for (k, v) in config_dict[:FORMS])
     lb, ub = find_total_items(config_dict[:CONSTRAINTSFILE])
@@ -207,7 +207,7 @@ function get_params(config::Config)::Params
         parms_dict[:THETA] = theta
         a, b, c = bank[!, :A], bank[!, :B], bank[!, :C]
         parms_dict[:K] = length(theta)
-        p = [Pr(t, b, a, c; d = 1.0) for t in theta]
+        p = [Pr(t, b, a, c; d=1.0) for t in theta]
         parms_dict[:P] = reduce(hcat, p)
 
         if haskey(parms_dict, :TAU)

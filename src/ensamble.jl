@@ -7,9 +7,6 @@ include("display_results.jl")
 include("get_data.jl")
 include("model_initializer.jl")
 include("solvers.jl")
-include("stats_functions.jl")
-
-
 
 """
     load_configuration(config_file::String)
@@ -52,26 +49,25 @@ function remove_used_items!(parameters::Params, used_items)
 end
 
 """
-    generate_unique_column_name(results::DataFrame)
+    generate_unique_column_name(results_df::DataFrame)
 
-Generate a unique column name to avoid naming conflicts in the results DataFrame.
+Generate a unique column name to avoid naming conflicts in the results_df DataFrame.
 """
-function generate_unique_column_name(results::DataFrame)
+function generate_unique_column_name(results_df::DataFrame)
     i = 1
-    while "Form_$i" in names(results)
+    while "Form_$i" in names(results_df)
         i += 1
     end
     return "Form_$i"
 end
 
-
 """
-    process_and_store_results!(model::Model, parameters::Params, results::DataFrame)
+    process_and_store_results!(model::Model, parameters::Params, results_df::DataFrame)
 
-Process the optimization results for each form and store them in a DataFrame.
+Process the optimization results_df for each form and store them in a DataFrame.
 Used items are removed from the bank for subsequent forms.
 """
-function process_and_store_results!(model::Model, parameters::Params, results::DataFrame)
+function process_and_store_results!(model::Model, parameters::Params, results_df::DataFrame)
     solver_matrix = value.(model[:x])
     item_codes = parameters.bank.CLAVE
     items = 1:length(item_codes)
@@ -82,15 +78,17 @@ function process_and_store_results!(model::Model, parameters::Params, results::D
         selected_items = items[solver_matrix[:, form_name] .> 0.5]
         item_codes_in_form = item_codes[selected_items]
         form_length = length(item_codes_in_form)
-        pad = max_items - form_length
-        padded_item_codes = vcat(item_codes_in_form, fill(MISSING_VALUE_FILLER, pad))
+        missing_rows = max_items - form_length
+        padded_item_codes = vcat(item_codes_in_form,
+                                 fill(MISSING_VALUE_FILLER, missing_rows))
 
-        results[!, generate_unique_column_name(results)] = padded_item_codes
+        results_df[!, generate_unique_column_name(results_df)] = padded_item_codes
         used_items = vcat(used_items, selected_items)
     end
+
     used_items = sort(unique(used_items))
     remove_used_items!(parameters, used_items)
-    return results
+    return results_df
 end
 
 """
@@ -120,13 +118,13 @@ end
     main(config_file::String=CONFIG_FILE)
 
 Main function to run the entire optimization process, including loading configurations,
-running the solver, processing results, and saving the output.
+running the solver, processing results_df, and saving the output.
 """
-function main(config_file::String = CONFIG_FILE)
+function main(config_file::String=CONFIG_FILE)
     config, original_parameters = load_configuration(config_file)
     parameters = deepcopy(original_parameters)
     constraints = read_constraints(config.constraints_file)
-    results = DataFrame()
+    results_df = DataFrame()
 
     while parameters.f > 0
         parameters.num_forms = min(parameters.num_forms, parameters.f)
@@ -138,7 +136,7 @@ function main(config_file::String = CONFIG_FILE)
         initialize_model!(model, parameters, original_parameters, constraints)
 
         if run_optimization(model)
-            results = process_and_store_results!(model, parameters, results)
+            results_df = process_and_store_results!(model, parameters, results_df)
             display_results(model, parameters)
             parameters.f -= parameters.num_forms
         else
@@ -148,8 +146,8 @@ function main(config_file::String = CONFIG_FILE)
         end
     end
 
-    ## Display results and save
-    return final_report(original_parameters, results, config)
+    ## Display results_df and save
+    return final_report(original_parameters, results_df, config)
 end
 
 # Uncomment to run the main function

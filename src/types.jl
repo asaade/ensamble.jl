@@ -1,13 +1,13 @@
 # Define a struct for the configuration
-MatrixOrMissing = Union{Matrix{AbstractFloat}, Nothing}
-DataFrameOrMissing = Union{DataFrame, Nothing}
-VectorOrMissing = Union{Vector{AbstractFloat}, Nothing}
+MatrixOrMissing = Union{Matrix{AbstractFloat},Nothing}
+DataFrameOrMissing = Union{DataFrame,Nothing}
+VectorOrMissing = Union{Vector{AbstractFloat},Nothing}
 
 # Define a struct for the configuration
 struct Config
-    forms::Dict{Symbol, Any}
+    forms::Dict{Symbol,Any}
     items_file::String
-    anchor_items_file::Union{String, Missing}
+    anchor_items_file::Union{String,Missing}
     anchor_number::Int
     forms_file::String
     constraints_file::String

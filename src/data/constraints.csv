@@ -6,4 +6,4 @@
 5,C5,Number,Item,AREA == 4,14,16,ON
 6,C6,Sum,Item,Palabras,2200,2600,ON
 7,C7,Enemies,Item,enemigos,0,0,ON
-7,C7,Friends,Item,amigos,0,0,ON
+8,C8,Friends,Item,amigos,0,0,ON

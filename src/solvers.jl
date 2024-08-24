@@ -12,7 +12,7 @@ function load_solver_config(yaml_file::String)
     return config
 end
 
-function configure_solver!(model::Model, parameters::Params, solver_name::String = "cplex")
+function configure_solver!(model::Model, parameters::Params, solver_name::String="cplex")
     config = load_solver_config("data/solver_config.yaml")
     solver_options = config[solver_name]
 
