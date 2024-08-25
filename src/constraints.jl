@@ -304,10 +304,8 @@ function constraint_add_anchor!(model::Model, parameters::Params)
         bank_items = setdiff(items, anchor_items)
 
         # Avoid overlap of non-anchor items (operational and shadow)
-        if forms > 1
-            @constraint(model, [i = bank_items], sum([x[i, f] for f in 1:forms]) <= 1)
-        end
-
+        @constraint(model, [i = bank_items], sum([x[i, f] for f in 1:forms]) + parameters.bank.ITEM_USE[i] <= parameters.max_item_use)
+        
         # Force anchors in operational forms (ignore shadow)
         forms -= parameters.shadow_test > 0 ? 1 : 0
 
@@ -320,15 +318,14 @@ function constraint_add_anchor!(model::Model, parameters::Params)
     return model
 end
 
-function constraint_max_use(model::Model, parameters::Params, overlap=1)
+function constraint_max_use(model::Model, parameters::Params)
     if parameters.anchor_number == 0
         x = model[:x]
         items, forms = size(x)
         # forms -= parameters.shadow_test > 0 ? 1 : 0
-        if forms > 1
-            @constraint(model, [i = 1:items], sum([x[i, f] for f in 1:forms]) <= overlap)
-        end
+        @constraint(model, [i = 1:items], sum([x[i, f] for f in 1:forms]) + parameters.bank.ITEM_USE[i] <= parameters.max_item_use)
     end
+    
     return model
 end
 

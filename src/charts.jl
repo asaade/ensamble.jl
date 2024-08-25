@@ -96,7 +96,7 @@ end
 # Generate characteristic curves and observed score distribution plots
 function plot_results_and_simulation(parameters,
                                      results::DataFrame,
-                                     theta_range::AbstractVector=-3.0:0.1:3.0,
+                                     theta_range::AbstractVector=-4.0:0.1:4.0,
                                      plot_file::String="data/combined_plot.png")
     # Generate the plot data
     characteristic_curves = generate_characteristic_curves(parameters, results, theta_range)
@@ -107,7 +107,7 @@ function plot_results_and_simulation(parameters,
 
     # Set up the plot aesthetics
     theme(:dao)
-    gr(; size=(900, 900))
+    gr(; size=(1200, 900))
 
     forms = size(results, 2)
 
@@ -120,7 +120,8 @@ function plot_results_and_simulation(parameters,
                                         linewidth=2,
                                         label="",
                                         grid=(:on, :olivedrab, :dot, 1, 0.9),
-                                        tickfontsize=12)
+                                        tickfontsize=12,
+                                        titlefontsize=16)
 
     if parameters.method == "TCC"
         p1 = scatter!(parameters.theta, parameters.tau[1, :]; label="", markersize=5)
@@ -134,7 +135,8 @@ function plot_results_and_simulation(parameters,
                                      linewidth=2,
                                      label="",
                                      grid=(:on, :olivedrab, :dot, 1, 0.9),
-                                     tickfontsize=11)
+                                     tickfontsize=12,
+                                     titlefontsize=16)
 
     p3 = @df simulation_data1 plot(1:size(simulation_data1, 1),
                                    cols(),
@@ -144,7 +146,8 @@ function plot_results_and_simulation(parameters,
                                    linewidth=2,
                                    label="",
                                    grid=(:on, :olivedrab, :dot, 1, 0.9),
-                                   tickfontsize=11)
+                                   tickfontsize=12,
+                                   titlefontsize=16)
 
     if parameters.method != "TIC3"
         p3 = @df simulation_data2 plot!(1:size(simulation_data2, 1),
@@ -159,7 +162,7 @@ function plot_results_and_simulation(parameters,
     end
 
     # Combine the plots into a single image with subplots
-    combined_plot = plot(p1, p2, p3; layout=(2, 2), size=(900, 900))
+    combined_plot = plot(p1, p2, p3; layout=(2, 2), size=(1200, 900))
 
     write_results_to_file(hcat(theta_range, characteristic_curves))
 

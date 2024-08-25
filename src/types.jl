@@ -8,7 +8,6 @@ struct Config
     forms::Dict{Symbol,Any}
     items_file::String
     anchor_items_file::Union{String,Missing}
-    anchor_number::Int
     forms_file::String
     constraints_file::String
     results_file::String
@@ -23,7 +22,7 @@ mutable struct Params
     n::Int
     num_forms::Int
     max_items::Int
-    # item_max_use::VectorOrMissing
+    max_item_use::Int
     f::Int
     k::Int
     r::Int

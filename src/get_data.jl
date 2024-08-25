@@ -11,7 +11,6 @@ function Config(config_dict::Dict{Symbol,Any})
     return Config(forms_data,
                   config_dict[:ITEMSFILE],
                   config_dict[:ANCHORFILE],
-                  config_dict[:ANCHORNUMBER],
                   config_dict[:FORMSFILE],
                   config_dict[:CONSTRAINTSFILE],
                   config_dict[:RESULTSFILE],
@@ -26,14 +25,14 @@ function Params(parms_dict::Dict{Symbol,Any})
     return Params(parms_dict[:N],
                   parms_dict[:SHADOWTEST] > 0 ? 1 : parms_dict[:F],
                   parms_dict[:MAXN],
-                  # zeros(size(parms_dict[:BANK], 1)),
+                  get(parms_dict, :MAXITEMUSE, 1),
                   parms_dict[:F],
                   parms_dict[:K],
                   parms_dict[:R],
                   parms_dict[:SHADOWTEST],
                   parms_dict[:METHOD],
                   parms_dict[:BANK],
-                  parms_dict[:ANCHOR_NUMBER],
+                  parms_dict[:ANCHORNUMBER],
                   parms_dict[:THETA],
                   parms_dict[:P],
                   get(parms_dict, :INFO, nothing),
@@ -114,14 +113,14 @@ function read_anchor_file(config::Config)::DataFrame
 end
 
 # Function to add anchor labels to the bank
-function add_anchor_labels!(config::Config, bank::DataFrame)
+function add_anchor_labels!(config::Config, anchor_number::Int, bank::DataFrame)
     anchor_items = read_anchor_file(config)
     anchor_forms = 0
     if !isempty(anchor_items)
-        println("Loaded valid anchor data file")
+        println("Loaded anchor data file")
         anchor_tests = size(anchor_items, 2)
         if anchor_tests > 0
-            anchor_forms = min(config.anchor_number, anchor_tests)
+            anchor_forms = min(anchor_number, anchor_tests)
 
             bank[!, "ANCHOR"] = fill(0, size(bank, 1))
 
@@ -185,15 +184,17 @@ end
 
 # Function to get parameters based on configuration
 function get_params(config::Config)::Params
+    parms_dict = deepcopy(config.forms)
+    parms_dict[:ANCHORNUMBER] = get(parms_dict, :ANCHORNUMBER, 0)
+    anchor_number = parms_dict[:ANCHORNUMBER]
     bank = up!.(read_bank_file(config))
-    bank, anchor_number = add_anchor_labels!(config, bank)
+    bank, anchor_number = add_anchor_labels!(config, anchor_number, bank)
+    bank.ITEM_USE = zeros(size(bank, 1))
     bank = clean_items_bank!(config, bank)
 
     bank.CLAVE = string.(bank.CLAVE)
     bank.INDEX = rownumber.(eachrow(bank))
-    parms_dict = deepcopy(config.forms)
     parms_dict[:BANK] = unique(bank, [:CLAVE])
-    parms_dict[:ANCHOR_NUMBER] = anchor_number
     parms_dict[:VERBOSE] = config.verbose
     method = parms_dict[:METHOD]
 

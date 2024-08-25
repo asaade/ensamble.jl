@@ -73,7 +73,8 @@ function process_and_store_results!(model::Model, parameters::Params, results_df
     items = 1:length(item_codes)
     used_items = Int[]
     max_items = parameters.max_items
-
+    bank = parameters.bank
+    
     for form_name in 1:(parameters.num_forms)
         selected_items = items[solver_matrix[:, form_name] .> 0.5]
         item_codes_in_form = item_codes[selected_items]
@@ -82,11 +83,13 @@ function process_and_store_results!(model::Model, parameters::Params, results_df
         padded_item_codes = vcat(item_codes_in_form,
                                  fill(MISSING_VALUE_FILLER, missing_rows))
 
-        results_df[!, generate_unique_column_name(results_df)] = padded_item_codes
+        results_df[!, generate_unique_column_name(results_df)] = padded_item_codes 
         used_items = vcat(used_items, selected_items)
     end
 
     used_items = sort(unique(used_items))
+    bank[used_items, :ITEM_USE] .+= 1
+    used_items = used_items[bank[used_items, :ITEM_USE] .>= parameters.max_item_use]
     remove_used_items!(parameters, used_items)
     return results_df
 end

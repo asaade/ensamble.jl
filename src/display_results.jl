@@ -26,7 +26,7 @@ function calculate_common_items(results::DataFrame)
     num_forms = size(results, 2)
     common_items_matrix = zeros(Int, num_forms, num_forms)
 
-    for i in 1:num_forms, j in 1:num_forms
+    for i in 1:num_forms, j in 1:num_forms if i <= j end
         common = in(skipmissing(results[:, i])).(skipmissing(results[:, j]))
         common_items_matrix[i, j] = sum(common)
     end

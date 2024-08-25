@@ -12,12 +12,7 @@ plotFile: ./data/results/chart.png        # Plot output file
 ## Optimization engine selection
 ## Currently configured options:
 ## CPLEX, Cbc, SCIP, HiGHS, and GLPK
-solver: cplex
-
-## Number of anchor tests to alternate in forms from those
-## included in the anchorFile. If an acchor test is not
-## included, the items are excluded from assembly.
-anchorNumber: 2
+solver: highs
 
 ## Verbosity level of the program's output
 verbose: 2
@@ -25,7 +20,6 @@ verbose: 2
 ## Parameters
 ##
 forms:
-     F: 4           # Number of test forms to assemble
 
 ## Assembly model (TIC, TIC2, TCC, or CTT)
 ## TIC  - Test Information with absolute target at K points in theta
@@ -34,6 +28,21 @@ forms:
 ## TCC  - Test Characteristic Curve, absolute at Theta/Tau
 ## CTT  - Classic Test Theory (currently not functional)
      method: TCC
+
+## Use Big Shadow Test heuristic; assemble one test at a time
+## insted of all test simultaneously (shadowTest: 0) to easy
+## Recommended as defaut, specially for big or complex models.
+## Required if TCC3 method is selected to alternate forms
+## 1 use Big Shadow Test sequential assembly
+## 0 simultaneous assembly
+     shadowTest: 1
+     F: 10           # Number of test forms to assemble
+     maxItemUse: 1   # Number of times an item can appear in forms
+
+## Number of anchor tests to alternate in forms from those
+## included in the anchorFile. When an acchor test is not
+## included, the items are excluded from assembly.
+     anchorNumber: 4
 
 ## Number of powers for the TCC equating model
      R: 2
@@ -51,15 +60,6 @@ forms:
 ## If tau_info is not set, it will be calculated as the average from the
 ## item bank
      ## tau_info: []
-
-
-## Use Big Shadow Test heuristic; assemble one test at a time
-## insted of all test simultaneously (shadowTest: 0) to easy
-## Recommended as defaut, specially for big or complex models.
-## Required if TCC3 method is selected to alternate forms
-## 1 use Big Shadow Test sequential assembly
-## 0 simultaneous assembly
-     shadowTest: 1
 
 ## Points and weights to maximize for relative target models
 ## TIC2 and TIC3
