@@ -6,7 +6,7 @@ include("types.jl")
 include("utils.jl")
 
 # Function to convert a dictionary to a Config struct
-function Config(config_dict::Dict{Symbol,Any})
+function Config(config_dict::Dict{Symbol, Any})
     forms_data = Dict(Symbol(k) => v for (k, v) in config_dict[:FORMS])
     return Config(forms_data,
                   config_dict[:ITEMSFILE],
@@ -20,28 +20,33 @@ function Config(config_dict::Dict{Symbol,Any})
                   config_dict[:VERBOSE])
 end
 
-# Function to convert a dictionary to a Params struct
-function Params(parms_dict::Dict{Symbol,Any})
-    return Params(parms_dict[:N],
-                  parms_dict[:SHADOWTEST] > 0 ? 1 : parms_dict[:F],
-                  parms_dict[:MAXN],
-                  get(parms_dict, :MAXITEMUSE, 1),
-                  parms_dict[:F],
-                  parms_dict[:K],
-                  parms_dict[:R],
-                  parms_dict[:SHADOWTEST],
-                  parms_dict[:METHOD],
-                  parms_dict[:BANK],
-                  parms_dict[:ANCHORNUMBER],
-                  parms_dict[:THETA],
-                  parms_dict[:P],
-                  get(parms_dict, :INFO, nothing),
-                  parms_dict[:TAU],
-                  get(parms_dict, :TAU_INFO, nothing),
-                  parms_dict[:RELATIVETARGETWEIGHTS],
-                  parms_dict[:RELATIVETARGETPOINTS],
-                  get(parms_dict, :DELTA, nothing),
-                  parms_dict[:VERBOSE])
+# Function to convert a dictionary to a Parameters struct
+function Parameters(parms_dict::Dict{Symbol, Any})
+    return Parameters(parms_dict[:N],
+                      parms_dict[:SHADOWTEST] > 0 ?
+                      parms_dict[:METHOD] == "TIC3" ?
+                      parms_dict[:F] ÷ length(parms_dict[:RELATIVETARGETPOINTS]) : 1 :
+                      parms_dict[:F],
+                      parms_dict[:MAXN],
+                      parms_dict[:MAXN] - parms_dict[:ANCHORSIZE],
+                      get(parms_dict, :MAXITEMUSE, 1),
+                      parms_dict[:F],
+                      parms_dict[:K],
+                      parms_dict[:R],
+                      parms_dict[:SHADOWTEST],
+                      parms_dict[:METHOD],
+                      parms_dict[:BANK],
+                      parms_dict[:ANCHORTESTS],
+                      parms_dict[:ANCHORSIZE],
+                      parms_dict[:THETA],
+                      parms_dict[:P],
+                      get(parms_dict, :INFO, nothing),
+                      parms_dict[:TAU],
+                      get(parms_dict, :TAU_INFO, nothing),
+                      parms_dict[:RELATIVETARGETWEIGHTS],
+                      parms_dict[:RELATIVETARGETPOINTS],
+                      get(parms_dict, :DELTA, nothing),
+                      parms_dict[:VERBOSE])
 end
 
 # Error handling for reading CSV files
@@ -59,12 +64,9 @@ function clean_IRT!(bank::DataFrame)::DataFrame
     dropmissing!(bank, :B)
     bank[!, :A] .= coalesce.(bank[!, :A], 1.0)
     bank[!, :C] .= coalesce.(bank[!, :C], 0.0)
-    filter!(row -> (row.A >= 0.0 &&
-                    row.A < 3.0 &&
-                    row.B > -4.0 &&
-                    row.B < 4.0 &&
-                    row.C >= 0.0 &&
-                    row.C < 0.5),
+    filter!(row -> (0.4 <= row.A <= 2.0 &&
+                    -4.0 <= row.B <= 4.0 &&
+                    0.0 <= row.C <= 0.5),
             bank)
     return bank
 end
@@ -73,11 +75,10 @@ end
 function clean_TC!(bank::DataFrame)::DataFrame
     dropmissing!(bank, :DIF)
     dropmissing!(bank, :CORR)
-    if mean(bank.DIF) > 2.0
+    if mean(bank.DIF) > 1.0
         bank.DIF = bank.DIF / 100
     end
-    filter!(row -> (row.DIF > 0.1 && row.DIF < 0.9 && row.CORR >= 0.15 && row.CORR <= 0.65),
-            bank)
+    filter!(row -> (0.1 <= row.DIF < 0.9 && 0.15 <= row.CORR <= 0.65), bank)
     return bank
 end
 
@@ -113,14 +114,15 @@ function read_anchor_file(config::Config)::DataFrame
 end
 
 # Function to add anchor labels to the bank
-function add_anchor_labels!(config::Config, anchor_number::Int, bank::DataFrame)
+function add_anchor_labels!(config::Config, anchor_tests::Int, bank::DataFrame)
     anchor_items = read_anchor_file(config)
     anchor_forms = 0
+    anchor_size = size(anchor_items, 1)
     if !isempty(anchor_items)
         println("Loaded anchor data file")
-        anchor_tests = size(anchor_items, 2)
-        if anchor_tests > 0
-            anchor_forms = min(anchor_number, anchor_tests)
+        anchor_tests_available = size(anchor_items, 2)
+        if anchor_tests_available > 0
+            anchor_forms = min(anchor_tests, anchor_tests_available)
 
             bank[!, "ANCHOR"] = fill(0, size(bank, 1))
 
@@ -132,7 +134,7 @@ function add_anchor_labels!(config::Config, anchor_number::Int, bank::DataFrame)
     else
         println("Anchor file missing or empty")
     end
-    return bank, anchor_forms
+    return bank, anchor_forms, anchor_size
 end
 
 # Function to read bank file and handle errors
@@ -147,7 +149,7 @@ function read_bank_file(config::Config)::DataFrame
 end
 
 # Function to find total items in constraints file
-function find_total_items(file_path::String)::Tuple{Int,Int}
+function find_total_items(file_path::String)::Tuple{Int, Int}
     df = safe_read_csv(file_path)
 
     for row in eachrow(df)
@@ -161,13 +163,13 @@ function find_total_items(file_path::String)::Tuple{Int,Int}
 end
 
 # Function to load configuration from a YAML file
-function load_config(inFile::String="data/config.yaml")::Config
-    config_data = YAML.load_file(inFile; dicttype=Dict{Symbol,Any})
+function load_config(inFile::String = "data/config.yaml")::Config
+    config_data = YAML.load_file(inFile; dicttype = Dict{Symbol, Any})
     config_dict = Dict(upSymbol(k) => v for (k, v) in config_data)
     config_dict[:FORMS] = Dict(upSymbol(k) => v for (k, v) in config_dict[:FORMS])
     lb, ub = find_total_items(config_dict[:CONSTRAINTSFILE])
     config_dict[:FORMS][:N] = (lb + ub) ÷ 2
-    config_dict[:FORMS][:MINN] = lb
+    # config_dict[:FORMS][:MINN] = lb
     config_dict[:FORMS][:MAXN] = max(lb, ub)
 
     if !haskey(config_dict[:FORMS], :R)
@@ -182,15 +184,17 @@ function load_config(inFile::String="data/config.yaml")::Config
     return Config(config_dict)
 end
 
-# Function to get parameters based on configuration
-function get_params(config::Config)::Params
+# Function to get parms based on configuration
+function get_params(config::Config)::Parameters
     parms_dict = deepcopy(config.forms)
-    parms_dict[:ANCHORNUMBER] = get(parms_dict, :ANCHORNUMBER, 0)
-    anchor_number = parms_dict[:ANCHORNUMBER]
+    parms_dict[:ANCHORTESTS] = get(parms_dict, :ANCHORTESTS, 0)
+    anchor_tests = parms_dict[:ANCHORTESTS]
     bank = up!.(read_bank_file(config))
-    bank, anchor_number = add_anchor_labels!(config, anchor_number, bank)
+    bank, anchor_tests, anchor_size = add_anchor_labels!(config, anchor_tests, bank)
     bank.ITEM_USE = zeros(size(bank, 1))
     bank = clean_items_bank!(config, bank)
+
+    parms_dict[:ANCHORSIZE] = anchor_tests > 0 ? anchor_size : 0
 
     bank.CLAVE = string.(bank.CLAVE)
     bank.INDEX = rownumber.(eachrow(bank))
@@ -208,7 +212,7 @@ function get_params(config::Config)::Params
         parms_dict[:THETA] = theta
         a, b, c = bank[!, :A], bank[!, :B], bank[!, :C]
         parms_dict[:K] = length(theta)
-        p = [Pr(t, b, a, c; d=1.0) for t in theta]
+        p = [Pr(t, b, a, c; d = 1.0) for t in theta]
         parms_dict[:P] = reduce(hcat, p)
 
         if haskey(parms_dict, :TAU)
@@ -236,7 +240,7 @@ function get_params(config::Config)::Params
         error("Nonexistent method: $method")
     end
 
-    return Params(parms_dict)
+    return Parameters(parms_dict)
 end
 
 # Example usage:

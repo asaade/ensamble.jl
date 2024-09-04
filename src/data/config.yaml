@@ -7,15 +7,15 @@ anchorFile: ./data/anchor.csv              # Anchor items file
 formsFile: ./data/results/forms.csv # File to store assembled test forms
 tccFile: ./data/results/tcc.csv           # Test Characteristic Curve (TCC) file
 resultsFile: ./data/results/results.csv   # File to store final results
-plotFile: ./data/results/chart.png        # Plot output file
+plotFile: ./data/results/chart.pdf        # Plot output file
 
 ## Optimization engine selection
 ## Currently configured options:
 ## CPLEX, Cbc, SCIP, HiGHS, and GLPK
-solver: highs
+solver: cplex
 
 ## Verbosity level of the program's output
-verbose: 2
+verbose: 3
 
 ## Parameters
 ##
@@ -25,35 +25,36 @@ forms:
 ## TIC  - Test Information with absolute target at K points in theta
 ## TIC2 - Maximize relative information at specified points
 ## TIC3 - Maximize relative target, one per test
-## TCC  - Test Characteristic Curve, absolute at Theta/Tau
-## CTT  - Classic Test Theory (currently not functional)
-     method: TCC
+## TCC  - Test Characteristic Curve, absolute at Theta/Tau (Preequating)
+## CTT  - Classic Test Theory (currently not available)
+     method: TIC3
 
 ## Use Big Shadow Test heuristic; assemble one test at a time
-## insted of all test simultaneously (shadowTest: 0) to easy
+## insted of all test simultaneously (shadowTest: 0).
 ## Recommended as defaut, specially for big or complex models.
 ## Required if TCC3 method is selected to alternate forms
 ## 1 use Big Shadow Test sequential assembly
 ## 0 simultaneous assembly
-     shadowTest: 1
-     F: 10           # Number of test forms to assemble
-     maxItemUse: 1   # Number of times an item can appear in forms
+     shadowTest: 0
+     F: 25           # Number of test forms to assemble
+     maxItemUse: 2   # Number of that an item may appear in forms
+                     # 1 = not overlap
 
 ## Number of anchor tests to alternate in forms from those
 ## included in the anchorFile. When an acchor test is not
 ## included, the items are excluded from assembly.
-     anchorNumber: 4
+     anchorTests: 0
 
 ## Number of powers for the TCC equating model
      R: 2
 
 ## Points on the scale for equating (including cut points)
-     theta: [-2.5, -1.2, 0.0, 1.2, 2.5]
+     theta: [-2.5, -1.2, 0.0, 1.2, 2.5, 3.5]
 
 ## Score probabilities in the reference test to match at K theta points
-## If tau is not set, it will be calculated as the average from the
-## item bank. The number of rows should be the same as R, all separated by
-## a semicolon.
+## If tau is not set, it will be calculated as the average prob from the
+## item bank. The number of rows should be the same as R, (1,2,...) separated by
+## semicolons.
      ## tau: [15.18 24.32 34.05 43.46 51.81; 4.82 11.85 21.72 33.39 45.64]
 
 ## Information in the reference test to match at K theta points
@@ -64,4 +65,4 @@ forms:
 ## Points and weights to maximize for relative target models
 ## TIC2 and TIC3
      relativeTargetWeights: [1, 1, 1]
-     relativeTargetPoints: [-1.0, 0.0, 1.5]
+     relativeTargetPoints: [-1.0, 0.0, 1.0]

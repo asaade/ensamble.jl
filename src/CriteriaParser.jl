@@ -41,14 +41,13 @@ function apply_condition(op::String, lhs::Symbol, rhs, df::DataFrame)
 end
 
 # Helper function to determine if a string is numeric
-function is_numeric(s::AbstractString)
+is_numeric(s::AbstractString) =
     try
         parse(Float64, s)
         return true
     catch
         return false
     end
-end
 
 # Function to handle collections and quote string literals automatically
 function process_rhs(rhs::AbstractString)
@@ -82,7 +81,7 @@ function parse_criteria(input_str::String)
 
     # Check for comma-separated columns, but only if not within a collection
     if contains(normalized_str, r",") && !occursin(r"\[.*\]", normalized_str)
-        col_expr, condition_expr = split(normalized_str, ","; limit=2)
+        col_expr, condition_expr = split(normalized_str, ","; limit = 2)
         col_expr = strip(col_expr)
 
         condition_parts = split(condition_expr, r"\s+")

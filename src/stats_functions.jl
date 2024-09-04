@@ -7,22 +7,24 @@ Calculates the probability using the given parameters,
 for one or many parameters or ability points (vectors)
 
 # Arguments
-- `theta_k`: The ability parameter.
-- `A`: The discrimination parameter.
-- `B`: The difficulty parameter.
-- `C`: The guessing parameter.
-- `d`: The scaling constant (default is 1.0).
+
+  - `theta_k`: The ability parameter.
+  - `A`: The discrimination parameter.
+  - `B`: The difficulty parameter.
+  - `C`: The guessing parameter.
+  - `d`: The scaling constant (default is 1.0).
 
 # Returns
-- The calculated probability.
+
+  - The calculated probability.
 """
-function Pr(θ::Float64, b::Float64, a::Float64, c::Float64; d::Float64=1.0)
+function Pr(θ::Float64, b::Float64, a::Float64, c::Float64; d::Float64 = 1.0)
     return c + (1 - c) / (1 + exp(-d * a * (θ - b)))
 end
 
 # Overload to handle scalar inputs for b, a, and c
 function Pr(θ::Float64, b::AbstractVector, a::AbstractVector, c::AbstractVector;
-            d::Float64=1.0)
+            d::Float64 = 1.0)
     return c .+ (1 .- c) ./ (1 .+ exp.(-d .* a .* (θ .- b)))
 end
 
@@ -32,24 +34,26 @@ end
 Calculates the item information using the given parameters.
 
 # Arguments
-- `theta_k`: The ability parameter.
-- `A`: The discrimination parameter.
-- `B`: The difficulty parameter.
-- `C`: The guessing parameter.
-- `D`: The scaling constant (default is 1.0).
+
+  - `theta_k`: The ability parameter.
+  - `A`: The discrimination parameter.
+  - `B`: The difficulty parameter.
+  - `C`: The guessing parameter.
+  - `D`: The scaling constant (default is 1.0).
 
 # Returns
-- The item information rounded to 4 decimal places.
+
+  - The item information rounded to 4 decimal places.
 """
 function item_information(θ::Float64, b::AbstractVector, a::AbstractVector,
-                          c::AbstractVector; d::Float64=1.0)
-    p = Pr.(θ, b, a, c; d=d)
+                          c::AbstractVector; d::Float64 = 1.0)
+    p = Pr.(θ, b, a, c; d = d)
     q = 1 .- p
     return (d .* a) .^ 2 .* (p .- c) .^ 2 .* q ./ ((1 .- c) .^ 2 .* p)
 end
 
-function item_information(θ::Float64, b::Float64, a::Float64, c::Float64; d::Float64=1.0)
-    p = Pr.(θ, b, a, c; d=d)
+function item_information(θ::Float64, b::Float64, a::Float64, c::Float64; d::Float64 = 1.0)
+    p = Pr.(θ, b, a, c; d = d)
     q = 1 - p
     return (d * a)^2 * (p - c)^2 * q / ((1 - c)^2 * p)
 end
@@ -60,14 +64,16 @@ end
 Calculates the tau matrix for given parameters and items.
 
 # Arguments
-- `P`: The probability matrix.
-- `R`: The number of powers.
-- `K`: The number of points.
-- `N`: The sample size.
-- `items`: The items matrix.
+
+  - `P`: The probability matrix.
+  - `R`: The number of powers.
+  - `K`: The number of points.
+  - `N`: The sample size.
+  - `items`: The items matrix.
 
 # Returns
-- The tau matrix.
+
+  - The tau matrix.
 """
 function calc_tau(P, R::Int, K::Int, N::Int, items)
     tau = zeros((R, K))
@@ -87,13 +93,15 @@ end
 Calculates the information tau vector for given parameters and items.
 
 # Arguments
-- `info`: The information matrix.
-- `K`: The number of items.
-- `N`: The sample size.
-- `items`: The items matrix.
+
+  - `info`: The information matrix.
+  - `K`: The number of items.
+  - `N`: The sample size.
+  - `items`: The items matrix.
 
 # Returns
-- The information tau vector rounded to 4 decimal places.
+
+  - The information tau vector rounded to 4 decimal places.
 """
 function calc_info_tau(info, K::Int, N::Int)
     tau = zeros(K)
@@ -147,7 +155,7 @@ end
 # println("Score distribution: ", score_distribution)
 
 # Simulate a group of students with abilities drawn from a normal distribution N(0, 1)
-function simulate_abilities(num_examinees::Int, mean::Float64=0.0, stddev::Float64=1.0)
+function simulate_abilities(num_examinees::Int, mean::Float64 = 0.0, stddev::Float64 = 1.0)
     dist = Normal(mean, stddev)
     return rand(dist, num_examinees)
 end
@@ -183,7 +191,7 @@ end
 
 # Function to calculate the observed score distribution using numerical integration
 function observed_score_distribution_continuous(item_params::Matrix{Float64},
-                                                ability_dist::Normal; num_points::Int=100)
+                                                ability_dist::Normal; num_points::Int = 100)
     num_items = size(item_params, 2)
 
     # Function to calculate f(x|θ) * ψ(θ)
@@ -195,21 +203,17 @@ function observed_score_distribution_continuous(item_params::Matrix{Float64},
     # Integrate for each score using Gaussian quadrature
     observed_dist = zeros(Float64, num_items + 1)
     for x in 0:num_items
-        observed_dist[x + 1] = quadgk(θ -> integrand(θ, x), -Inf, Inf; order=num_points)[1]
+        observed_dist[x + 1] = quadgk(θ -> integrand(θ, x), -Inf, Inf; order = num_points)[1]
     end
 
     return observed_dist
 end
 
-function euclidian_distance(x::Vector{Float64}, y::Vector{Float64})
-    return (sqrt.(x .- y)) .^ 0.5
-end
+euclidian_distance(x::Vector{Float64}, y::Vector{Float64}) = (sqrt.(x .- y)) .^ 0.5
 
-function euclidian_distance(x::Number, y::Number)
-    return sqrt.((x .- y) .^ 2)
-end
+euclidian_distance(x::Number, y::Number) = sqrt.((x .- y) .^ 2)
 
-function delta(q1::Vector{T}, q2::Vector{T}) where {T<:Number}
+function delta(q1::Vector{T}, q2::Vector{T}) where {T <: Number}
     items = size(q1, 1)
     v = sqrt.([(q1[i] - q1[j]) .^ 2 for i in 1:items for j in 1:items] .+
               [(q2[i] - q2[j]) .^ 2 for i in 1:items for j in 1:items])
