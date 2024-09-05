@@ -42,6 +42,7 @@ function configure_solver!(model::Model, parms::Parameters, solver_name::String 
         end
     end
 
+    set_time_limit_sec(model, 120.0)
     parms.verbose <= 1 && set_silent(model)
 
     return model
