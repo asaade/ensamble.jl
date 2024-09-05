@@ -50,7 +50,6 @@ and constraints based on the provided parms.
 """
 function initialize_model!(model::Model,
                            parms::Parameters,
-                           original_parms::Parameters,
                            constraints::Dict{String, Constraint})
     println(INITIALIZING_MODEL_MESSAGE)
     num_items = size(parms.bank, 1)
@@ -60,7 +59,7 @@ function initialize_model!(model::Model,
     @variable(model, x[1:num_items, 1:num_forms], Bin)
 
     set_objective!(model, parms)
-    apply_constraints!(model, parms, original_parms, constraints)
+    apply_constraints!(model, parms, constraints)
     write_to_file(model, MODEL_FILE)
 
     return model
@@ -73,10 +72,8 @@ Apply the constraints from the configuration to the optimization model.
 """
 function apply_constraints!(model::Model,
                             parms::Parameters,
-                            original_parms::Parameters,
                             constraints::Dict{String, Constraint})
-    apply_objective!(model, parms, original_parms)
-    constraint_prevent_overlap!(model, parms)
+    apply_objective!(model, parms)
     constraint_add_anchor!(model, parms)
 
     for (constraint_id, constraint) in constraints
@@ -106,7 +103,7 @@ end
 
 Apply the objective function specific to the method being used.
 """
-function apply_objective!(model::Model, parms::Parameters, original_parms::Parameters)
+function apply_objective!(model::Model, parms::Parameters)
     if parms.method in ["TCC"]
         objective_match_characteristic_curve!(model, parms)
     elseif parms.method in ["TIC"]
@@ -114,9 +111,9 @@ function apply_objective!(model::Model, parms::Parameters, original_parms::Param
     elseif parms.method == "TIC2"
         objective_max_info(model, parms)
     elseif parms.method == "TIC3"
-        objective_info_relative2(model, parms, original_parms)
+        objective_info_relative2(model, parms)
     elseif parms.method == "TC"
-        objective_match_items(model, parms)
+        println("Method TC not implemented yet.")
     else
         error("Unknown method: ", parms.method)
     end
@@ -148,8 +145,11 @@ function apply_individual_constraint!(model::Model, parms::Parameters,
         constraint_enemies_in_form(model, parms, condition)
     elseif constraint.type == "FRIENDS"
         condition = constraint.condition(bank)
-        #  selected_items = items[condition]
         constraint_friends_in_form(model, parms, condition)
+    elseif constraint.type == "MAXUSE"
+        constraint_max_use(model, parms, ub)
+    elseif constraint.type == "OVERLAP"
+        constraint_item_overlap(model, parms, lb, ub)
     else
         error("Unknown constraint type: ", constraint.type)
     end
