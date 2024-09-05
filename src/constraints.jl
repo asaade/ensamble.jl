@@ -32,7 +32,7 @@ function constraint_enemies_in_form(model::Model, parms::Parameters, selected)
     end
 end
 
-## Enemies
+## Friends
 function constraint_friends_in_form(model::Model, parms::Parameters, selected)
     x = model[:x]
     forms = size(x, 2)
@@ -119,7 +119,7 @@ function constraint_item_sum_shadow_aux(model::Model, parms::Parameters, vals, m
         if minVal == maxVal && minVal >= 0
             @constraint(model,
                         sum([x[i, zcol] * vals[i] for i in 1:items if cond[1]])==
-                        verminVal * shadow_test)
+                        minVal * shadow_test)
         elseif minVal < maxVal
             @constraint(model,
                         sum([x[i, zcol] * vals[i] for i in 1:items if cond[1]])>=
@@ -267,8 +267,7 @@ function objective_max_info(model::Model, parms::Parameters)
 end
 
 ## Maximiza info en puntos k
-function objective_info_relative2(model::Model, parms::Parameters,
-                                  original_parms::Parameters)
+function objective_info_relative2(model::Model, parms::Parameters)
     R = parms.relative_target_weights
     K = length(parms.relative_target_weights)
     info = parms.info
@@ -286,29 +285,6 @@ function objective_info_relative2(model::Model, parms::Parameters,
     return model
 end
 
-# ## Maximiza info en puntos k
-# function objective_info_relative2(model::Model, parms::Parameters,
-#                                   original_parms::Parameters)
-#     R = parms.relative_target_weights
-
-#     # alterna k para esta versión
-#     k = mod(parms.k, original_parms.k) + 1
-#     parms.k = k
-#     info = parms.info
-#     x, y = model[:x], model[:y]
-#     items, forms = size(x)
-#     xs = forms
-#     shadow = parms.shadow_test
-#     forms -= shadow > 0 ? 1 : 0
-
-#     @constraint(model, [f = 1:forms],
-#                 sum([info[i, k] * x[i, f] for i in 1:items])>=R[k] * y)
-
-#     shadow > 0 && @constraint(model,
-#                 sum([info[i, k] * x[i, xs] for i in 1:items])>=R[k] * y * shadow)
-
-#     return model
-# end
 
 function constraint_add_anchor!(model::Model, parms::Parameters)
     if parms.anchor_tests > 0
@@ -341,7 +317,7 @@ function constraint_add_anchor!(model::Model, parms::Parameters)
     return model
 end
 
-function constraint_max_use(model::Model, parms::Parameters)
+function constraint_max_use(model::Model, parms::Parameters, max_use::Int)
     if parms.anchor_tests == 0
         x = model[:x]
         items, forms = size(x)
@@ -349,33 +325,48 @@ function constraint_max_use(model::Model, parms::Parameters)
         @constraint(model, [i = 1:items],
                     sum([x[i, f] for f in 1:forms]) +
                     parms.bank.ITEM_USE[i]<=
-                    parms.max_item_use)
+                    max_use)
     end
 
     return model
 end
 
-function constraint_prevent_overlap!(model::Model, parms::Parameters)
-    return constraint_max_use(model, parms)
+# Define the function to constrain item overlap between tests
+function constraint_item_overlap(model::Model, parms::Parameters, minItems::Int, maxItems::Int = minItems)
+    if parms.shadow_test < 1
+        # Retrieve x and z from the model
+        x = model[:x]
+        # Get the number of forms (tests) from the size of x
+        num_items, num_forms = size(x)
+
+        @variable(model, z[1:num_items, 1:num_forms, 1:num_forms], Bin)
+        items = collect(1:num_items)
+        if parms.anchor_tests > 0
+            anchor_items = items[(parms.bank.ANCHOR .== parms.anchor_tests)]
+            setdiff!(items, anchor_items)
+        end
+
+        # Loop over all items and test pairs (t1, t2) where t1 < t2
+        for t1 in 1:num_forms
+            for t2 in (t1 + 1):num_forms
+                # Sum of overlaps for item i between test t1 and t2 should be within bounds (minItems, maxItems)
+                @constraint(model, sum(z[i, t1, t2] for i in items) <= maxItems)
+                if minItems > 0
+                    @constraint(model, sum(z[i, t1, t2] for i in items) >= minItems)
+                end
+
+                # Constraints to link z[i, t1, t2] with x[i, t1] and x[i, t2]
+                for i in items
+                    @constraint(model, 2 * z[i, t1, t2] <= x[i, t1] + x[i, t2])
+                    @constraint(model, z[i, t1, t2] >= x[i, t1] + x[i, t2] - 1)
+                end
+            end
+        end
+    end
 end
 
-## TODO
-# function objective_match_items(model::Model, parms::Parameters)
-#     x, y = model[:x], model[:y];
-#     items, forms = size(x)
-#     D(I, LL=-1.5, W=3.0, N=parms.n) = W * (I-1) / ((N-1) - LL)
-#     reference20_80 =
 
-#     @constraint(model, [i=1:items, j=i:(items-1), f=1:forms],
-#                 x[i, f] * x[j, f] * parms.delta[i, j] <= y)
 
-#     @constraint(model, [i=1:items, j=i:items, f=1:forms],
-#                 x[i, f] * x[j, f] * parms.delta[i, j] >= -y)
-
-#     @constraint(model, [j=1:items, f=1:forms],
-#                 sum([x[i, f] * x[j, f] for i in 1:items if i < j] == 1) == 1)
-
-#     # @constraint(model, [j=1:items, f=1:forms],
-#     #              sum([x[i, f] + x[j, f] for i in 1:items] == 1 if i < j) == 1)
-
-# end
+function constraint_prevent_overlap!(model::Model, parms::Parameters)
+    return constraint_max_use(model, parms, 1)
+end
