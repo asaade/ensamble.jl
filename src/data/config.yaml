@@ -12,7 +12,7 @@ plotFile: ./data/results/chart.pdf        # Plot output file
 ## Optimization engine selection
 ## Currently configured options:
 ## CPLEX, Cbc, SCIP, HiGHS, and GLPK
-solver: cplex
+solver: cbc
 
 ## Verbosity level of the program's output
 verbose: 3
@@ -27,7 +27,7 @@ forms:
 ## TIC3 - Maximize relative target, one per test
 ## TCC  - Test Characteristic Curve, absolute at Theta/Tau (Preequating)
 ## CTT  - Classic Test Theory (currently not available)
-     method: TIC3
+     method: TIC
 
 ## Use Big Shadow Test heuristic; assemble one test at a time
 ## insted of all test simultaneously (shadowTest: 0).
@@ -36,9 +36,7 @@ forms:
 ## 1 use Big Shadow Test sequential assembly
 ## 0 simultaneous assembly
      shadowTest: 0
-     F: 25           # Number of test forms to assemble
-     maxItemUse: 2   # Number of that an item may appear in forms
-                     # 1 = not overlap
+     F: 5           # Number of test forms to assemble
 
 ## Number of anchor tests to alternate in forms from those
 ## included in the anchorFile. When an acchor test is not
