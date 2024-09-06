@@ -134,7 +134,7 @@ function main(config_file::String = CONFIG_FILE)
 
         model = Model()
         configure_solver!(model, par, config.solver)
-        initialize_model!(model, par, old_par, constraints)
+        initialize_model!(model, par, constraints)
 
         if run_optimization(model)
             results_df = process_and_store_results!(model, par, results_df)
