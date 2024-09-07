@@ -12,6 +12,48 @@ function constraint_items_per_form(model::Model, parms::Parameters, minItems::In
                                  maxItems::Int)
 end
 
+## Incluye un número de reactivos ente minItems y maxItems] de la lista "selected" en cada prueba(F)
+function constraint_item_count_aux(model::Model, parms::Parameters, selected,
+                                   minItems::Int, maxItems::Int = minItems)
+    @assert(minItems <= maxItems, "Error in item_count. maxItems < minItems")
+
+    x = model[:x]
+    forms = size(x, 2)
+    forms -= parms.shadow_test > 0 ? 1 : 0
+
+    @constraint(model, [f = 1:forms], sum(x[i, f] for i in selected) <= maxItems)
+    @constraint(model, [f = 1:forms], sum(x[i, f] for i in selected) >= minItems)
+    return model
+end
+
+## Incluye un número de reactivos ente minItems y maxItems de la lista para la prueba sombra
+function constraint_item_count_shadow_aux(model::Model, parms::Parameters, selected,
+                                          minItems::Int, maxItems::Int = minItems)
+    shadow_test = parms.shadow_test
+    if shadow_test > 0
+        @assert(minItems <= maxItems, "Error in item_count. maxItems < minItems")
+        x = model[:x]
+        zcol = size(x, 2)
+
+        @constraint(model, sum(x[i, zcol] for i in selected)>=minItems * shadow_test)
+        @constraint(model, sum(x[i, zcol] for i in selected)<=maxItems * shadow_test)
+    end
+
+    return model
+end
+
+function constraint_item_count(model::Model, parms::Parameters, selected, minItems::Int,
+                               maxItems::Int = minItems)
+    @assert(minItems <= maxItems, "Error in item_count. maxItems < minItems")
+
+    constraint_item_count_aux(model::Model, parms::Parameters, selected, minItems::Int,
+                              maxItems::Int)
+    constraint_item_count_shadow_aux(model::Model, parms::Parameters, selected,
+                                     minItems::Int, maxItems::Int)
+    return model
+end
+
+
 ## Enemies
 function constraint_enemies_in_form(model::Model, parms::Parameters, selected)
     x = model[:x]
@@ -53,57 +95,11 @@ function constraint_friends_in_form(model::Model, parms::Parameters, selected)
     end
 end
 
-## Incluye un número de reactivos ente minItems y maxItems de la lista para la prueba sombra
-function constraint_item_count_shadow_aux(model::Model, parms::Parameters, selected,
-                                          minItems::Int, maxItems::Int = minItems)
-    shadow_test = parms.shadow_test
-
-    if shadow_test > 0
-        x = model[:x]
-        zcol = size(x, 2)
-
-        if minItems == maxItems && minItems >= 0
-            @constraint(model, sum(x[i, zcol] for i in selected)==minItems * shadow_test)
-        elseif minItems < maxItems
-            @constraint(model, sum(x[i, zcol] for i in selected)>=minItems * shadow_test)
-            @constraint(model, sum(x[i, zcol] for i in selected)<=maxItems * shadow_test)
-        end
-    end
-
-    return model
-end
-
-## Incluye un número de reactivos ente minItems y maxItems] de la lista "selected" en cada prueba(F)
-function constraint_item_count_aux(model::Model, parms::Parameters, selected,
-                                   minItems::Int, maxItems::Int = minItems)
-    x = model[:x]
-    forms = size(x, 2)
-    forms -= parms.shadow_test > 0 ? 1 : 0
-
-    if minItems == maxItems && minItems >= 0
-        @constraint(model, [f = 1:forms], sum(x[i, f] for i in selected)==minItems)
-    elseif minItems < maxItems
-        @constraint(model, [f = 1:forms], sum(x[i, f] for i in selected)<=maxItems)
-        @constraint(model, [f = 1:forms], sum(x[i, f] for i in selected)>=minItems)
-    else
-        println("No contraints created in constraint_item_count")
-    end
-
-    return model
-end
-
-function constraint_item_count(model::Model, parms::Parameters, selected, minItems::Int,
-                               maxItems::Int = minItems)
-    constraint_item_count_aux(model::Model, parms::Parameters, selected, minItems::Int,
-                              maxItems::Int)
-    constraint_item_count_shadow_aux(model::Model, parms::Parameters, selected,
-                                     minItems::Int, maxItems::Int)
-    return model
-end
-
 ## Suma de los valores de los reactivos entre [minVal, maxVal] en la prueba sombra
 function constraint_item_sum_shadow_aux(model::Model, parms::Parameters, vals, minVal,
                                         maxVal = minVal)
+    @assert(minVal <= maxVal, "Error in item_sum. maxVal < minVal")
+
     shadow_test = parms.shadow_test
     if shadow_test > 0
         x = model[:x]
@@ -116,18 +112,12 @@ function constraint_item_sum_shadow_aux(model::Model, parms::Parameters, vals, m
             cond, val = eachcol(vals)
         end
 
-        if minVal == maxVal && minVal >= 0
-            @constraint(model,
-                        sum([x[i, zcol] * vals[i] for i in 1:items if cond[1]])==
+        @constraint(model,
+                    sum([x[i, zcol] * vals[i] for i in 1:items if cond[1]]) >=
                         minVal * shadow_test)
-        elseif minVal < maxVal
-            @constraint(model,
-                        sum([x[i, zcol] * vals[i] for i in 1:items if cond[1]])>=
-                        minVal * shadow_test)
-            @constraint(model,
-                        sum([x[i, zcol] * vals[i] for i in 1:items if cond[1]])<=
+        @constraint(model,
+                    sum([x[i, zcol] * vals[i] for i in 1:items if cond[1]]) <=
                         maxVal * shadow_test)
-        end
     end
 
     return model
@@ -136,6 +126,8 @@ end
 ## Suma de los valores de los reactivos entre [minVal, maxVal] en cada prueba(F)
 function constraint_item_sum_aux(model::Model, parms::Parameters, vals, minVal,
                                  maxVal = minVal)
+    @assert(minVal <= maxVal, "Error in item_sum. maxVal < minVal")
+
     x = model[:x]
     if size(vals, 2) == 1
         cond = fill(true, length(vals))
@@ -147,25 +139,18 @@ function constraint_item_sum_aux(model::Model, parms::Parameters, vals, minVal,
     items, forms = size(x)
     forms -= parms.shadow_test > 0 ? 1 : 0
 
-    if minVal == maxVal && minVal >= 0
-        @constraint(model,
-                    [f = 1:forms],
-                    sum([x[i, f] * val[i] for i in 1:items if cond[1]])==maxVal)
-    elseif minVal < maxVal
-        @constraint(model,
-                    [f = 1:forms],
-                    sum([x[i, f] * val[i] for i in 1:items if cond[1]])<=maxVal)
-        @constraint(model,
-                    [f = 1:forms],
-                    sum([x[i, f] * val[i] for i in 1:items if cond[1]])>=minVal)
-    else
-        println("No contraints created in constraint_item_sum")
-    end
-
+    @constraint(model,
+                [f = 1:forms],
+                sum([x[i, f] * val[i] for i in 1:items if cond[1]]) <= maxVal)
+    @constraint(model,
+                [f = 1:forms],
+                sum([x[i, f] * val[i] for i in 1:items if cond[1]]) >= minVal)
     return model
 end
 
 function constraint_item_sum(model::Model, parms::Parameters, vals, minVal, maxVal = minVal)
+    @assert(minVal <= maxVal, "Error in item_sum. maxVal < minVal")
+
     constraint_item_sum_aux(model::Model, parms::Parameters, vals, minVal, maxVal)
     constraint_item_sum_shadow_aux(model::Model, parms::Parameters, vals, minVal, maxVal)
     return model
@@ -317,7 +302,7 @@ function constraint_add_anchor!(model::Model, parms::Parameters)
 end
 
 function constraint_max_use(model::Model, parms::Parameters, max_use::Int)
-    if parms.anchor_tests == 0
+    if parms.anchor_tests == 0 && max_use > 0
         x = model[:x]
         items, forms = size(x)
         # forms -= parms.shadow_test > 0 ? 1 : 0
@@ -333,6 +318,7 @@ end
 # Define the function to constrain item overlap between tests
 function constraint_forms_overlap(model::Model, parms::Parameters, minItems::Int,
                                   maxItems::Int = minItems)
+    @assert(minItems <= maxItems, "Error in forms_overlap. maxItems < minItems")
     if parms.shadow_test < 1
         # Retrieve x and z from the model
         x = model[:x]
