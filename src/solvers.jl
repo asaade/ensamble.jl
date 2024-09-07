@@ -2,10 +2,10 @@ using JuMP
 using YAML
 using CPLEX
 using Cbc
-using SCIP
 using GLPK
-using HiGHS
 using Gurobi
+using HiGHS
+using SCIP
 
 function load_solver_config(yaml_file::String)
     config = YAML.load_file(yaml_file)

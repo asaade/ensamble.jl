@@ -122,14 +122,14 @@ end
 # using .CriteriaParser
 # using DataFrames
 
-# df = DataFrame(AREA = [1, 2, 3, 4], CLAVE = ["A", "B", "C", "D"], A = [0.6, 0.4, 0.9, 0.2])
+# df = DataFrame(AREA = [1, 2, 3, 4], ID = ["A", "B", "C", "D"], A = [0.6, 0.4, 0.9, 0.2])
 
 # # Test cases
 # expr1 = CriteriaParser.parse_criteria("AREA == 1")
 # result1 = expr1(df)
 # println(result1)  # Expected: Bool[1, 0, 0, 0]
 
-# expr1_1 = CriteriaParser.parse_criteria("CLAVE == A")
+# expr1_1 = CriteriaParser.parse_criteria("ID == A")
 # result1_1 = expr1_1(df)
 # println(result1_1)  # Expected: Bool[1, 0, 0, 0]
 
@@ -137,19 +137,19 @@ end
 # result2 = expr2(df)
 # println(result2)  # Expected: Bool[1, 1, 1, 0]
 
-# expr3 = CriteriaParser.parse_criteria("CLAVE, AREA == 1")
+# expr3 = CriteriaParser.parse_criteria("ID, AREA == 1")
 # result3 = expr3(df)
-# println(result3)  # Expected: the values in CLAVE where AREA == 1 (here is "A")
+# println(result3)  # Expected: the values in ID where AREA == 1 (here is "A")
 
 # expr4 = CriteriaParser.parse_criteria("AREA")
 # result4 = expr4(df)
 # println(result4)  # Expected: df[!, :AREA]
 
-# expr5 = CriteriaParser.parse_criteria("CLAVE in [A, D]")
+# expr5 = CriteriaParser.parse_criteria("ID in [A, D]")
 # result5 = expr5(df)
 # println(result5)  # Expected: Bool[1, 0, 0, 1]
 
-# expr5_5 = CriteriaParser.parse_criteria("CLAVE in [\"A\", \"D\"]")
+# expr5_5 = CriteriaParser.parse_criteria("ID in [\"A\", \"D\"]")
 # result5_5 = expr5_5(df)
 # println(result5_5)  # Expected: Bool[1, 0, 0, 1]
 

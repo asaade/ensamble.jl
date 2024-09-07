@@ -278,13 +278,12 @@ function objective_info_relative2(model::Model, parms::Parameters)
         # alterna k para cada versión
         k = k % K + 1
         @constraint(model,
-                    sum([info[i, k] * x[i, f] for i in 1:items]) >= R[k] * y)
+                    sum([info[i, k] * x[i, f] for i in 1:items])>=R[k] * y)
     end
     # shadow > 0 && @constraint(model,
     #                           sum([info[i, k] * x[i, xs] for i in 1:items])>=R[k] * y * shadow)
     return model
 end
-
 
 function constraint_add_anchor!(model::Model, parms::Parameters)
     if parms.anchor_tests > 0
@@ -332,7 +331,8 @@ function constraint_max_use(model::Model, parms::Parameters, max_use::Int)
 end
 
 # Define the function to constrain item overlap between tests
-function constraint_item_overlap(model::Model, parms::Parameters, minItems::Int, maxItems::Int = minItems)
+function constraint_forms_overlap(model::Model, parms::Parameters, minItems::Int,
+                                  maxItems::Int = minItems)
     if parms.shadow_test < 1
         # Retrieve x and z from the model
         x = model[:x]
@@ -347,25 +347,21 @@ function constraint_item_overlap(model::Model, parms::Parameters, minItems::Int,
         end
 
         # Loop over all items and test pairs (t1, t2) where t1 < t2
-        for t1 in 1:num_forms
+        for t1 in 1:(num_forms - 1)
             for t2 in (t1 + 1):num_forms
                 # Sum of overlaps for item i between test t1 and t2 should be within bounds (minItems, maxItems)
-                @constraint(model, sum(z[i, t1, t2] for i in items) <= maxItems)
-                if minItems > 0
-                    @constraint(model, sum(z[i, t1, t2] for i in items) >= minItems)
-                end
+                @constraint(model, sum(z[i, t1, t2] for i in items)<=maxItems)
+                @constraint(model, sum(z[i, t1, t2] for i in items)>=minItems)
 
                 # Constraints to link z[i, t1, t2] with x[i, t1] and x[i, t2]
                 for i in items
-                    @constraint(model, 2 * z[i, t1, t2] <= x[i, t1] + x[i, t2])
-                    @constraint(model, z[i, t1, t2] >= x[i, t1] + x[i, t2] - 1)
+                    @constraint(model, 2 * z[i, t1, t2]<=x[i, t1] + x[i, t2])
+                    @constraint(model, z[i, t1, t2]>=x[i, t1] + x[i, t2] - 1)
                 end
             end
         end
     end
 end
-
-
 
 function constraint_prevent_overlap!(model::Model, parms::Parameters)
     return constraint_max_use(model, parms, 1)

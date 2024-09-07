@@ -51,8 +51,8 @@ end
 
 function display_final_results(parms::Parameters, results::DataFrame)
     bank = parms.bank
-    items = bank.CLAVE
-    anchor_items = bank[bank.ANCHOR .> 0, :CLAVE]
+    items = bank.ID
+    anchor_items = bank[bank.ANCHOR .> 0, :ID]
     items_used = unique(reduce(vcat, eachcol(results)))
     anchors_used = anchor_items[anchor_items .∈ Ref(items_used)]
     non_anchor_used = setdiff(items_used, anchors_used)
@@ -85,7 +85,7 @@ function save_forms(parms::Parameters, results::DataFrame, config)
 
     for v in names(results)
         bank[!, Symbol(v)] = map(x -> x == 1 ? CHECKMARK : "",
-                                 bank.CLAVE .∈ Ref(skipmissing(results[:, v])))
+                                 bank.ID .∈ Ref(skipmissing(results[:, v])))
     end
     write_results_to_file(bank, config.forms_file)
     return write_results_to_file(results, config.results_file)

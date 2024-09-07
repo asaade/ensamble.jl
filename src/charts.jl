@@ -8,8 +8,8 @@ include("stats_functions.jl")
 # Function to extract a, b, c parms from the bank based on selected items
 function fetch_irt_parms(bank::DataFrame,
                          selected_items::Vector{Union{String, Missing}})
-    # items = in(skipmissing(selected_items)).(bank.CLAVE)
-    items = bank.CLAVE .∈ Ref(skipmissing(selected_items))
+    # items = in(skipmissing(selected_items)).(bank.ID)
+    items = bank.ID .∈ Ref(skipmissing(selected_items))
     return fetch_irt_parms(bank, items)
 end
 
