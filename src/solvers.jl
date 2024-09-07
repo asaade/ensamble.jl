@@ -62,6 +62,17 @@ function conflicting_constraints(model)
     return list_of_conflicting_constraints
 end
 
+function check_constraints(model)
+    compute_conflict!(model)
+
+    # if get_attribute(model, MOI.ConflictStatus()) == MOI.CONFLICT_FOUND
+    #     iis_model, _ = copy_conflict(model)
+    #     print(iis_model)
+    # end
+
+    return conflicting_constraints(model)
+end
+
 # # Example usage:
 
 # model = Model()

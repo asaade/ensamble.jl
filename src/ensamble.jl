@@ -143,21 +143,7 @@ function main(config_file::String = CONFIG_FILE)
         else
             println(OPTIMIZATION_FAILED_MESSAGE)
             if par.verbose > 1
-                compute_conflict!(model)
-
-                if get_attribute(model, MOI.ConflictStatus()) == MOI.CONFLICT_FOUND
-                    iis_model, _ = copy_conflict(model)
-                    print(iis_model)
-                end
-
-                list_of_conflicting_constraints = ConstraintRef[]
-                for (F, S) in list_of_constraint_types(model)
-                    for con in all_constraints(model, F, S)
-                        if get_attribute(con, MOI.ConstraintConflictStatus()) == MOI.IN_CONFLICT
-                            push!(list_of_conflicting_constraints, con)
-                        end
-                    end
-                end
+                display(check_constraints(model))
                 return 1
             end
             par.f -= 1

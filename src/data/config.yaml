@@ -15,7 +15,7 @@ plotFile: ./data/results/chart.pdf        # Plot output file
 solver: cplex
 
 ## Verbosity level of the program's output
-verbose: 3
+verbose: 1
 
 ## Parameters
 ##
@@ -39,7 +39,7 @@ forms:
 
      shadowTest: 1
 
-     F: 8           # Number of test forms to assemble
+     F: 12           # Number of test forms to assemble
 
 ## Number of anchor tests to alternate in forms from those
 ## included in the anchorFile. When an acchor test is not

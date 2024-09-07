@@ -238,8 +238,8 @@ function get_params(config::Config)::Parameters
     parms_dict[:VERBOSE] = config.verbose
     method = parms_dict[:METHOD]
 
-    df = dropmissing(bank[:, [:AMIGOS, :ENEMIGOS]])
-    df = groupby(df, [:AMIGOS, :ENEMIGOS])
+    df = dropmissing(bank[:, [:FRIENDS, :ENEMIES]])
+    df = groupby(df, [:FRIENDS, :ENEMIES])
     for sub in df
         if size(sub, 1) > 1
             println(sub)
@@ -247,8 +247,8 @@ function get_params(config::Config)::Parameters
         end
     end
 
-    df = dropmissing(bank[bank.ANCHOR .> 0, [:ANCHOR, :ENEMIGOS]])
-    df = groupby(df, [:ANCHOR, :ENEMIGOS])
+    df = dropmissing(bank[bank.ANCHOR .> 0, [:ANCHOR, :ENEMIES]])
+    df = groupby(df, [:ANCHOR, :ENEMIES])
     for sub in df
         if size(sub, 1) > 1
             println(sub)
@@ -256,9 +256,9 @@ function get_params(config::Config)::Parameters
         end
     end
 
-    df = dropmissing(bank[bank.ANCHOR .> 0, [:ANCHOR, :AMIGOS]])
-    df = groupby(df, [:ANCHOR, :AMIGOS])
-    df = groupby(combine(df, nrow, proprow, groupindices), :AMIGOS)
+    df = dropmissing(bank[bank.ANCHOR .> 0, [:ANCHOR, :FRIENDS]])
+    df = groupby(df, [:ANCHOR, :FRIENDS])
+    df = groupby(combine(df, nrow, groupindices), :FRIENDS)
     for sub in df
         if size(sub, 1) > 1
             println(sub)
