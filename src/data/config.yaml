@@ -12,7 +12,7 @@ plotFile: ./data/results/chart.pdf        # Plot output file
 ## Optimization engine selection
 ## Currently configured options:
 ## CPLEX, Cbc, SCIP, HiGHS, and GLPK
-solver: cbc
+solver: cplex
 
 ## Verbosity level of the program's output
 verbose: 3
@@ -27,7 +27,8 @@ forms:
 ## TIC3 - Maximize relative target, one per test
 ## TCC  - Test Characteristic Curve, absolute at Theta/Tau (Preequating)
 ## CTT  - Classic Test Theory (currently not available)
-     method: TIC
+
+     method: TCC
 
 ## Use Big Shadow Test heuristic; assemble one test at a time
 ## insted of all test simultaneously (shadowTest: 0).
@@ -35,19 +36,22 @@ forms:
 ## Required if TCC3 method is selected to alternate forms
 ## 1 use Big Shadow Test sequential assembly
 ## 0 simultaneous assembly
-     shadowTest: 0
-     F: 5           # Number of test forms to assemble
+
+     shadowTest: 1
+
+     F: 8           # Number of test forms to assemble
 
 ## Number of anchor tests to alternate in forms from those
 ## included in the anchorFile. When an acchor test is not
 ## included, the items are excluded from assembly.
-     anchorTests: 0
+
+     anchorTests: 3
 
 ## Number of powers for the TCC equating model
      R: 2
 
 ## Points on the scale for equating (including cut points)
-     theta: [-2.5, -1.2, 0.0, 1.2, 2.5, 3.5]
+     theta: [-1.8, 0.0, 1.8]
 
 ## Score probabilities in the reference test to match at K theta points
 ## If tau is not set, it will be calculated as the average prob from the
@@ -62,5 +66,5 @@ forms:
 
 ## Points and weights to maximize for relative target models
 ## TIC2 and TIC3
-     relativeTargetWeights: [1, 1, 1]
-     relativeTargetPoints: [-1.0, 0.0, 1.0]
+     relativeTargetWeights: [6, 6]
+     relativeTargetPoints: [-1.0, 1.0]

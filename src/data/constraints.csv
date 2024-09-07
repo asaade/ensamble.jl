@@ -7,5 +7,5 @@
 6,C6,Sum,Item,Palabras,2100,3400,ON
 7,C7,Enemies,Item,enemigos,0,0,ON
 8,C8,Friends,Item,amigos,0,0,ON
-9,C9,maxuse,Item,,0,2,ON
-10,C10,overlap,Item,,0,4,ON
+9,C9,maxuse,Item,,0,1,ON
+10,C10,overlap,Item,,5,5,OFF

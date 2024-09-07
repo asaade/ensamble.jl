@@ -37,8 +37,8 @@ end
 Remove items used in forms from the bank and update probabilities or
 information for the remaining items based on the method used.
 """
-function remove_used_items!(par::Parameters, items_used)
-    remaining = setdiff(1:length(par.bank.CLAVE), items_used)
+function remove_used_items!(par::Parameters, items_used::Vector{Int})
+    remaining = setdiff(1:length(par.bank.ID), items_used)
     par.bank = par.bank[remaining, :]
     if par.method in ["TCC", "TIC", "TIC2", "TIC3"]
         par.method in ["TCC"] && (par.p = par.p[remaining, :])
@@ -69,7 +69,7 @@ Used items are removed from the bank for subsequent forms.
 """
 function process_and_store_results!(model::Model, par::Parameters, results_df::DataFrame)
     solver_matrix = value.(model[:x])
-    item_codes = par.bank.CLAVE
+    item_codes = par.bank.ID
     items = 1:length(item_codes)
     items_used = Int[]
     max_items = par.max_items
@@ -142,6 +142,24 @@ function main(config_file::String = CONFIG_FILE)
             par.f -= par.num_forms
         else
             println(OPTIMIZATION_FAILED_MESSAGE)
+            if par.verbose > 1
+                compute_conflict!(model)
+
+                if get_attribute(model, MOI.ConflictStatus()) == MOI.CONFLICT_FOUND
+                    iis_model, _ = copy_conflict(model)
+                    print(iis_model)
+                end
+
+                list_of_conflicting_constraints = ConstraintRef[]
+                for (F, S) in list_of_constraint_types(model)
+                    for con in all_constraints(model, F, S)
+                        if get_attribute(con, MOI.ConstraintConflictStatus()) == MOI.IN_CONFLICT
+                            push!(list_of_conflicting_constraints, con)
+                        end
+                    end
+                end
+                return 1
+            end
             par.f -= 1
         end
     end

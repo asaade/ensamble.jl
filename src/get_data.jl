@@ -1,11 +1,17 @@
-
-using DataFrames, YAML, CSV
+using CSV
+using DataFrames
+using YAML
 
 include("stats_functions.jl")
 include("types.jl")
 include("utils.jl")
 
-# Function to convert a dictionary to a Config struct
+
+"""
+    Config(config_dict::Dict{Symbol, Any})
+
+Convert a dictionary from file to a Config struct
+"""
 function Config(config_dict::Dict{Symbol, Any})
     forms_data = Dict(Symbol(k) => v for (k, v) in config_dict[:FORMS])
     return Config(forms_data,
@@ -20,7 +26,11 @@ function Config(config_dict::Dict{Symbol, Any})
                   config_dict[:VERBOSE])
 end
 
-# Function to convert a dictionary to a Parameters struct
+"""
+    Parameters(parms_dict::Dict{Symbol, Any})
+
+Convert a dictionary from fileto a Parameters struct
+"""
 function Parameters(parms_dict::Dict{Symbol, Any})
     return Parameters(parms_dict[:N],
                       parms_dict[:SHADOWTEST] > 0 ?
@@ -49,7 +59,11 @@ function Parameters(parms_dict::Dict{Symbol, Any})
                       parms_dict[:VERBOSE])
 end
 
-# Error handling for reading CSV files
+"""
+    safe_read_csv(file_path::String)::DataFrame
+
+Simple error handling when reading CSV files
+"""
 function safe_read_csv(file_path::String)::DataFrame
     try
         return DataFrame(CSV.File(file_path))
@@ -59,7 +73,14 @@ function safe_read_csv(file_path::String)::DataFrame
     end
 end
 
-# Function to clean IRT data
+"""
+    clean_IRT!(bank::DataFrame)::DataFrame
+
+Function to clean item bank data as IRT 3P. Valid values:
+ 0.4 <= a <= 2.0
+-4.0 <= b <= 4.0
+ 0.0 <= c <= 0.5
+"""
 function clean_IRT!(bank::DataFrame)::DataFrame
     dropmissing!(bank, :B)
     bank[!, :A] .= coalesce.(bank[!, :A], 1.0)
@@ -71,7 +92,13 @@ function clean_IRT!(bank::DataFrame)::DataFrame
     return bank
 end
 
-# Function to clean TC data
+"""
+    clean_TC!(bank::DataFrame)::DataFrame
+
+Clean Classic Theory data in bank. Valid values:
+0.1  <= D <= 0.9
+0.15 <= p <= 0.7
+"""
 function clean_TC!(bank::DataFrame)::DataFrame
     dropmissing!(bank, :DIF)
     dropmissing!(bank, :CORR)
@@ -82,13 +109,17 @@ function clean_TC!(bank::DataFrame)::DataFrame
     return bank
 end
 
-# Function to clean the items bank based on the selected method
+"""
+    clean_items_bank!(config::Config, bank::DataFrame)::DataFrame
+
+Clean the items bank based on the selected optimization method
+"""
 function clean_items_bank!(config::Config, bank::DataFrame)::DataFrame
     original_size = size(bank, 1)
     unique!(bank)
 
-    if !("CLAVE" in names(bank))
-        bank[!, "CLAVE"] = collect(1:size(bank, 1))
+    if !("ID" in names(bank))
+        bank[!, "ID"] = collect(1:size(bank, 1))
     end
 
     method = config.forms[:METHOD]
@@ -105,7 +136,12 @@ function clean_items_bank!(config::Config, bank::DataFrame)::DataFrame
     return bank
 end
 
-# Function to read anchor file and handle errors
+"""
+    read_anchor_file(config::Config)::DataFrame
+
+Read file containing anchor tests data and handle errors.
+The file must id items by ID and organize them by column.
+"""
 function read_anchor_file(config::Config)::DataFrame
     anchor_data = safe_read_csv(config.anchor_items_file)
     upcase!(anchor_data)
@@ -127,7 +163,7 @@ function add_anchor_labels!(config::Config, anchor_tests::Int, bank::DataFrame)
             bank[!, "ANCHOR"] = fill(0, size(bank, 1))
 
             for i in 1:anchor_forms
-                dfv = view(bank, bank.CLAVE .∈ Ref(anchor_items[:, i]), :)
+                dfv = view(bank, bank.ID .∈ Ref(anchor_items[:, i]), :)
                 @. dfv.ANCHOR = i
             end
         end
@@ -196,11 +232,40 @@ function get_params(config::Config)::Parameters
 
     parms_dict[:ANCHORSIZE] = anchor_tests > 0 ? anchor_size : 0
 
-    bank.CLAVE = string.(bank.CLAVE)
+    bank.ID = string.(bank.ID)
     bank.INDEX = rownumber.(eachrow(bank))
-    parms_dict[:BANK] = unique(bank, [:CLAVE])
+    parms_dict[:BANK] = unique(bank, [:ID])
     parms_dict[:VERBOSE] = config.verbose
     method = parms_dict[:METHOD]
+
+    df = dropmissing(bank[:, [:AMIGOS, :ENEMIGOS]])
+    df = groupby(df, [:AMIGOS, :ENEMIGOS])
+    for sub in df
+        if size(sub, 1) > 1
+            println(sub)
+            error("Conflicting Friend and Enemy items")
+        end
+    end
+
+    df = dropmissing(bank[bank.ANCHOR .> 0, [:ANCHOR, :ENEMIGOS]])
+    df = groupby(df, [:ANCHOR, :ENEMIGOS])
+    for sub in df
+        if size(sub, 1) > 1
+            println(sub)
+            error("Conflicting Anchor and Enemy items")
+        end
+    end
+
+    df = dropmissing(bank[bank.ANCHOR .> 0, [:ANCHOR, :AMIGOS]])
+    df = groupby(df, [:ANCHOR, :AMIGOS])
+    df = groupby(combine(df, nrow, proprow, groupindices), :AMIGOS)
+    for sub in df
+        if size(sub, 1) > 1
+            println(sub)
+            error("Conflicting Anchor and Friend items")
+        end
+    end
+
 
     if method in ["TIC2", "TIC3"]
         theta = parms_dict[:RELATIVETARGETPOINTS]

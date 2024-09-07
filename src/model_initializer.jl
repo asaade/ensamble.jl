@@ -1,6 +1,6 @@
-using JuMP
 using CSV
 using DataFrames
+using JuMP
 
 # Include external modules
 include("CriteriaParser.jl")
@@ -9,9 +9,9 @@ include("types.jl")
 include("utils.jl")
 
 # Module constants
-const MODEL_FILE = "./data/model.lp"
-const INITIALIZING_MODEL_MESSAGE = "Initializing optimization model..."
 const APPLYING_CONSTRAINT_MESSAGE = "Applying constraint: "
+const INITIALIZING_MODEL_MESSAGE = "Initializing optimization model..."
+const MODEL_FILE = "./data/model.lp"
 
 """
     read_constraints(file_path::String) -> Dict{String, Constraint}
@@ -23,7 +23,7 @@ function read_constraints(file_path::String)
     constraints = Dict{String, Constraint}()
 
     for row in eachrow(df)
-        if row[:ONOFF] != "OFF"
+        if row[:ONOFF] == "ON"
             row = map(up!, row)
             cond_id = row[:CONSTRAINT_ID]
             type = row[:TYPE]
@@ -141,7 +141,6 @@ function apply_individual_constraint!(model::Model, parms::Parameters,
         constraint_item_sum(model, parms, item_vals, lb, ub)
     elseif constraint.type == "ENEMIES"
         condition = constraint.condition(bank)
-        #  selected_items = items[condition]
         constraint_enemies_in_form(model, parms, condition)
     elseif constraint.type == "FRIENDS"
         condition = constraint.condition(bank)
@@ -149,7 +148,7 @@ function apply_individual_constraint!(model::Model, parms::Parameters,
     elseif constraint.type == "MAXUSE"
         constraint_max_use(model, parms, ub)
     elseif constraint.type == "OVERLAP"
-        constraint_item_overlap(model, parms, lb, ub)
+        constraint_forms_overlap(model, parms, lb, ub)
     else
         error("Unknown constraint type: ", constraint.type)
     end
