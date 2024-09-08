@@ -84,7 +84,7 @@ function save_forms(parms::Parameters, results::DataFrame, config)
     bank = deepcopy(parms.bank)
 
     for v in names(results)
-        bank[!, Symbol(v)] = map(x -> x == 1 ? CHECKMARK : "",
+        bank[!, Symbol(v)] = map(x -> x == 1 ? v : "",
                                  bank.ID .∈ Ref(skipmissing(results[:, v])))
     end
     write_results_to_file(bank, config.forms_file)
