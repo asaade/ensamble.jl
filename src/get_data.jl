@@ -184,7 +184,7 @@ function read_bank_file(config::Config)::DataFrame
     return bank
 end
 
-# Function to find total items in constraints file
+# Function to find total form size in constraints file
 function find_total_items(file_path::String)::Tuple{Int, Int}
     df = safe_read_csv(file_path)
 
@@ -198,6 +198,20 @@ function find_total_items(file_path::String)::Tuple{Int, Int}
     return 0, 0
 end
 
+# Function to find max item use in constraints file
+function find_max_use(file_path::String)::Tuple{Int, Int}
+    df = safe_read_csv(file_path)
+
+    for row in eachrow(df)
+        row = map(up!, row)
+        if row[:TYPE] == "MAXUSE"
+            return row[:LB], row[:UB]
+        end
+    end
+
+    return 0, 1
+end
+
 # Function to load configuration from a YAML file
 function load_config(inFile::String = "data/config.yaml")::Config
     config_data = YAML.load_file(inFile; dicttype = Dict{Symbol, Any})
@@ -207,6 +221,9 @@ function load_config(inFile::String = "data/config.yaml")::Config
     config_dict[:FORMS][:N] = (lb + ub) ÷ 2
     # config_dict[:FORMS][:MINN] = lb
     config_dict[:FORMS][:MAXN] = max(lb, ub)
+
+    lb, ub = find_max_use(config_dict[:CONSTRAINTSFILE])
+    config_dict[:FORMS][:MAXITEMUSE] = ub
 
     if !haskey(config_dict[:FORMS], :R)
         config_dict[:FORMS][:R] = if config_dict[:FORMS][:N] <= 25

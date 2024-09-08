@@ -15,14 +15,18 @@ end
 ## Incluye un número de reactivos ente minItems y maxItems] de la lista "selected" en cada prueba(F)
 function constraint_item_count_aux(model::Model, parms::Parameters, selected,
                                    minItems::Int, maxItems::Int = minItems)
-    @assert(minItems <= maxItems, "Error in item_count. maxItems < minItems")
+    @assert(0 <= minItems <= maxItems, "Error in item_count. maxItems < minItems")
 
     x = model[:x]
     forms = size(x, 2)
     forms -= parms.shadow_test > 0 ? 1 : 0
 
-    @constraint(model, [f = 1:forms], sum(x[i, f] for i in selected) <= maxItems)
-    @constraint(model, [f = 1:forms], sum(x[i, f] for i in selected) >= minItems)
+    if minItems == maxItems
+        @constraint(model, [f = 1:forms], sum(x[i, f] for i in selected) == maxItems)
+    else
+        @constraint(model, [f = 1:forms], sum(x[i, f] for i in selected) <= maxItems)
+        @constraint(model, [f = 1:forms], sum(x[i, f] for i in selected) >= minItems)
+    end
     return model
 end
 
@@ -34,9 +38,12 @@ function constraint_item_count_shadow_aux(model::Model, parms::Parameters, selec
         @assert(minItems <= maxItems, "Error in item_count. maxItems < minItems")
         x = model[:x]
         zcol = size(x, 2)
-
-        @constraint(model, sum(x[i, zcol] for i in selected)>=minItems * shadow_test)
-        @constraint(model, sum(x[i, zcol] for i in selected)<=maxItems * shadow_test)
+        if minItems == maxItems
+            @constraint(model, sum(x[i, zcol] for i in selected)==minItems * shadow_test)
+        else
+            @constraint(model, sum(x[i, zcol] for i in selected)>=minItems * shadow_test)
+            @constraint(model, sum(x[i, zcol] for i in selected)<=maxItems * shadow_test)
+        end
     end
 
     return model
@@ -302,24 +309,22 @@ function constraint_add_anchor!(model::Model, parms::Parameters)
 end
 
 function constraint_max_use(model::Model, parms::Parameters, max_use::Int)
-    if parms.anchor_tests == 0 && max_use > 0
-        x = model[:x]
-        items, forms = size(x)
-        # forms -= parms.shadow_test > 0 ? 1 : 0
-        @constraint(model, [i = 1:items],
-                    sum([x[i, f] for f in 1:forms]) +
-                    parms.bank.ITEM_USE[i]<=
-                    max_use)
-    end
+    @assert(max_use > 0, "Error in max_use constraint. max_use must be positive.")
+    x = model[:x]
+    num_items, forms = size(x)
+    items = collect(1:num_items)
+    items = items[parms.bank.ANCHOR .!= parms.anchor_tests]
 
+    @constraint(model, max_use[i in items],
+                sum([x[i, f] for f in 1:forms]) + parms.bank.ITEM_USE[i] <= max_use)
     return model
 end
 
 # Define the function to constrain item overlap between tests
 function constraint_forms_overlap(model::Model, parms::Parameters, minItems::Int,
                                   maxItems::Int = minItems)
-    @assert(minItems <= maxItems, "Error in forms_overlap. maxItems < minItems")
-    if parms.shadow_test < 1
+    @assert(0 <= minItems <= maxItems, "Error in forms_overlap. maxItems < minItems")
+    if parms.shadow_test < 1 && parms.anchor_tests == 0
         # Retrieve x and z from the model
         x = model[:x]
         # Get the number of forms (tests) from the size of x
@@ -327,25 +332,20 @@ function constraint_forms_overlap(model::Model, parms::Parameters, minItems::Int
 
         @variable(model, z[1:num_items, 1:num_forms, 1:num_forms], Bin)
         items = collect(1:num_items)
-        if parms.anchor_tests > 0
-            anchor_items = items[(parms.bank.ANCHOR .== parms.anchor_tests)]
-            setdiff!(items, anchor_items)
-        end
+        items = items[(parms.bank.ANCHOR .!= parms.anchor_tests)]
 
         # Loop over all items and test pairs (t1, t2) where t1 < t2
-        for t1 in 1:(num_forms - 1)
-            for t2 in (t1 + 1):num_forms
-                # Sum of overlaps for item i between test t1 and t2 should be within bounds (minItems, maxItems)
-                @constraint(model, sum(z[i, t1, t2] for i in items)<=maxItems)
-                @constraint(model, sum(z[i, t1, t2] for i in items)>=minItems)
-
-                # Constraints to link z[i, t1, t2] with x[i, t1] and x[i, t2]
-                for i in items
-                    @constraint(model, 2 * z[i, t1, t2]<=x[i, t1] + x[i, t2])
-                    @constraint(model, z[i, t1, t2]>=x[i, t1] + x[i, t2] - 1)
-                end
-            end
+        # Sum of overlaps for item i between test t1 and t2 should be within bounds (minItems, maxItems)
+        if minItems == maxItems
+            @constraint(model, [t1=1:(num_forms - 1), t2= (t1 + 1):num_forms], sum(z[i, t1, t2] for i in items)==maxItems)
+        else
+            @constraint(model, [t1=1:(num_forms - 1), t2= (t1 + 1):num_forms], sum(z[i, t1, t2] for i in items)<=maxItems)
+            @constraint(model, [t1=1:(num_forms - 1), t2= (t1 + 1):num_forms], sum(z[i, t1, t2] for i in items)>=minItems)
         end
+
+        # Constraints to link z[i, t1, t2] with x[i, t1] and x[i, t2]
+        @constraint(model, [i=items], 2 * z[i, t1, t2]<=x[i, t1] + x[i, t2])
+        @constraint(model, [i=items], z[i, t1, t2]>=x[i, t1] + x[i, t2] - 1)
     end
 end
 
