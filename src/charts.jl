@@ -8,19 +8,7 @@ include("stats_functions.jl")
 # Function to extract a, b, c parms from the bank based on selected items
 function fetch_irt_parms(bank::DataFrame,
                          selected_items::Vector{Union{String, Missing}})
-    # items = in(skipmissing(selected_items)).(bank.ID)
-    items = bank.ID .∈ Ref(skipmissing(selected_items))
-    return fetch_irt_parms(bank, items)
-end
-
-function fetch_irt_parms(bank::DataFrame, selected_items::BitVector)
-    a = bank[selected_items, :A]
-    b = bank[selected_items, :B]
-    c = bank[selected_items, :C]
-    return a, b, c
-end
-
-function fetch_irt_parms(bank::DataFrame, selected_items::Vector{Int})
+    selected_items = bank.ID .∈ Ref(skipmissing(selected_items))
     a = bank[selected_items, :A]
     b = bank[selected_items, :B]
     c = bank[selected_items, :C]
@@ -96,7 +84,7 @@ end
 # Generate characteristic curves and observed score distribution plots
 function plot_results_and_simulation(parms,
                                      results::DataFrame,
-                                     theta_range::AbstractVector = -4.0:0.1:4.0,
+                                     theta_range::AbstractVector = -3.0:0.1:3.0,
                                      plot_file::String = "data/combined_plot.pdf")
     # Generate the plot data
     characteristic_curves = generate_characteristic_curves(parms, results, theta_range)
@@ -115,7 +103,7 @@ function plot_results_and_simulation(parms,
     end
 
     # Set up the plot aesthetics
-    theme(:mute)
+    theme(:dark)
     gr(; size = (1200, 900))
 
     forms = size(results, 2)
@@ -175,5 +163,5 @@ function plot_results_and_simulation(parms,
 
     # Save the combined plot
     savefig(combined_plot, plot_file)
-    return display(combined_plot)
+    return combined_plot
 end
