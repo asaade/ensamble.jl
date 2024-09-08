@@ -3,44 +3,54 @@ export parse_criteria
 
 using DataFrames
 
-# Helper function to normalize the input string
-function normalize(input_str::String)
-    input_str = uppercase(input_str)
-    input_str = replace(input_str, r"\s*([!=<>]=?|in|\&|\|)\s*" => s" \1 ")
-    input_str = replace(input_str, r"\s*,\s*" => ",")
+# Normalize input string
+function normalize(input_str::AbstractString)
+    return uppercase(replace(input_str, r"\s*([!=<>]=?|in|\&|\|)\s*" => s" \1 ", r"\s*,\s*" => ","))
+end
+
+function sanitize_input(input_str::AbstractString)
+    # Only allow alphanumeric, spaces, and certain symbols
+    if isempty(input_str)
+        return input_str
+    elseif !isvalidinput(input_str)
+        throw(ArgumentError("Input string contains invalid characters"))
+    end
     return input_str
 end
 
-# Function to handle different operations in a regular function
-function apply_condition(op::String, lhs::Symbol, rhs, df::DataFrame)
-    if lhs ∉ Symbol.(names(df))
-        throw(ArgumentError("Column $lhs does not exist in the DataFrame"))
-    end
+function isvalidinput(input_str::AbstractString)
+    return occursin(r"^[a-zA-Z0-9\[\]\,\s\<\>\=\!\|&\-\.]+$", input_str)
+end
 
-    lhs_col = df[!, lhs]
 
-    if op == "=="
-        return lhs_col .== rhs
-    elseif op == "<="
-        return lhs_col .<= rhs
-    elseif op == "<"
-        return lhs_col .< rhs
-    elseif op == ">="
-        return lhs_col .>= rhs
-    elseif op == ">"
-        return lhs_col .> rhs
-    elseif op == "!="
-        return lhs_col .!= rhs
-    elseif op == "IN"
-        return lhs_col .∈ Ref(rhs)
-    elseif op == "!IN"
-        return lhs_col .∉ Ref(rhs)
-    else
+# Refactored condition application using a dictionary for operator functions
+const OPERATOR_MAP = Dict(
+    "!=" => (lhs, rhs) -> lhs .!= rhs,
+    "<"  => (lhs, rhs) -> lhs .< rhs,
+    "<=" => (lhs, rhs) -> lhs .<= rhs,
+    "==" => (lhs, rhs) -> lhs .== rhs,
+    ">"  => (lhs, rhs) -> lhs .> rhs,
+    ">=" => (lhs, rhs) -> lhs .>= rhs,
+    "IN" => (lhs, rhs) -> lhs .∈ Ref(rhs),
+    "!IN" => (lhs, rhs) -> lhs .∉ Ref(rhs)
+)
+
+function validate_operator(op::AbstractString)
+    if op ∉ keys(OPERATOR_MAP)
         throw(ArgumentError("Unsupported operator: $op"))
     end
 end
 
-# Helper function to determine if a string is numeric
+# Apply condition on DataFrame
+function apply_condition(op::AbstractString, lhs::Symbol, rhs, df::DataFrame)
+    if lhs ∉ Symbol.(names(df))
+        throw(ArgumentError("Column $lhs does not exist in the DataFrame"))
+    end
+    lhs_col = df[!, lhs]
+    return OPERATOR_MAP[op](lhs_col, rhs)
+end
+
+# Check if string is numeric
 is_numeric(s::AbstractString) =
     try
         parse(Float64, s)
@@ -49,76 +59,84 @@ is_numeric(s::AbstractString) =
         return false
     end
 
-# Function to handle collections and quote string literals automatically
+# Process the right-hand side (rhs)
 function process_rhs(rhs::AbstractString)
-    # Check if rhs is a collection
     if occursin(r"^\[.*\]$", rhs)
-        # Evaluate the content inside the brackets
-        elements = strip(rhs, ['[', ']'])
-        elements = split(elements, ",")
-
-        # Process each element based on whether it's numeric or a string literal
-        processed_elements = [is_numeric(el) ? parse(Float64, el) :
-                              replace(el, r"^\"(.*)\"$" => s"\1")  # Remove quotes if present
-                              for el in elements]
-        return processed_elements
-
-    elseif is_numeric(rhs)  # If it's a number, parse it as a Float64
+        elements = split(strip(rhs, ['[', ']']), ",")
+        return [is_numeric(el) ? parse(Float64, el) : strip(el, '"') for el in elements]
+    elseif is_numeric(rhs)
         return parse(Float64, rhs)
-
-    else  # Otherwise, assume it's a string literal and remove any quotes
-        return replace(rhs, r"^\"(.*)\"$" => s"\1")  # Remove quotes if present
+    else
+        return strip(rhs, '"')
     end
 end
 
-# Function to parse the criteria string and apply it to a DataFrame
-function parse_criteria(input_str::String)
-    if strip(input_str) == ""
+# Parse individual condition (e.g., AREA == 1)
+function parse_condition(condition_expr::AbstractString)
+    parts = split(condition_expr, r"\s+")
+    if length(parts) == 3
+        lhs, op, rhs = parts
+        return (Symbol(lhs), String(op), process_rhs(rhs))
+    else
+        throw(ArgumentError("Invalid condition format"))
+    end
+end
+
+# Handle column selection with a condition
+function handle_column_and_condition(col_expr::AbstractString, condition_expr::AbstractString)
+    lhs, op, rhs = parse_condition(condition_expr)
+    validate_operator(op)
+    return df -> df[apply_condition(op, Symbol(lhs), rhs, df), Symbol(col_expr)]
+end
+
+# Handle basic condition
+function handle_basic_condition(condition_expr::AbstractString)
+    lhs, op, rhs = parse_condition(condition_expr)
+    validate_operator(op)
+    return df -> apply_condition(op, Symbol(lhs), rhs, df)
+end
+
+# Handle column-only selection (no condition)
+function handle_column_only(col_expr::AbstractString)
+    return df -> df[!, Symbol(col_expr)]
+end
+
+# Main function to parse the entire criteria string
+function parse_criteria(input_str::AbstractString; max_length::Int=100)
+    if length(input_str) > max_length
+        throw(ArgumentError("Input string exceeds maximum allowed length of $max_length characters"))
+    end
+
+    input_str = strip(input_str)
+    input_str = sanitize_input(input_str)
+
+    # Return all `true` if input is empty
+    if isempty(input_str)
         return df -> trues(size(df, 1))
     end
 
     normalized_str = normalize(input_str)
 
-    # Check for comma-separated columns, but only if not within a collection
+    # Check for column selection with a condition
     if contains(normalized_str, r",") && !occursin(r"\[.*\]", normalized_str)
         col_expr, condition_expr = split(normalized_str, ","; limit = 2)
-        col_expr = strip(col_expr)
-
-        condition_parts = split(condition_expr, r"\s+")
-
-        if length(condition_parts) == 3
-            lhs, op, rhs = condition_parts
-            op = String(op)
-
-            rhs = process_rhs(rhs)
-
-            return df -> df[apply_condition(op, Symbol(lhs), rhs, df), Symbol(col_expr)]
-        else
-            throw(ArgumentError("Invalid criteria string format"))
-        end
+        return handle_column_and_condition(strip(col_expr), strip(condition_expr))
     else
+        # Check if it's a basic condition or just a column
         parts = split(normalized_str, r"\s+")
-
         if length(parts) == 3
-            lhs, op, rhs = parts
-            op = String(op)  # Convert SubString to String
-
-            rhs = process_rhs(rhs)
-
-            return df -> apply_condition(op, Symbol(lhs), rhs, df)
-
+            return handle_basic_condition(normalized_str)
         elseif length(parts) == 1
-            lhs = Symbol(parts[1])
-            return df -> df[!, lhs]
-
+            return handle_column_only(normalized_str)
         else
             throw(ArgumentError("Invalid criteria string format"))
         end
     end
 end
+
 end
 
-# # Example usage
+# # # Example usage
 # using .CriteriaParser
 # using DataFrames
 
@@ -149,9 +167,10 @@ end
 # result5 = expr5(df)
 # println(result5)  # Expected: Bool[1, 0, 0, 1]
 
-# expr5_5 = CriteriaParser.parse_criteria("ID in [\"A\", \"D\"]")
-# result5_5 = expr5_5(df)
-# println(result5_5)  # Expected: Bool[1, 0, 0, 1]
+## ## Not available for now
+# # expr5_5 = CriteriaParser.parse_criteria("ID in [\"A\", \"D\"]")
+# # result5_5 = expr5_5(df)
+# # println(result5_5)  # Expected: Bool[1, 0, 0, 1]
 
 # expr6 = CriteriaParser.parse_criteria("")
 # result6 = expr6(df)
