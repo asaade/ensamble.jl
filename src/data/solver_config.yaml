@@ -13,7 +13,7 @@ cbc:
   seconds: 120                       # Time limit in seconds
   allowableGap: 0.05                # Relative MIP gap tolerance
   ratioGap: 0.05                    # Absolute MIP gap tolerance
-  threads: 0                        # Number of threads to use
+  threads: 10                        # Number of threads to use
   timeMode: elapsed                 # Measure time based on elapsed time
   logLevel: 1                       # Logging level
   presolve: on                      # Presolve indicator ("on", "off")

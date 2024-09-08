@@ -45,13 +45,13 @@ forms:
 ## included in the anchorFile. When an acchor test is not
 ## included, the items are excluded from assembly.
 
-     anchorTests: 3
+     anchorTests: 2
 
 ## Number of powers for the TCC equating model
      R: 2
 
 ## Points on the scale for equating (including cut points)
-     theta: [-1.8, 0.0, 1.8]
+     theta: [-2.5, -1.5, 0.0, 1.5, 2.5]
 
 ## Score probabilities in the reference test to match at K theta points
 ## If tau is not set, it will be calculated as the average prob from the

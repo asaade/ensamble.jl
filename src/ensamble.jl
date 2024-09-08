@@ -127,6 +127,8 @@ function main(config_file::String = CONFIG_FILE)
     constraints = read_constraints(config.constraints_file)
     results_df = DataFrame()
 
+    assembled_forms = 0
+
     while par.f > 0
         par.num_forms = min(par.num_forms, par.f)
         par.shadow_test = max(0, par.f - par.num_forms)
@@ -139,7 +141,11 @@ function main(config_file::String = CONFIG_FILE)
         if run_optimization(model)
             results_df = process_and_store_results!(model, par, results_df)
             display_results(model, par)
+            assembled_forms += par.num_forms
             par.f -= par.num_forms
+            println("Forms assembled: $assembled_forms")
+            println("Forms remaining: $(par.f)")
+
         else
             println(OPTIMIZATION_FAILED_MESSAGE)
             if par.verbose > 1

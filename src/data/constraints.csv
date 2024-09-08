@@ -6,6 +6,6 @@
 5,C5,Number,Item,AREA == 4,15,15,ON
 6,C6,Sum,Item,Words,2100,3400,ON
 7,C7,Enemies,Item,Enemies,0,0,ON
-8,C8,Friends,Item,Friends,0,0,ON
-9,C9,maxuse,Item,,0,1,ON
-10,C10,overlap,Item,,5,5,OFF
+8,C8,Friends,Item,Friends,0,0,OFF
+9,C9,MAXUSE,Item,,0,2,ON
+10,C10,overlap,Item,,5,5,ON
