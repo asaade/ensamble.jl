@@ -1,12 +1,34 @@
 using DataFrames
 using JuMP
+using Logging, LoggingExtras
+
+logger = TeeLogger(
+    # Current global logger (stderr)
+    global_logger(),
+    # Accept any messages with level >= Info
+    MinLevelLogger(
+        FileLogger("logfile.log"),
+        Logging.Info
+    ),
+    # Accept any messages with level >= Debug
+    MinLevelLogger(
+        FileLogger("debug.log"),
+        Logging.Debug,
+    ),
+)
 
 # Include external modules
-include("constants.jl")
-include("display_results.jl")
-include("get_data.jl")
-include("model_initializer.jl")
-include("solvers.jl")
+
+include("src/configuration.jl")
+using .Configuration
+
+include("src/constants.jl")
+include("src/model/constraints.jl")
+include("src/model/criteria_parser.jl")
+include("src/model/model_initializer.jl")
+include("src/model/solvers.jl")
+include("src/display/charts.jl")
+include("src/display/display_results.jl")
 
 """
     load_configuration(config_file::String)
@@ -15,9 +37,7 @@ Load the configuration and parameters from the specified YAML configuration file
 """
 function load_configuration(config_file::String)
     println(LOADING_CONFIGURATION_MESSAGE)
-    config = load_config(config_file)
-    par = get_params(config)
-    return config, par
+    return Configuration.configure(config_file)
 end
 
 """
@@ -32,20 +52,20 @@ function run_optimization(model::Model)
 end
 
 """
-    remove_used_items!(par::Parameters, items_used)
+    remove_used_items!(parms::Parameters, items_used)
 
 Remove items used in forms from the bank and update probabilities or
 information for the remaining items based on the method used.
 """
-function remove_used_items!(par::Parameters, items_used::Vector{Int})
-    remaining = setdiff(1:length(par.bank.ID), items_used)
-    par.bank = par.bank[remaining, :]
-    if par.method in ["TCC", "TIC", "TIC2", "TIC3"]
-        par.method in ["TCC"] && (par.p = par.p[remaining, :])
-        par.method in ["TIC", "TIC2", "TIC3"] &&
-            (par.info = par.info[remaining, :])
+function remove_used_items!(parms::Parameters, items_used::Vector{Int})
+    remaining = setdiff(1:length(parms.bank.ID), items_used)
+    parms.bank = parms.bank[remaining, :]
+    if parms.method in ["TCC", "TIC", "TIC2", "TIC3"]
+        parms.method in ["TCC"] && (parms.p = parms.p[remaining, :])
+        parms.method in ["TIC", "TIC2", "TIC3"] &&
+            (parms.info = parms.info[remaining, :])
     end
-    return par
+    return parms
 end
 
 """
@@ -62,55 +82,58 @@ function generate_unique_column_name(results_df::DataFrame)
 end
 
 """
-    process_and_store_results!(model::Model, par::Parameters, results_df::DataFrame)
+    process_and_store_results!(model::Model, parms::Parameters, results_df::DataFrame)
 
 Process the optimization results_df for each form and store them in a DataFrame.
 Used items are removed from the bank for subsequent forms.
 """
-function process_and_store_results!(model::Model, par::Parameters, results_df::DataFrame)
+function process_and_store_results!(model::Model, parms::Parameters, results_df::DataFrame)
     solver_matrix = value.(model[:x])
-    item_codes = par.bank.ID
+    item_codes = parms.bank.ID
     items = 1:length(item_codes)
     items_used = Int[]
-    max_items = par.max_items
-    bank = par.bank
+    max_items = parms.max_items
 
-    for f in 1:(par.num_forms)
+    for f in 1:(parms.num_forms)
         selected_items = items[solver_matrix[:, f] .> 0.9]
         codes_in_form = item_codes[selected_items]
         form_length = length(codes_in_form)
         missing_rows = max_items - form_length
-        padded_codes_vector = vcat(codes_in_form,
-                                   fill(MISSING_VALUE_FILLER, missing_rows))
+        if missing_rows > 0
+            padded_codes_vector = vcat(codes_in_form,
+                                       fill(MISSING_VALUE_FILLER, missing_rows))
+        else
+            padded_codes_vector = codes_in_form
+        end
         results_df[!, generate_unique_column_name(results_df)] = padded_codes_vector
         items_used = vcat(items_used, selected_items)
     end
 
     items_used = sort(unique(items_used))
-    bank[items_used, :ITEM_USE] .+= 1
-    items_used = items_used[bank[items_used, :ITEM_USE] .>= par.max_item_use]
-    remove_used_items!(par, items_used)
+    parms.bank[items_used, :ITEM_USE] .+= 1
+    items_used = items_used[parms.bank[items_used, :ITEM_USE] .>= parms.max_item_use]
+    remove_used_items!(parms, items_used)
     return results_df
 end
 
 """
-    handle_anchor_items(par::Parameters, old_par::Parameters)
+    handle_anchor_items(parms::Parameters, old_par::Parameters)
 
-Handle anchor items by adjusting the bank and relevant par based on the
+Handle anchor items by adjusting the bank and relevant parms based on the
 specified anchor number.
 """
-function handle_anchor_items(par::Parameters, old_par::Parameters)
-    if par.anchor_tests > 0
-        par.anchor_tests = par.anchor_tests % old_par.anchor_tests + 1
-        bank = par.bank[par.bank.ANCHOR .== 0, :]
-        anchors = old_par.bank[old_par.bank.ANCHOR .== par.anchor_tests,
+function handle_anchor_items(parms::Parameters, old_par::Parameters)
+    if parms.anchor_tests > 0
+        parms.anchor_tests = parms.anchor_tests % old_par.anchor_tests + 1
+        bank = parms.bank[parms.bank.ANCHOR .== 0, :]
+        anchors = old_par.bank[old_par.bank.ANCHOR .== parms.anchor_tests,
                                :]
-        par.bank = vcat(bank, anchors)
+        parms.bank = vcat(bank, anchors)
 
-        if par.method in ["TCC"]
-            par.p = old_par.p[par.bank.INDEX, :]
-        elseif par.method in ["TIC", "TIC2", "TIC3"]
-            par.info = old_par.info[par.bank.INDEX, :]
+        if parms.method in ["TCC"]
+            parms.p = old_par.p[parms.bank.INDEX, :]
+        elseif parms.method in ["TIC", "TIC2", "TIC3"]
+            parms.info = old_par.info[parms.bank.INDEX, :]
         end
     end
 end
@@ -123,36 +146,39 @@ running the solver, processing results_df, and saving the output.
 """
 function main(config_file::String = CONFIG_FILE)
     config, old_par = load_configuration(config_file)
-    par = deepcopy(old_par)
-    constraints = read_constraints(config.constraints_file)
+    parms = deepcopy(old_par)
+    constraints = read_constraints(config.constraints_file, parms)
     results_df = DataFrame()
+    if parms.shadow_test > 0
+        parms.num_forms = 1
+    end
 
     assembled_forms = 0
 
-    while par.f > 0
-        par.num_forms = min(par.num_forms, par.f)
-        par.shadow_test = max(0, par.f - par.num_forms)
-        handle_anchor_items(par, old_par)
+    while parms.f > 0
+        parms.num_forms = min(parms.num_forms, parms.f)
+        parms.shadow_test = max(0, parms.f - parms.num_forms)
+        handle_anchor_items(parms, old_par)
 
         model = Model()
-        configure_solver!(model, par, config.solver)
-        initialize_model!(model, par, constraints)
+        configure_solver!(model, parms, config.solver)
+        initialize_model!(model, parms, constraints)
 
         if run_optimization(model)
-            results_df = process_and_store_results!(model, par, results_df)
-            display_results(model, par)
-            assembled_forms += par.num_forms
-            par.f -= par.num_forms
+            results_df = process_and_store_results!(model, parms, results_df)
+            display_results(model, parms)
+            assembled_forms += parms.num_forms
+            parms.f -= parms.num_forms
             println("Forms assembled: $assembled_forms")
-            println("Forms remaining: $(par.f)")
+            println("Forms remaining: $(parms.f)")
 
         else
             println(OPTIMIZATION_FAILED_MESSAGE)
-            if par.verbose > 1
+            if parms.verbose > 1
                 display(check_constraints(model))
                 return 1
             end
-            par.f -= 1
+            parms.f -= 1
         end
     end
 

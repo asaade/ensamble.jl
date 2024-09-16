@@ -1,5 +1,5 @@
 # Constants
-const CONFIG_FILE = "data/config.yaml"
+const CONFIG_FILE = "data/config.toml"
 const CHECKMARK = " ✓"
 const MISSING_VALUE_FILLER = missing
 const COMMON_ITEMS_MATRIX_TITLE = "\nCommon Items Matrix:"
@@ -14,4 +14,4 @@ const NONANCHOR_USED_MESSAGE = "Non-anchor items used: "
 const REMAINING_ITEMS_MESSAGE = "Items not used (without anchor): "
 const TOLERANCE_LABEL = "Value: "
 const SEPARATOR = "====================================="
-const SAVE_FILE_NAME = "data/forms.csv"
+const SAVE_FILE_NAME = "results/forms.csv"
