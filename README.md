@@ -12,7 +12,7 @@ This repository presents an example of how the process of selecting items for a 
 
 ## Overview
 
-For example, if a psychometrician needs to create multiple test forms that adhere to certain constraints, such as maintaining a balance of content areas and difficulty levels, Ensamble.jl automates this process and ensures all constraints are met.
+If a psychometrician needs to create multiple test forms that adhere to certain constraints, such as maintaining a balance of content areas and difficulty levels, Ensamble.jl automates this process and ensures all constraints are met.
 
 In psychometrics, standardized tests often rely on a single version of a test, created after extensive research. However, reusing the same test repeatedly is impractical in educational contexts, and assembling multiple test forms is exponentially more complex. Ensamble.jl automates this process by ensuring content balance and comparable difficulty levels across forms, addressing issues of fairness and equity for test-takers.
 
@@ -48,7 +48,8 @@ In Julia, Python, and SAS, there are interesting, though somewhat unpolished, so
 
 ## Structure
 
-.
+```text
+
 ├── data
 │  ├── anchor.csv
 │  ├── config.toml
@@ -99,6 +100,7 @@ In Julia, Python, and SAS, there are interesting, though somewhat unpolished, so
 │     └── string_utils.jl
 └── tests
 
+```
 
 ---
 
