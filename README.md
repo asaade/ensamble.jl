@@ -6,66 +6,170 @@ Automatic Test Assembly (ATA)  in julia and a MIP solver
 
 This repository presents an example of how the process of selecting items for a test may be implemented using free software. For now, it is only an early and incomplete example and is not recommended for use in high-stakes applications.
 
+# Ensamble.jl
+
+**Automatic Test Assembly (ATA) in Julia using Mixed Integer Programming (MIP)**
+
 ## Overview
 
-In the psychometric tradition of standardized testing, a single version of a test is often deemed sufficient. This is "the" test, the result of months or even years of research, trial, and error. Once this test is approved, it is administered to a reference population and a standard is established, which further serves to classify individuals relative to this original population, the "normative" group. However, there are numerous reasons why this approach may not be practical in educational contexts. Consider the implications if the same version of the SAT were used repeatedly—year after year, or for every new cohort of students.
+For example, if a psychometrician needs to create multiple test forms that adhere to certain constraints, such as maintaining a balance of content areas and difficulty levels, Ensamble.jl automates this process and ensures all constraints are met.
 
-Assembling two or more forms of a test is exponentially more complex than creating just one. Not only must the content specifications be meticulously adhered to —already a hard task— but the difficulty or information levels of the items must also be comparable. Otherwise, one form may be easier or noisier than another, with potentially severe consequences for test-takers. It would be highly inequitable for a student's score to depend on which version they received, as it is simply unfair for one to fail entry into a university because they took the harder version.
+In psychometrics, standardized tests often rely on a single version of a test, created after extensive research. However, reusing the same test repeatedly is impractical in educational contexts, and assembling multiple test forms is exponentially more complex. Ensamble.jl automates this process by ensuring content balance and comparable difficulty levels across forms, addressing issues of fairness and equity for test-takers.
 
-Item Response Theory (IRT) offers a common solution to this problem, Once the statistical characteristics of the items are known from prior testing, their future performance can be predicted with some high accuracy. This allows for the assembly of a new test version with a reasonably clear idea of how it will perform operationally. Classical Test Theory can also be used, but it is more challenging to obtain difficulty estimates on the same scale, leading to potentially unexpected results.
+Traditionally, test assembly has been a manual, iterative task, requiring the careful selection of items to meet specifications. With the rise of optimization techniques, this process has been automated, reducing time and errors. Ensamble.jl uses Item Response Theory (IRT) to predict item performance, ensuring consistency across test forms.
 
-Traditionally, this process is iterative —manually combining available items from the bank like puzzle pieces according to their content and estimated difficulties, until the objective is met. Manual assembly is tedious; it can take hours, or even days in some cases, especially when assembling multiple booklets with dozens of items each. This involves a process of adding and removing items until the desired outcome is reached.
+Julia is ideal for this purpose due to its speed and simplicity, while JuMP provides robust tools for formulating optimization models, working seamlessly with various solvers.
 
-Computers have brought significant advantages to this process. To ease this burden and minimize the errors that result from manual processes, optimization methods have increasingly been used to enable the relatively automatic assembly of test forms.
+Ensamble.jl is a Julia-based system designed for **Automatic Test Assembly (ATA)**, focusing on efficiency, objectivity, and flexibility. It uses dichotomic  **Item Response Theory (IRT)** models to generate multiple test forms that are comparable in content and difficulty while satisfying specific constraints, such as content balance and item usage.
 
-The idea is that if the test constructor defines the desired characteristics of the test in detail, including the necessary topics and content, the machine can select the best combinations.
+The system leverages **Mixed Integer Programming (MIP)** solvers to find the optimal combination of test items, making it a powerful tool for large-scale testing programs, certification exams, and adaptive testing systems. With support for various solvers, it is versatile and adaptable to different use cases.
 
-(A key reference for this methodology is the book Linear Models for Optimal Test Design by Wim Van der Linden (2005). This book discusses the models covered here, as well as others applicable to different scenarios, from assembling a single test version to designing block-sampling for evaluating entire populations, and even constructing item banks for an assessment program and adaptive test design.)
+**Key Goals**:
+- **Efficiency**: Automate the test assembly process.
+- **Fairness**: Ensure consistency and fairness in test content and difficulty.
+- **Customization**: Provide flexible constraint definitions to meet specific testing needs.
 
-## Advantages of Automatic Assembly
+---
 
-- Speed and Efficiency: Test assembly becomes a much faster and less tedious process.
+## Why Automatic Test Assembly?
 
-- Objective and Reproducible: It forces the creation of well-defined and detailed specifications, making the process more objective and reproducible.
+Manual test assembly is both **time-consuming** and **prone to errors**, especially when generating multiple test forms with comparable content. Ensamble.jl addresses these challenges by:
+- **Automating the selection of test items** based on predefined constraints.
+- **Ensuring fairness and balance** by using strict test specifications to meet the content needs and Item Response Theory (IRT) to standardize scores across forms.
+- **Providing flexibility** in constraint handling, allowing for tests with varying content and statistical properties.
 
-- Simultaneous Form Assembly: Multiple forms can be assembled simultaneously. This also promotes better use of items.
-
-- Powerful Constraints Management: The process is robust enough to meet all constraints objectively, even with complex specification tables.
-
-- Customizable: It is possible to assemble specific forms according to the needs of each application. In some cases, it is even possible to create and modify the test form "on the fly" for each test-taker, adapting the content as they respond.
-
-- Automatic Reporting: The system can generate detailed and fast assembly reports automatically.
-
-## Disadvantages
-
-- Rigorous Specifications Required: Although specification tables and assembly rules should always exist, they are sometimes incomplete or allow too much discretion to the test constructor. While this flexibility is appreciated by many who view test assembly as an art, automated assembly eliminates this margin. Good or bad as this may be, significant effort is required in ATA to ensure that all rules are well-defined, detailed, and codified so that the machine can process them effectively. Even tolerances must be explicit.
-
-- Possible Non-Solutions: The program may not always find a satisfactory solution, especially when assembly conditions are highly complex or the rules are contradictory, which happens often. In such cases, additional effort is needed to identify and correct the problems after each failed attempt.
-
-- Uncertain Outcomes: Like manual processes, the final versions do not always perform as expected in operational use. Whether manual or automatic, assembly is not a magical, infallible solution, and quality assurance methods and post-application checks, as well as routine scaling or equating procedures, are always necessary.
-
-## Calibrating the Item Bank
-
-This step is not strictly part of the assembly process, but it is a fundamental prerequisite; you cannot proceed without a well-calibrated item bank with sufficient sample data. Various specialized software packages can be used for item calibration. Some, like Winsteps, Facets, or ConQuest for the Rasch model family, have a long history in the market. For Item Response Theory, other options include Bilog, Parscale, Multilog, or FlexMIRT. There is also a growing number of packages for exploring new models, primarily developed for the R programming language, such as TAM, SIRT, MIRT, ErM, and many others available on CRAN.
-
-## Optimization
-
-There is a number of general optimization software that can be easily adapted for our needs. The most common technique is "Mixed-Integer Programming" (MIP), which is used here. This software tends to find the best combinations, although in complex cases it may take too long or fail to reach a solution. For this reason, other methodologies are sometimes used, such as simulated annealing, genetic algorithms, constraint programming, network-flow algorithms, and even  Markov chains. Linear optimization programs tend to be more precise and efficient, especially when additional constraints are involved (such as including various topics, item types, or considering the presence of friend and enemy items).
-
-## Julia and JuMP
-
-Julia is a high-level language that compiles to very efficient code and can be used interactively, which facilitates work. It can be compared to Python in simplicty and easy of use and, in many situations, it has a performance similar to the fastes compiled programs. It is well suited for use in numerical and data analysis problems.
-
-JuMP, on the other hand, is a Julia-based package that provides tools for formulating optimization models to be used with a long list of solvers (commercial and open source). In this case, the models were tested with almost identical results using:
-
-- IBM CPLEX
-- Cbc (coin-or)
-- SCIP
-- GLPK
-- HiGHS
 
 ## Alternatives
 
 There are other ways to achieve this. In R, for example, the package TestDesign seems to be a good solution that saves several steps and requires little programming. Other examples include eatATA, ATA, xxIRT, dexterMST, catR, mstR —all of them in R, perhaps the most popular language for this purpose. Some of these packages are designed for assembling adaptive tests.
 
 In Julia, Python, and SAS, there are interesting, though somewhat unpolished, solutions that require at least basic knowledge of the underlying programming languages. In a way, these can be considered experimental libraries. Major testing and assessment agencies typically develop their own in-house solutions.
+
+
+## Structure
+
+.
+├── data
+│  ├── anchor.csv
+│  ├── config.toml
+│  ├── constraints.csv
+│  ├── items.csv
+│  ├── model.lp
+│  └── solver_config.toml
+├── debug.log
+├── docs
+│  └── structure.md
+├── items.csv
+├── LICENSE
+├── logfile.log
+├── Manifest.toml
+├── Project.toml
+├── README.md
+├── results
+│  ├── combined_plot.pdf
+│  ├── model.lp
+│  ├── p1_characteristic_curves.svg
+│  ├── p2_information_curves.svg
+│  ├── p3_1_observed_scores_n01.svg
+│  ├── p3_2_observed_scores_n_variations.svg
+│  ├── results.csv
+│  └── tcc.csv
+├── src
+│  ├── config
+│  │  ├── assembly_config_loader.jl
+│  │  ├── bank_data_loader.jl
+│  │  ├── config_loader.jl
+│  │  └── irt_data_loader.jl
+│  ├── configuration.jl
+│  ├── constants.jl
+│  ├── debug.log
+│  ├── display
+│  │  ├── charts.jl
+│  │  └── display_results.jl
+│  ├── ensamble.jl
+│  ├── logfile.log
+│  ├── model
+│  │  ├── constraints.jl
+│  │  ├── criteria_parser.jl
+│  │  ├── model_initializer.jl
+│  │  └── solvers.jl
+│  └── utils
+│     ├── custom_logger.jl
+│     ├── stats_functions.jl
+│     └── string_utils.jl
+└── tests
+
+
+---
+
+## How It Works
+
+Ensamble.jl is built around the following components:
+
+1. **Item Response Theory (IRT)**: IRT provides a framework for modeling item parameters such as difficulty (b), discrimination (a), and guessing (c). These parameters are used to predict how well each item will perform across different ability levels.
+
+2. **Mixed Integer Programming (MIP)**: MIP optimization is used to select the best set of items that meet the defined constraints. These constraints can include:
+   - Content area balance
+   - Maximum or minimum test length
+   - Item overlap between forms
+   - Anchor item usage
+   - Statistical properties such as item information and expected score
+
+3. **Solvers**: Ensamble.jl supports various solvers to perform the MIP optimization, ensuring flexibility based on the available resources and licensing preferences.
+
+The system defines test specifications and constraints via a configuration file, then uses a solver to find the optimal item selection.
+
+## Supported Solvers
+
+Ensamble.jl supports several MIP solvers to ensure flexibility for different user needs and environments:
+
+IBM CPLEX: A powerful commercial solver ideal for large-scale, complex test assembly.
+
+CBC (Coin-OR): An open-source solver for smaller-scale applications.
+
+SCIP: Another open-source option suitable for constraint programming.
+
+GLPK: Free and open-source but less efficient for large problems.
+
+HiGHS: A newer open-source solver optimized for high-performance MIP and LP problems.
+
+The user can select the preferred solver in the configuration file.
+
+---
+
+## Features
+
+- **Multiple Form Assembly**: Generate multiple forms simultaneously, ensuring comparability.
+- **Flexible Constraints**: Define content constraints, item properties, and test length requirements.
+- **Integration with Solvers**: Supports multiple MIP solvers, ensuring flexibility for users based on their environment.
+- **Automatic Report Generation**: Generates detailed reports that include item usage, test characteristics, and visualizations (e.g., characteristic curves, information curves).
+- **Optimization Algorithms**: Built on robust optimization frameworks, Ensamble.jl efficiently handles large item banks and complex constraint systems.
+
+
+---
+
+## Usage
+
+### 1. Prepare the Item Bank
+
+The item bank must contain the necessary item parameters. The 3PL IRT model is used by default, but it can be adjusted to use 1, 2 or 3 parameters and approximate a normal distribution model.  Any tool such as **Winsteps**, **ConQuest**, **Bilog**, **Parscale**, or R packages like `TAM` and `MIRT` can be used to calibrate and provide the item parameters.
+
+### 2. Define Test Constraints
+
+Using a configuration file, specify the constraints for your test. This includes:
+- Number of forms to be generated
+- Minimum and maximum test lengths
+- Content balance across areas (e.g., reading, math)
+- Use of anchor items
+
+### 3. Run Ensamble.jl
+
+Once the item bank and constraints are prepared, run the test assembly process:
+
+```julia
+# Load the configuration and item bank
+include("src/ensamble.jl")
+using .Ensamble
+
+# Run the assembly process
+results = Ensamble.assemble_tests("data/config.toml");

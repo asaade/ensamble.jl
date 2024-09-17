@@ -70,7 +70,6 @@ function load_irt_data(config_data::Dict{Symbol, Any}, bank::DataFrame)::IRTMode
     @info "Ended IRT configuration"
 end
 
-
 # Helper function to extract item parameters a, b, c from bank
 function extract_item_params(bank::DataFrame)
     a::Vector{Float64} = bank[!, :A]

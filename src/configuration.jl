@@ -2,11 +2,11 @@ module Configuration
 
 # Export main configuration-related functions and types
 export AssemblyConfig, IRTModelData,
-    configure, Config, Parameters, Constraint,
-    upSymbol, upcase, upcaseKeys, safe_read_csv,
-    safe_read_csv, safe_read_toml,
-    Probability, Information,
-    observed_score_distribution_continuous, lw_dist
+       configure, Config, Parameters, Constraint,
+       upSymbol, upcase, upcaseKeys, safe_read_csv,
+       safe_read_csv, safe_read_toml,
+       Probability, Information,
+       observed_score_distribution_continuous, lw_dist
 
 using DataFrames
 using Logging: Logging
@@ -67,7 +67,6 @@ mutable struct Parameters
     verbose::Int                    # verbosity from BasicConfig
 end
 
-
 # Include all the necessary module files
 include("utils/string_utils.jl")      # Auxiliary string manipulation methods
 include("utils/stats_functions.jl")   # Auxiliary Statistical and IRT methods
@@ -84,7 +83,6 @@ using .AssemblyConfigLoader
 using .BankDataLoader
 using .IRTDataLoader
 
-
 """
     transform_config_to_flat(basic_config::BasicConfig)::Config
 
@@ -94,7 +92,7 @@ function transform_config_to_flat(basic_config::BasicConfig)::Config
     return Config(Dict{Symbol, Any}(),  # forms (placeholder, could be added)
                   basic_config.items_file,
                   basic_config.anchor_items_file,
-                  basic_config.items_file,  # Assuming form_file is the same as items_file (adjust if needed)
+                  basic_config.forms_file,
                   basic_config.constraints_file,
                   basic_config.results_file,
                   basic_config.tcc_file,
@@ -102,7 +100,6 @@ function transform_config_to_flat(basic_config::BasicConfig)::Config
                   basic_config.solver,
                   basic_config.verbose)
 end
-
 
 """
     transform_parameters_to_flat(forms_config::AssemblyConfig, irt_data::IRTModelData, bank::DataFrame, flat_config::Config)::Parameters
@@ -152,14 +149,16 @@ function configure(inFile::String = "data/config.toml")::Tuple{Config, Parameter
     # Load configuration, forms, item bank, and IRT data
     basic_config::BasicConfig = load_config(config_data)           # This was renamed to avoid name clashes
     forms_config::AssemblyConfig = load_assembly_config(config_data)
-    bank::DataFrame = read_bank_file(basic_config.items_file, basic_config.anchor_items_file)
+    bank::DataFrame = read_bank_file(basic_config.items_file,
+                                     basic_config.anchor_items_file)
     irt_data::IRTModelData = load_irt_data(config_data, bank)
 
     # Transform the nested configuration to the flat Config struct
     flat_config = transform_config_to_flat(basic_config)
 
     # Transform and return the flat Parameters struct
-    return (flat_config, transform_parameters_to_flat(forms_config, irt_data, bank, flat_config))
+    return (flat_config,
+            transform_parameters_to_flat(forms_config, irt_data, bank, flat_config))
 end
 
 end # module Configuration

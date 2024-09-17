@@ -6,7 +6,6 @@ using Gurobi
 using HiGHS
 using SCIP
 
-
 function load_solver_config(toml_file::String)
     config = safe_read_toml(toml_file)
     return config

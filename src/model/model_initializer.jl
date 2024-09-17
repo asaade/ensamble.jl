@@ -8,7 +8,7 @@ using StatsBase
 # Module constants
 const APPLYING_CONSTRAINT_MESSAGE = "Applying constraint: "
 const INITIALIZING_MODEL_MESSAGE = "Initializing optimization model..."
-const MODEL_FILE = "./data/model.lp"
+const MODEL_FILE = "./results/model.lp"
 
 """
     read_constraints(file_path::String) -> Dict{String, Constraint}
@@ -28,6 +28,8 @@ function read_constraints(file_path::String, parms::Parameters)
             lb = row[:LB]
             ub = row[:UB]
 
+            @assert(lb<=ub, "'ub' must be equal or greater than 'lb' in the $cond_id constraint")
+
             # Parse the condition or set it to always true if empty
             condition = strip(condition_expr) == "" ? df -> trues(size(df, 1)) :
                         CriteriaParser.parse_criteria(condition_expr)
@@ -38,8 +40,11 @@ function read_constraints(file_path::String, parms::Parameters)
     end
 
     if length(find_all_constraints_by_type(constraints, "TEST")) != 1
-        error("Constraint on TOTAL items (\"TEST\") must be included exactly one time.")
+        error("Constraint \"TEST\" must be included exactly one time.")
     end
+
+    cond_keys = keys(constraints)
+    @assert(all(cond_keys.==unique(cond_keys)), "CONSTRAINT_ID keys must be unique")
 
     # Identify and store conflict-related constraints
     conflict_constraints = Dict{String, Constraint}()
@@ -82,8 +87,6 @@ function initialize_model!(model::Model,
     return model
 end
 
-
-
 """
     apply_objective!(model::Model, parms::Parameters, original_parms)
 
@@ -112,7 +115,6 @@ function set_objective!(model::Model, parms::Parameters)
     end
 end
 
-
 """
     apply_individual_constraint!(model::Model, parms::Parameters, constraint::Constraint)
 
@@ -125,7 +127,9 @@ function apply_individual_constraint!(model::Model, parms::Parameters,
     items = 1:size(bank, 1)
 
     if constraint.type == "TEST"
-        @assert(lb <= parms.n <= ub, "Number of total items in the config file must be the values in the TEST constraint.")
+        if !(lb<=parms.n<=ub)
+            throw(DomainError("N=$(parms.n) are not between 'lb'=$lb and 'ub'=$ub in the TEST constraint"))
+        end
         parms.max_items = ub
         constraint_items_per_form(model, parms, lb, ub)
     elseif constraint.type == "NUMBER"
@@ -141,9 +145,9 @@ function apply_individual_constraint!(model::Model, parms::Parameters,
     elseif constraint.type == "FRIENDS"
         condition = constraint.condition(bank)
         constraint_friends_in_form(model, parms, condition)
-    # elseif constraint.type == "ANCHOR"
-    #     condition = constraint.condition(bank)
-    #     constraint_anchor_in_form(model, parms, condition)
+        # elseif constraint.type == "ANCHOR"
+        #     condition = constraint.condition(bank)
+        #     constraint_anchor_in_form(model, parms, condition)
     elseif constraint.type == "MAXUSE"
         parms.max_item_use = ub
         constraint_max_use(model, parms, ub)
@@ -153,7 +157,6 @@ function apply_individual_constraint!(model::Model, parms::Parameters,
         error("Unknown constraint type: ", constraint.type)
     end
 end
-
 
 """
     apply_constraints!(model::Model, parms::Parameters, constraints::Dict{String, Constraint})
@@ -176,7 +179,8 @@ end
 Run all conflict checks (Friends, Enemies, Anchor combinations) after applying non-conflict constraints.
 The failure or logging of these checks will not affect the other constraints.
 """
-function run_conflict_checks!(parms::Parameters, conflict_constraints::Dict{String, Constraint})
+function run_conflict_checks!(parms::Parameters,
+                              conflict_constraints::Dict{String, Constraint})
     try
         friends_constraints = find_all_constraints_by_type(conflict_constraints, "FRIENDS")
         enemies_constraints = find_all_constraints_by_type(conflict_constraints, "ENEMIES")
@@ -196,7 +200,8 @@ function run_conflict_checks!(parms::Parameters, conflict_constraints::Dict{Stri
                     @debug "Enemies values: ", enemies_values
 
                     # Apply one-to-many conflict rule between friends and enemies
-                    conflict_df = apply_conflict_rule(friends_values, enemies_values, one_to_many_conflict_rule)
+                    conflict_df = apply_conflict_rule(friends_values, enemies_values,
+                                                      one_to_many_conflict_rule)
                     if !isempty(conflict_df)
                         log_conflicts("Friends-Enemies", conflict_df)
                     end
@@ -214,7 +219,8 @@ function run_conflict_checks!(parms::Parameters, conflict_constraints::Dict{Stri
                 @debug "Enemies values for anchor check: ", enemies_values
 
                 # One-to-many conflict rule between anchor and enemies
-                conflict_df = apply_conflict_rule(anchor_values, enemies_values, one_to_many_conflict_rule)
+                conflict_df = apply_conflict_rule(anchor_values, enemies_values,
+                                                  one_to_many_conflict_rule)
                 if !isempty(conflict_df)
                     log_conflicts("Anchor-Enemies", conflict_df)
                 end
@@ -225,7 +231,8 @@ function run_conflict_checks!(parms::Parameters, conflict_constraints::Dict{Stri
                 @debug "Friends values for anchor check: ", friends_values
 
                 # All-or-none conflict rule between anchor and friends
-                conflict_df = apply_conflict_rule(friends_values, anchor_values, all_or_none_conflict_rule)
+                conflict_df = apply_conflict_rule(friends_values, anchor_values,
+                                                  all_or_none_conflict_rule)
                 if !isempty(conflict_df)
                     log_conflicts("Anchor-Friends", conflict_df)
                 end
@@ -260,7 +267,6 @@ function find_all_constraints_by_type(constraints::Dict{String, Constraint},
     return [constraint for constraint in values(constraints) if constraint.type == type]
 end
 
-
 """
     log_conflicts(conflict_type::String, conflicting_rows::DataFrame, max_rows_to_log::Int=5)
 
@@ -271,7 +277,8 @@ function log_conflicts(conflict_type::String, conflicting_rows::DataFrame,
                        max_rows_to_log::Int = 5)
     if size(conflicting_rows, 1) > 0
         @warn "Conflicting $conflict_type found"
-        @warn "Displaying the first $max_rows_to_log rows of the conflict:", first(conflicting_rows, max_rows_to_log)
+        @warn "Displaying the first $max_rows_to_log rows of the conflict:",
+              first(conflicting_rows, max_rows_to_log)
     end
 end
 
@@ -302,7 +309,8 @@ end
 Checks for all-or-none conflicts between two sets of values.
 E.g., All friends in a group should be linked to the same anchor.
 """
-function all_or_none_conflict_rule(friends_values::Vector, anchor_values::Vector)::Vector{Tuple}
+function all_or_none_conflict_rule(friends_values::Vector,
+                                   anchor_values::Vector)::Vector{Tuple}
     # Group by friends_values and check if anchor_values has consistent values for each group
     group_dict = Dict{Any, Set{Any}}()
 
@@ -317,11 +325,11 @@ function all_or_none_conflict_rule(friends_values::Vector, anchor_values::Vector
     end
 
     # Return groups where friends are associated with multiple anchors (conflicts)
-    conflicting_pairs = [(friend, anchors) for (friend, anchors) in group_dict if length(anchors) > 1]
+    conflicting_pairs = [(friend, anchors)
+                         for (friend, anchors) in group_dict if length(anchors) > 1]
 
     return conflicting_pairs
 end
-
 
 """
     apply_conflict_rule(values1::Vector, values2::Vector, rule::Function)::DataFrame

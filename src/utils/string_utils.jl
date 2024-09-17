@@ -86,7 +86,7 @@ Safely reads a CSV file and returns a DataFrame. Logs an error if the file canno
 """
 function safe_read_csv(file_path::String)::DataFrames.DataFrame
     try
-        return CSV.read(file_path, DataFrames.DataFrame; stripwhitespace=true)
+        return CSV.read(file_path, DataFrames.DataFrame; stripwhitespace = true)
     catch e
         @error "Error reading CSV file: $file_path. Error: $e"
         return DataFrames.DataFrame()

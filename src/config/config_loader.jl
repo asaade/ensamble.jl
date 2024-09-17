@@ -8,6 +8,7 @@ mutable struct BasicConfig
     items_file::String             # Path to item bank file
     anchor_items_file::String      # Path to anchor items file (empty string if not used)
     constraints_file::String       # Path to constraints file
+    forms_file::String             # Path to item bank file (output)
     results_file::String           # Path to results file
     tcc_file::String               # Path to TCC file
     plot_file::String              # Path to plot file
@@ -28,7 +29,7 @@ Reads configuration from a TOML dictionary and returns a `Config` struct.
 
   - A `Config` struct with configuration settings loaded from the dictionary.
 """
-function load_config(config_data::Dict{Symbol, Any})::BasicConfig
+function load_config(config_data::Dict{Symbol,Any})::BasicConfig
     # Load only the corresponding part from the dictionary
 
     if !haskey(config_data, :FILES)
@@ -42,6 +43,7 @@ function load_config(config_data::Dict{Symbol, Any})::BasicConfig
     items_file = get(files_data, :ITEMSFILE, "items.csv")
     anchor_file = get(files_data, :ANCHORFILE, "anchors.csv")
     constraints_file = get(files_data, :CONSTRAINTSFILE, "")
+    forms_file = get(files_data, :FORMSFILE, "results/forms.csv")
     results_file = get(files_data, :RESULTSFILE, "results/results.csv")
     tcc_file = get(files_data, :TCCFILE, "results/tcc_results.csv")
     plot_file = get(files_data, :PLOTFILE, "results/combined_plots.pdf")
@@ -52,8 +54,8 @@ function load_config(config_data::Dict{Symbol, Any})::BasicConfig
     @info "Loaded configuration: items_file = $items_file, anchor_file = $anchor_file, solver = $solver"
 
     # Return the Config struct
-    return BasicConfig(items_file, anchor_file, constraints_file, results_file, tcc_file,
-                       plot_file, solver, verbose)
+    return BasicConfig(items_file, anchor_file, constraints_file, forms_file, results_file, tcc_file,
+        plot_file, solver, verbose)
 end
 
 end # module ConfigLoader

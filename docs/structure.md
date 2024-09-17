@@ -4,16 +4,24 @@
 │  ├── config.toml
 │  ├── constraints.csv
 │  ├── items.csv
+│  ├── model.lp
 │  └── solver_config.toml
+├── debug.log
 ├── docs
 │  └── structure.md
+├── items.csv
 ├── LICENSE
+├── logfile.log
 ├── Manifest.toml
 ├── Project.toml
 ├── README.md
 ├── results
 │  ├── combined_plot.pdf
 │  ├── model.lp
+│  ├── p1_characteristic_curves.svg
+│  ├── p2_information_curves.svg
+│  ├── p3_1_observed_scores_n01.svg
+│  ├── p3_2_observed_scores_n_variations.svg
 │  ├── results.csv
 │  └── tcc.csv
 ├── src

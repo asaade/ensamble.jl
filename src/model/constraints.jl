@@ -304,7 +304,7 @@ function constraint_max_use(model::Model, parms::Parameters, max_use::Int)
     forms -= parms.shadow_test > 0 ? 1 : 0
 
     @constraint(model, max_use[i in items],
-                sum([x[i, f] for f in 1:forms]) + parms.bank.ITEM_USE[i] <= max_use)
+                sum([x[i, f] for f in 1:forms]) + parms.bank.ITEM_USE[i]<=max_use)
     return model
 end
 

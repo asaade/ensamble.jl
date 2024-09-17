@@ -1,45 +1,34 @@
-using DataFrames
+module Ensamble
+
+# Import necessary packages
 using JuMP
+using DataFrames
 using Logging, LoggingExtras
 
-logger = TeeLogger(
-    # Current global logger (stderr)
-    global_logger(),
-    # Accept any messages with level >= Info
-    MinLevelLogger(
-        FileLogger("logfile.log"),
-        Logging.Info
-    ),
-    # Accept any messages with level >= Debug
-    MinLevelLogger(
-        FileLogger("debug.log"),
-        Logging.Debug,
-    ),
-)
-
-# Include external modules
-
-include("src/configuration.jl")
+# Include external modules (organized by functionality)
+include("configuration.jl")
 using .Configuration
 
-include("src/constants.jl")
-include("src/model/constraints.jl")
-include("src/model/criteria_parser.jl")
-include("src/model/model_initializer.jl")
-include("src/model/solvers.jl")
-include("src/display/charts.jl")
-include("src/display/display_results.jl")
+include("constants.jl")
+include("model/constraints.jl")
+include("model/criteria_parser.jl")
+include("model/model_initializer.jl")
+include("model/solvers.jl")
+include("display/charts.jl")
+include("display/display_results.jl")
 
+# Load the configuration file and initialize parameters
 """
     load_configuration(config_file::String)
 
-Load the configuration and parameters from the specified YAML configuration file.
+Load the configuration and parameters from the specified configuration file.
 """
 function load_configuration(config_file::String)
     println(LOADING_CONFIGURATION_MESSAGE)
     return Configuration.configure(config_file)
 end
 
+# Run the optimization solver
 """
     run_optimization(model::Model)
 
@@ -51,8 +40,9 @@ function run_optimization(model::Model)
     return is_solved_and_feasible(model)
 end
 
+# Remove used items from the bank
 """
-    remove_used_items!(parms::Parameters, items_used)
+    remove_used_items!(parms::Parameters, items_used::Vector{Int})
 
 Remove items used in forms from the bank and update probabilities or
 information for the remaining items based on the method used.
@@ -60,18 +50,20 @@ information for the remaining items based on the method used.
 function remove_used_items!(parms::Parameters, items_used::Vector{Int})
     remaining = setdiff(1:length(parms.bank.ID), items_used)
     parms.bank = parms.bank[remaining, :]
+
     if parms.method in ["TCC", "TIC", "TIC2", "TIC3"]
-        parms.method in ["TCC"] && (parms.p = parms.p[remaining, :])
-        parms.method in ["TIC", "TIC2", "TIC3"] &&
-            (parms.info = parms.info[remaining, :])
+        parms.method == "TCC" && (parms.p = parms.p[remaining, :])
+        parms.method in ["TIC", "TIC2", "TIC3"] && (parms.info = parms.info[remaining, :])
     end
+
     return parms
 end
 
+# Generate a unique column name for DataFrame
 """
     generate_unique_column_name(results_df::DataFrame)
 
-Generate a unique column name to avoid naming conflicts in the results_df DataFrame.
+Generate a unique column name to avoid naming conflicts in the results DataFrame.
 """
 function generate_unique_column_name(results_df::DataFrame)
     i = 1
@@ -81,10 +73,11 @@ function generate_unique_column_name(results_df::DataFrame)
     return "Form_$i"
 end
 
+# Process optimization results and store them
 """
     process_and_store_results!(model::Model, parms::Parameters, results_df::DataFrame)
 
-Process the optimization results_df for each form and store them in a DataFrame.
+Process the optimization results for each form and store them in a DataFrame.
 Used items are removed from the bank for subsequent forms.
 """
 function process_and_store_results!(model::Model, parms::Parameters, results_df::DataFrame)
@@ -94,28 +87,27 @@ function process_and_store_results!(model::Model, parms::Parameters, results_df:
     items_used = Int[]
     max_items = parms.max_items
 
-    for f in 1:(parms.num_forms)
+    for f in 1:parms.num_forms
         selected_items = items[solver_matrix[:, f] .> 0.9]
         codes_in_form = item_codes[selected_items]
         form_length = length(codes_in_form)
         missing_rows = max_items - form_length
-        if missing_rows > 0
-            padded_codes_vector = vcat(codes_in_form,
-                                       fill(MISSING_VALUE_FILLER, missing_rows))
-        else
-            padded_codes_vector = codes_in_form
-        end
+
+        padded_codes_vector = missing_rows > 0 ? vcat(codes_in_form, fill(MISSING_VALUE_FILLER, missing_rows)) : codes_in_form
         results_df[!, generate_unique_column_name(results_df)] = padded_codes_vector
+
         items_used = vcat(items_used, selected_items)
     end
 
     items_used = sort(unique(items_used))
     parms.bank[items_used, :ITEM_USE] .+= 1
     items_used = items_used[parms.bank[items_used, :ITEM_USE] .>= parms.max_item_use]
+
     remove_used_items!(parms, items_used)
     return results_df
 end
 
+# Handle anchor items for test assembly
 """
     handle_anchor_items(parms::Parameters, old_par::Parameters)
 
@@ -126,11 +118,10 @@ function handle_anchor_items(parms::Parameters, old_par::Parameters)
     if parms.anchor_tests > 0
         parms.anchor_tests = parms.anchor_tests % old_par.anchor_tests + 1
         bank = parms.bank[parms.bank.ANCHOR .== 0, :]
-        anchors = old_par.bank[old_par.bank.ANCHOR .== parms.anchor_tests,
-                               :]
+        anchors = old_par.bank[old_par.bank.ANCHOR .== parms.anchor_tests, :]
         parms.bank = vcat(bank, anchors)
 
-        if parms.method in ["TCC"]
+        if parms.method == "TCC"
             parms.p = old_par.p[parms.bank.INDEX, :]
         elseif parms.method in ["TIC", "TIC2", "TIC3"]
             parms.info = old_par.info[parms.bank.INDEX, :]
@@ -138,17 +129,19 @@ function handle_anchor_items(parms::Parameters, old_par::Parameters)
     end
 end
 
+# Main function to run the optimization process
 """
-    main(config_file::String=CONFIG_FILE)
+    assemble_tests(config_file::String="path_to_config_file.toml")
 
-Main function to run the entire optimization process, including loading configurations,
-running the solver, processing results_df, and saving the output.
+Main entry point for assembling tests. Loads configurations, runs the solver,
+and processes the results, then generates and saves a report.
 """
-function main(config_file::String = CONFIG_FILE)
+function assemble_tests(config_file::String="path_to_config_file.toml")
     config, old_par = load_configuration(config_file)
     parms = deepcopy(old_par)
     constraints = read_constraints(config.constraints_file, parms)
     results_df = DataFrame()
+
     if parms.shadow_test > 0
         parms.num_forms = 1
     end
@@ -182,9 +175,10 @@ function main(config_file::String = CONFIG_FILE)
         end
     end
 
-    ## Display results_df and save
-    return final_report(old_par, results_df, config)
+    # Display and save the final report
+    final_report(old_par, results_df, config)
+
+    return results_df
 end
 
-# Uncomment to run the main function
-# main(CONFIG_FILE)
+end  # module Ensamble

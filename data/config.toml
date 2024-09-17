@@ -1,12 +1,12 @@
 [FORMS]
 N = 60
-NumForms = 6
-AnchorTests = 3
+NumForms = 8
+AnchorTests = 2
 ShadowTest = 1
 MaxItemUse = 1
 
 [IRT]
-METHOD = "TCC"
+METHOD = "TIC"
 THETA = [-2.5, -1.5, 0.0, 1.5, 2.5]
 TAU = []  # [[0.5, 0.4], [0.6, 0.5], [0.7, 0.6], [0.8, 0.7]]
 TAU_INFO = [] # [0.3, 0.4, 0.5, 0.6]
@@ -20,6 +20,7 @@ ITEMSFILE = "items.csv"
 ANCHORFILE = "anchor.csv"
 CONSTRAINTSFILE = "data/constraints.csv"
 RESULTSFILE = "results/results.csv"
+FORMSFILE = "results/forms.csv"
 TCCFILE = "results/tcc_output.csv"
 PLOTFILE = "results/plot_output.png"
 SOLVER = "CPLEX"
