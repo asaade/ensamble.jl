@@ -1,6 +1,6 @@
 module BankDataLoader
 
-using Main.DataFrames
+using DataFrames
 # using Logging
 using ..StringUtils
 

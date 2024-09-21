@@ -1,15 +1,18 @@
 module Ensamble
 
+export assemble_tests
 # Import necessary packages
 using JuMP
 using DataFrames
 using Logging, LoggingExtras
 
+include("constants.jl")
+
 # Include external modules (organized by functionality)
 include("configuration.jl")
 using .Configuration
 
-include("constants.jl")
+include("config/validation.jl")
 include("model/constraints.jl")
 include("model/criteria_parser.jl")
 include("model/model_initializer.jl")
@@ -17,11 +20,10 @@ include("model/solvers.jl")
 include("display/charts.jl")
 include("display/display_results.jl")
 
-# Load the configuration file and initialize parameters
 """
-    load_configuration(config_file::String)
+load_configuration(config_file::String)::Tuple{Dict, Parameters}
 
-Load the configuration and parameters from the specified configuration file.
+Load the configuration from a TOML file and return the configuration and parameters.
 """
 function load_configuration(config_file::String)
     println(LOADING_CONFIGURATION_MESSAGE)
@@ -51,9 +53,12 @@ function remove_used_items!(parms::Parameters, items_used::Vector{Int})
     remaining = setdiff(1:length(parms.bank.ID), items_used)
     parms.bank = parms.bank[remaining, :]
 
-    if parms.method in ["TCC", "TIC", "TIC2", "TIC3"]
-        parms.method == "TCC" && (parms.p = parms.p[remaining, :])
-        parms.method in ["TIC", "TIC2", "TIC3"] && (parms.info = parms.info[remaining, :])
+    if parms.method == "TCC"
+        parms.p = parms.p[remaining, :]
+    elseif parms.method in ["TIC", "TIC2", "TIC3"]
+        parms.info = parms.info[remaining, :]
+    else
+        error("Unknown $(parms.method) optimization method used.")
     end
 
     return parms
@@ -77,8 +82,8 @@ end
 """
     process_and_store_results!(model::Model, parms::Parameters, results_df::DataFrame)
 
-Process the optimization results for each form and store them in a DataFrame.
-Used items are removed from the bank for subsequent forms.
+Process the optimization results at each iteration and store them in a DataFrame.
+Used items ARE DELETED from the working copy of the bank to avoid its use in subsequent forms.
 """
 function process_and_store_results!(model::Model, parms::Parameters, results_df::DataFrame)
     solver_matrix = value.(model[:x])
@@ -96,10 +101,13 @@ function process_and_store_results!(model::Model, parms::Parameters, results_df:
         padded_codes_vector = missing_rows > 0 ? vcat(codes_in_form, fill(MISSING_VALUE_FILLER, missing_rows)) : codes_in_form
         results_df[!, generate_unique_column_name(results_df)] = padded_codes_vector
 
-        items_used = vcat(items_used, selected_items)
+        # Directly append the selected items to items_used
+        append!(items_used, selected_items)
     end
 
+    # Ensure uniqueness and sort the items after collecting them
     items_used = sort(unique(items_used))
+
     parms.bank[items_used, :ITEM_USE] .+= 1
     items_used = items_used[parms.bank[items_used, :ITEM_USE] .>= parms.max_item_use]
 
@@ -136,8 +144,10 @@ end
 Main entry point for assembling tests. Loads configurations, runs the solver,
 and processes the results, then generates and saves a report.
 """
-function assemble_tests(config_file::String="path_to_config_file.toml")
+function assemble_tests(config_file::String="data/config.toml")
     config, old_par = load_configuration(config_file)
+    # validate_parameters(old_par)
+
     parms = deepcopy(old_par)
     constraints = read_constraints(config.constraints_file, parms)
     results_df = DataFrame()

@@ -1,12 +1,10 @@
 module CriteriaParser
 
-export parse_criteria
-
 using DataFrames
 
 # Normalize input string
 function normalize(input_str::AbstractString)::AbstractString
-    return uppercase(replace(input_str, r"\s*([!=<>]=?|in|\&\&|\|\|)\s*" => s" \1 ",
+    return uppercase(replace(input_str, r"\s*([!=<>]=|!IN|IN|\&\&|\|\|)\s*" => s" \1 ",
                              r"\s*,\s*" => ","))
 end
 
@@ -71,6 +69,18 @@ function process_rhs(rhs::AbstractString)
     end
 end
 
+# Parse individual condition
+function parse_condition(condition_expr::AbstractString)::Tuple{Symbol, String, Any}
+    parts = split(condition_expr, r"\s+")
+    if length(parts) == 3
+        lhs, op, rhs = parts
+        validate_operator(op)
+        return (Symbol(lhs), op, process_rhs(rhs))
+    else
+        throw(ArgumentError("Invalid condition format: $condition_expr"))
+    end
+end
+
 # Handle basic condition
 function handle_basic_condition(condition_expr::AbstractString)
     lhs, op, rhs = parse_condition(condition_expr)
@@ -80,24 +90,53 @@ end
 # Handle column-only selection
 handle_column_only(col_expr::AbstractString) = df -> df[!, Symbol(col_expr)]
 
-# Parse individual condition
-function parse_condition(condition_expr::AbstractString)::Tuple{Symbol, String, Any}
-    parts = split(condition_expr, r"\s+")
-    if length(parts) == 3
-        lhs, op, rhs = parts
-        validate_operator(op)
-        return (Symbol(lhs), op, process_rhs(rhs))
+# Split the string at the first comma outside of brackets
+function split_outside_brackets(input_str::AbstractString)::Tuple{AbstractString, AbstractString}
+    level = 0  # Track bracket nesting
+    split_pos = nothing
+
+    for i in 1:length(input_str)
+        c = input_str[i]
+
+        if c == '['
+            level += 1
+        elseif c == ']'
+            level -= 1
+        elseif c == ',' && level == 0
+            split_pos = i
+            break
+        end
+    end
+
+    if split_pos === nothing
+        return input_str, ""
     else
-        throw(ArgumentError("Invalid condition format"))
+        return input_str[1:split_pos-1], input_str[split_pos+1:end]
     end
 end
 
 # Handle column selection with condition
-function handle_column_and_condition(col_expr::AbstractString,
-                                     condition_expr::AbstractString)
+function handle_column_and_condition(col_expr::AbstractString, condition_expr::AbstractString)
     lhs, op, rhs = parse_condition(condition_expr)
     return df -> df[apply_condition(op, lhs, rhs, df), Symbol(col_expr)]
 end
+
+# Handle logical expressions: parse and combine using && and ||
+function handle_logical_expression(expr::AbstractString)
+    if contains(expr, "&&")
+        conditions = split(expr, "&&")
+        condition_funcs = [parse_criteria(strip(cond)) for cond in conditions]
+        return df -> reduce((a, b) -> a .& b, [cond(df) for cond in condition_funcs])
+    elseif contains(expr, "||")
+        conditions = split(expr, "||")
+        condition_funcs = [parse_criteria(strip(cond)) for cond in conditions]
+        return df -> reduce((a, b) -> a .| b, [cond(df) for cond in condition_funcs])
+    else
+        return parse_criteria(expr)
+    end
+end
+# input_str = "AREA !IN [1,2,3] && A > 0.2"
+# max_length = 100
 
 # Main function to parse criteria
 function parse_criteria(input_str::AbstractString; max_length::Int = 100)
@@ -107,18 +146,20 @@ function parse_criteria(input_str::AbstractString; max_length::Int = 100)
 
     input_str = sanitize_input(strip(input_str))
 
-    # Return all `true` if input is empty
     if isempty(input_str)
         return df -> trues(size(df, 1))
     end
 
     normalized_str = normalize(input_str)
 
-    # Check for column selection with a condition
-    if contains(normalized_str, ",") && match(r"\[.*\]", normalized_str) === nothing
-        col_expr, condition_expr = split(normalized_str, ","; limit = 2)
+    # Check for logical operators (&& or ||)
+    if contains(normalized_str, "&&") || contains(normalized_str, "||")
+        return handle_logical_expression(normalized_str)
+    end
 
-        # Handle conditions like "ID, AREA in [2]"
+    # Check for column selection with a condition
+    col_expr, condition_expr = split_outside_brackets(normalized_str)
+    if !isempty(condition_expr)
         return handle_column_and_condition(strip(col_expr), strip(condition_expr))
     else
         # Check if it's a basic condition or just a column
@@ -133,4 +174,4 @@ function parse_criteria(input_str::AbstractString; max_length::Int = 100)
     end
 end
 
-end
+end  # module CriteriaParser

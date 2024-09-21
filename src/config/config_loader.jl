@@ -1,4 +1,3 @@
-__precompile__()
 module ConfigLoader
 
 export BasicConfig, load_config

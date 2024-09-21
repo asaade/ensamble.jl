@@ -54,7 +54,7 @@ Displays the distribution of items by area for each form, showing the count of i
 """
 function display_area_distribution(results::DataFrame, bank::DataFrame)
     num_forms = size(results, 2)
-    areas = unique(bank.AREA)  # Get the unique areas from the bank
+    areas = sort(unique(bank.AREA))  # Get the unique areas from the bank
 
     println("\nItem Distribution by Area Across Forms:")
     println("=================================")
@@ -82,11 +82,9 @@ function calculate_common_items(results::DataFrame)
     common_items_matrix = zeros(Int, num_forms, num_forms)
 
     for i in 1:num_forms, j in 1:num_forms
-        if i <= j
-            # Handle missing values before performing the common item comparison
-            common = in(skipmissing(results[:, i])).(skipmissing(results[:, j]))
-            common_items_matrix[i, j] = sum(common)
-        end
+        # Handle missing values before performing the common item comparison
+        common = in(skipmissing(results[:, i])).(skipmissing(results[:, j]))
+        common_items_matrix[i, j] = sum(common)
     end
 
     return common_items_matrix
