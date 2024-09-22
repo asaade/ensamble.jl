@@ -134,8 +134,7 @@ function apply_individual_constraint!(model::Model, parms::Parameters,
         constraint_items_per_form(model, parms, lb, ub)
     elseif constraint.type == "NUMBER"
         condition = constraint.condition(bank)
-        selected_items = items[condition]
-        constraint_item_count(model, parms, selected_items, lb, ub)
+        constraint_item_count(model, parms, condition, lb, ub)
     elseif constraint.type == "SUM"
         item_vals = constraint.condition(bank)
         constraint_item_sum(model, parms, item_vals, lb, ub)
@@ -145,12 +144,10 @@ function apply_individual_constraint!(model::Model, parms::Parameters,
     elseif constraint.type == "FRIENDS"
         condition = constraint.condition(bank)
         constraint_friends_in_form(model, parms, condition)
-        # elseif constraint.type == "ANCHOR"
-        #     condition = constraint.condition(bank)
-        #     constraint_anchor_in_form(model, parms, condition)
     elseif constraint.type == "MAXUSE"
+        condition = constraint.condition(bank)
         parms.max_item_use = ub
-        constraint_max_use(model, parms, ub)
+        constraint_max_use(model, parms, condition, ub)
     elseif constraint.type == "OVERLAP"
         constraint_forms_overlap(model, parms, lb, ub)
     else

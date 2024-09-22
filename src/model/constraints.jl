@@ -5,49 +5,52 @@ function constraint_items_per_form(model::Model, parms::Parameters, minItems::In
                                    maxItems::Int = minItems)
     return constraint_item_count(model::Model,
                                  parms::Parameters,
-                                 1:size(parms.bank, 1),
+                                 trues(size(parms.bank, 1)),
                                  minItems::Int,
                                  maxItems::Int)
 end
 
 ## Includes a number of items between minItems and maxItems from the "selected" list in each test (F)
-function constraint_item_count_aux(model::Model, parms::Parameters, selected,
+function constraint_item_count_aux(model::Model, parms::Parameters, selected::BitVector,
                                    minItems::Int, maxItems::Int = minItems)
     @assert(0<=minItems<=maxItems, "Error in item_count. maxItems < minItems")
 
     x = model[:x]
-    forms = size(x, 2)
+    rows, forms = size(x)
     forms -= parms.shadow_test > 0 ? 1 : 0
+    items = collect(1:rows)[selected]
 
     if minItems == maxItems
-        @constraint(model, [f = 1:forms], sum(x[i, f] for i in selected)==maxItems)
+        @constraint(model, [f = 1:forms], sum(x[i, f] for i in items)==maxItems)
     else
-        @constraint(model, [f = 1:forms], sum(x[i, f] for i in selected)<=maxItems)
-        @constraint(model, [f = 1:forms], sum(x[i, f] for i in selected)>=minItems)
+        @constraint(model, [f = 1:forms], sum(x[i, f] for i in items)<=maxItems)
+        @constraint(model, [f = 1:forms], sum(x[i, f] for i in items)>=minItems)
     end
     return model
 end
 
 ## Include a number of items between minItems and maxItems from the list for the shadow test
-function constraint_item_count_shadow_aux(model::Model, parms::Parameters, selected,
+function constraint_item_count_shadow_aux(model::Model, parms::Parameters, selected::BitVector,
                                           minItems::Int, maxItems::Int = minItems)
     shadow_test = parms.shadow_test
     if shadow_test > 0
         @assert(minItems<=maxItems, "Error in item_count. maxItems < minItems")
         x = model[:x]
         zcol = size(x, 2)
+        items = collect(1:size(x, 1))[selected]
+
         if minItems == maxItems
-            @constraint(model, sum(x[i, zcol] for i in selected)==minItems * shadow_test)
+            @constraint(model, sum(x[i, zcol] for i in items)==minItems * shadow_test)
         else
-            @constraint(model, sum(x[i, zcol] for i in selected)>=minItems * shadow_test)
-            @constraint(model, sum(x[i, zcol] for i in selected)<=maxItems * shadow_test)
+            @constraint(model, sum(x[i, zcol] for i in items)>=minItems * shadow_test)
+            @constraint(model, sum(x[i, zcol] for i in items)<=maxItems * shadow_test)
         end
     end
 
     return model
 end
 
-function constraint_item_count(model::Model, parms::Parameters, selected, minItems::Int,
+function constraint_item_count(model::Model, parms::Parameters, selected::BitVector, minItems::Int,
                                maxItems::Int = minItems)
     @assert(minItems<=maxItems, "Error in item_count. maxItems < minItems")
 
@@ -293,13 +296,15 @@ function constraint_add_anchor!(model::Model, parms::Parameters)
     return model
 end
 
-function constraint_max_use(model::Model, parms::Parameters, max_use::Int)
+function constraint_max_use(model::Model, parms::Parameters, selected::BitVector, max_use::Int)
     if max_use <= 0 || ismissing(max_use)
         max_use = 1
     end
     x = model[:x]
     num_items, forms = size(x)
     items = collect(1:num_items)
+    items[selected]
+
     items = parms.anchor_size > 0 ? items[parms.bank.ANCHOR .== 0] : items
     forms -= parms.shadow_test > 0 ? 1 : 0
 

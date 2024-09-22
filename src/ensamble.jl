@@ -25,7 +25,7 @@ load_configuration(config_file::String)::Tuple{Dict, Parameters}
 
 Load the configuration from a TOML file and return the configuration and parameters.
 """
-function load_configuration(config_file::String)
+function configure_system(config_file::String)
     println(LOADING_CONFIGURATION_MESSAGE)
     return Configuration.configure(config_file)
 end
@@ -145,7 +145,7 @@ Main entry point for assembling tests. Loads configurations, runs the solver,
 and processes the results, then generates and saves a report.
 """
 function assemble_tests(config_file::String="data/config.toml")
-    config, old_par = load_configuration(config_file)
+    config, old_par = configure_system(config_file)
     # validate_parameters(old_par)
 
     parms = deepcopy(old_par)

@@ -1,6 +1,7 @@
 module CriteriaParser
 
 using DataFrames
+using StringDistances
 
 # Normalize input string
 function normalize(input_str::AbstractString)::AbstractString
@@ -38,10 +39,19 @@ function validate_operator(op::AbstractString)
     end
 end
 
+# Function to find the closest matching column name
+function suggest_similar_column(input_column::Symbol, df::DataFrame)::AbstractString
+    existing_columns = Symbol.(names(df))
+    distances = [levenshtein(string(input_column), string(col)) for col in existing_columns]
+    closest_match = existing_columns[argmin(distances)]
+    return string(closest_match)
+end
+
 # Apply condition on a DataFrame
 function apply_condition(op::AbstractString, lhs::Symbol, rhs, df::DataFrame)
     if lhs ∉ Symbol.(names(df))
-        throw(ArgumentError("Column $lhs does not exist in the DataFrame"))
+        similar_col = suggest_similar_column(lhs, df)
+        throw(ArgumentError("Column $lhs does not exist in the DataFrame. Did you mean '$similar_col'?"))
     end
     lhs_col = df[!, lhs]
     return OPERATOR_MAP[op](lhs_col, rhs)
@@ -135,8 +145,6 @@ function handle_logical_expression(expr::AbstractString)
         return parse_criteria(expr)
     end
 end
-# input_str = "AREA !IN [1,2,3] && A > 0.2"
-# max_length = 100
 
 # Main function to parse criteria
 function parse_criteria(input_str::AbstractString; max_length::Int = 100)

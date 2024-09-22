@@ -144,7 +144,7 @@ Reads from a TOML configuration file, loads data, and returns the system paramet
 """
 function configure(inFile::String = "data/config.toml")::Tuple{Config, Parameters}
     # Read TOML configuration
-    config_data = safe_read_toml(inFile)
+    config_data = upcaseKeys(safe_read_toml(inFile))
 
     # Load configuration, forms, item bank, and IRT data
     basic_config::BasicConfig = load_config(config_data)           # This was renamed to avoid name clashes

@@ -109,7 +109,7 @@ Safely reads a YAML file and returns a dictionary with upcased symbol keys.
 function safe_read_yaml(file_path::String)::Dict{Symbol, Any}
     try
         yaml_dict = YAML.load_file(file_path; dicttype = Dict{Union{String, Symbol}, Any})
-        return upcaseKeys(yaml_dict)
+        return yaml_dict
     catch e
         @error "Error reading YAML file: $file_path. Error: $e"
         return Dict{Symbol, Any}()
@@ -129,10 +129,10 @@ Safely reads a TOML file and returns a dictionary with upcased symbol keys.
 
   - A dictionary where keys are upcased symbols. Returns an empty dictionary if an error occurs.
 """
-function safe_read_toml(file_path::String)::Dict{Symbol, Any}
+function safe_read_toml(file_path::String)::Dict{String, Any}
     try
         toml_dict = TOML.parsefile(file_path)
-        return upcaseKeys(toml_dict)
+        return toml_dict
     catch e
         @error "Error reading TOML file: $file_path. Error: $e"
         return Dict{Symbol, Any}()

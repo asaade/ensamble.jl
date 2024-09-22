@@ -14,9 +14,9 @@ end
 function configure_solver!(model::Model, parms::Parameters, solver_name::String = "cplex")
     parms.verbose > 1 && @info "Configuring $solver_name solver."
     config = load_solver_config("data/solver_config.toml")
-    config = upcaseKeys(config)
+    solver_options = config[lowercase(solver_name)]
+
     name = upSymbol(solver_name)
-    solver_options = config[name]
 
     if name == :CPLEX
         set_optimizer(model, CPLEX.Optimizer)
