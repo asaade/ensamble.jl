@@ -28,7 +28,7 @@ Reads configuration from a TOML dictionary and returns a `Config` struct.
 
   - A `Config` struct with configuration settings loaded from the dictionary.
 """
-function load_config(config_data::Dict{Symbol,Any})::BasicConfig
+function load_config(config_data::Dict{Symbol, Any})::BasicConfig
     # Load only the corresponding part from the dictionary
 
     if !haskey(config_data, :FILES)
@@ -53,8 +53,9 @@ function load_config(config_data::Dict{Symbol,Any})::BasicConfig
     @info "Loaded configuration: items_file = $items_file, anchor_file = $anchor_file, solver = $solver"
 
     # Return the Config struct
-    return BasicConfig(items_file, anchor_file, constraints_file, forms_file, results_file, tcc_file,
-        plot_file, solver, verbose)
+    return BasicConfig(items_file, anchor_file, constraints_file, forms_file, results_file,
+                       tcc_file,
+                       plot_file, solver, verbose)
 end
 
 end # module ConfigLoader

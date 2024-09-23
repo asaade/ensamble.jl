@@ -98,24 +98,26 @@ end
 # Helper function to calculate tau
 function get_tau(irt_dict::Dict{Symbol, Any}, p_matrix::Matrix{Float64}, r::Int, k::Int,
                  N::Int)::Matrix{Float64}
-    if haskey(irt_dict, :TAU) && length(irt_dict[:TAU]) > 0 && irt_dict[:TAU] != [[]]
-        tau_vectors = irt_dict[:TAU]
-        tau = reduce(hcat, tau_vectors)
-        return Matrix{Float64}(tau)
-    else
-        return StatsFunctions.calc_tau(p_matrix, r, k, N)
+    if haskey(irt_dict, :TAU_INFO)
+        tau = irt_dict[:TAU_INFO]
+        if length(tau) > 0 && tau != [[]]
+            tau_vectors = reduce(hcat, tau)
+            return Matrix{Float64}(tau_vectors)
+        end
     end
+    return StatsFunctions.calc_tau(p_matrix, r, k, N)
 end
 
 # Helper function to calculate tau_info
 function get_tau_info(irt_dict::Dict{Symbol, Any}, info_matrix::Matrix{Float64}, k::Int,
                       N::Int)::Vector{Float64}
-    if haskey(irt_dict, :TAU_INFO) && length(irt_dict[:TAU_INFO]) > 0 &&
-       irt_dict[:TAU] != [[]]
-        return Vector{Float64}(irt_dict[:TAU_INFO])
-    else
-        return StatsFunctions.calc_info_tau(info_matrix, k, N)
+    if haskey(irt_dict, :TAU_INFO)
+        tau = irt_dict[:TAU_INFO]
+        if length(tau) > 0 && tau != [[]]
+            return Vector{Float64}(irt_dict[:TAU_INFO])
+        end
     end
+    return StatsFunctions.calc_info_tau(info_matrix, k, N)
 end
 
 end # module IRTDataLoader

@@ -92,13 +92,15 @@ function process_and_store_results!(model::Model, parms::Parameters, results_df:
     items_used = Int[]
     max_items = parms.max_items
 
-    for f in 1:parms.num_forms
+    for f in 1:(parms.num_forms)
         selected_items = items[solver_matrix[:, f] .> 0.9]
         codes_in_form = item_codes[selected_items]
         form_length = length(codes_in_form)
         missing_rows = max_items - form_length
 
-        padded_codes_vector = missing_rows > 0 ? vcat(codes_in_form, fill(MISSING_VALUE_FILLER, missing_rows)) : codes_in_form
+        padded_codes_vector = missing_rows > 0 ?
+                              vcat(codes_in_form,
+                                   fill(MISSING_VALUE_FILLER, missing_rows)) : codes_in_form
         results_df[!, generate_unique_column_name(results_df)] = padded_codes_vector
 
         # Directly append the selected items to items_used
@@ -131,7 +133,7 @@ function handle_anchor_items(parms::Parameters, old_par::Parameters)
 
         if parms.method == "TCC"
             parms.p = old_par.p[parms.bank.INDEX, :]
-        elseif parms.method in ["TIC", "TIC2", "TIC3"]
+        else parms.method in ["TIC", "TIC2", "TIC3"]
             parms.info = old_par.info[parms.bank.INDEX, :]
         end
     end
@@ -144,7 +146,7 @@ end
 Main entry point for assembling tests. Loads configurations, runs the solver,
 and processes the results, then generates and saves a report.
 """
-function assemble_tests(config_file::String="data/config.toml")
+function assemble_tests(config_file::String = "data/config.toml")
     config, old_par = configure_system(config_file)
     # validate_parameters(old_par)
 
@@ -184,7 +186,7 @@ function assemble_tests(config_file::String="data/config.toml")
             parms.f -= 1
         end
     end
-
+    
     # Display and save the final report
     final_report(old_par, results_df, config)
 
