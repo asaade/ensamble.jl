@@ -16,7 +16,7 @@ const MODEL_FILE = "./results/model.lp"
 Read constraints from a CSV file, returning a dictionary of Constraint objects.
 """
 function read_constraints(file_path::String, parms::Parameters)
-    df = CSV.read(file_path, DataFrame; missingstring = nothing)
+    df = CSV.read(file_path, DataFrame; missingstring=nothing)
     constraints = Dict{String, Constraint}()
 
     for row in eachrow(df)
@@ -28,12 +28,15 @@ function read_constraints(file_path::String, parms::Parameters)
             lb = row[:LB]
             ub = row[:UB]
 
-            @assert(lb<=ub,
+            @assert(lb <= ub,
                     "'ub' must be equal or greater than 'lb' in the $cond_id constraint")
 
             # Parse the condition or set it to always true if empty
-            condition = strip(condition_expr) == "" ? df -> trues(size(df, 1)) :
-                        CriteriaParser.parse_criteria(condition_expr)
+            condition = if strip(condition_expr) == ""
+                df -> trues(size(df, 1))
+            else
+                CriteriaParser.parse_criteria(condition_expr)
+            end
 
             # Store the constraint in the dictionary
             constraints[cond_id] = Constraint(cond_id, type, eval(condition), lb, ub)
@@ -51,7 +54,7 @@ function read_constraints(file_path::String, parms::Parameters)
     conflict_constraints = Dict{String, Constraint}()
 
     for (constraint_id, constraint) in constraints
-        if constraint.type in ["FRIENDS", "ENEMIES"]
+        if constraint.type in ["ALLORNONE", "ENEMIES"]
             conflict_constraints[constraint_id] = constraint
         end
     end
@@ -76,7 +79,7 @@ function initialize_model!(model::Model,
     num_forms = parms.num_forms + (parms.shadow_test > 0 ? 1 : 0)
 
     # Declare model variables
-    @variable(model, y>=0.0)
+    @variable(model, y >= 0.0)
     @variable(model, x[1:num_items, 1:num_forms], Bin)
 
     # Set the objective and apply constraints
@@ -110,10 +113,12 @@ function set_objective!(model::Model, parms::Parameters)
     elseif parms.method == "TIC3"
         objective_info_relative2(model, parms)
     elseif parms.method == "TC"
-        println("Method TC not implemented yet.")
+        throw(ArgumentError("Method TC not implemented yet."))
     else
-        error("Unknown method: ", parms.method)
+        throw(ArgumentError("Unknown method: $(parms.method)"))
     end
+
+    return model
 end
 
 """
@@ -142,7 +147,7 @@ function apply_individual_constraint!(model::Model, parms::Parameters,
     elseif constraint.type == "ENEMIES"
         condition = constraint.condition(bank)
         constraint_enemies_in_form(model, parms, condition)
-    elseif constraint.type == "FRIENDS"
+    elseif constraint.type == "ALLORNONE"
         condition = constraint.condition(bank)
         constraint_friends_in_form(model, parms, condition)
     elseif constraint.type == "MAXUSE"
@@ -152,8 +157,10 @@ function apply_individual_constraint!(model::Model, parms::Parameters,
     elseif constraint.type == "OVERLAP"
         constraint_forms_overlap(model, parms, lb, ub)
     else
-        error("Unknown constraint type: ", constraint.type)
+        throw(ArgumentError("Unknown constraint type: $(constraint.type)"))
     end
+
+    return model
 end
 
 """
@@ -180,7 +187,7 @@ The failure or logging of these checks will not affect the other constraints.
 function run_conflict_checks!(parms::Parameters,
                               conflict_constraints::Dict{String, Constraint})
     try
-        friends_constraints = find_all_constraints_by_type(conflict_constraints, "FRIENDS")
+        friends_constraints = find_all_constraints_by_type(conflict_constraints, "ALLORNONE")
         enemies_constraints = find_all_constraints_by_type(conflict_constraints, "ENEMIES")
 
         # Log constraint information for debugging
@@ -272,7 +279,7 @@ Logs conflicts found in data.
 If a conflict is found, the first `max_rows_to_log` rows of the conflict will be logged.
 """
 function log_conflicts(conflict_type::String, conflicting_rows::DataFrame,
-                       max_rows_to_log::Int = 5)
+                       max_rows_to_log::Int=5)
     if size(conflicting_rows, 1) > 0
         @warn "Conflicting $conflict_type found"
         @warn "Displaying the first $max_rows_to_log rows of the conflict:",
