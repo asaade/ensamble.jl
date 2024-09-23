@@ -39,6 +39,8 @@ struct Config
     plot_file::AbstractString
     solver::AbstractString
     verbose::Int
+    report_categories::Vector{String}
+    report_sums::Vector{String}
 end
 
 # Final struct for the parameters (types updated for consistency)
@@ -98,7 +100,10 @@ function transform_config_to_flat(basic_config::BasicConfig)::Config
                   basic_config.tcc_file,
                   basic_config.plot_file,
                   basic_config.solver,
-                  basic_config.verbose)
+                  basic_config.verbose,
+                  basic_config.report_categories,
+                  basic_config.report_sums
+    )
 end
 
 """
@@ -142,7 +147,7 @@ end
 Entry point function that loads and prepares the system configuration.
 Reads from a TOML configuration file, loads data, and returns the system parameters.
 """
-function configure(inFile::String = "data/config.toml")::Tuple{Config, Parameters}
+function configure(inFile::String="data/config.toml")::Tuple{Config, Parameters}
     # Read TOML configuration
     config_data = upcaseKeys(safe_read_toml(inFile))
 

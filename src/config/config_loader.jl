@@ -1,4 +1,5 @@
 module ConfigLoader
+using ..StringUtils
 
 export BasicConfig, load_config
 
@@ -13,6 +14,8 @@ mutable struct BasicConfig
     plot_file::String              # Path to plot file
     solver::String                 # Solver type (e.g., "CPLEX", "HiGHS", etc.)
     verbose::Int                   # Verbosity level
+    report_categories::Vector{String}
+    report_sums::Vector{String}
 end
 
 """
@@ -36,6 +39,8 @@ function load_config(config_data::Dict{Symbol, Any})::BasicConfig
         throw(ArgumentError("Missing FILES section in the configuration"))
     end
 
+    config_data = cleanValues(config_data)
+    
     files_data = config_data[:FILES]
 
     # Extract necessary fields and provide defaults if needed
@@ -48,14 +53,16 @@ function load_config(config_data::Dict{Symbol, Any})::BasicConfig
     plot_file = get(files_data, :PLOTFILE, "results/combined_plots.pdf")
     solver = get(files_data, :SOLVER, "CPLEX")  # Default solver is "CPLEX"
     verbose = get(files_data, :VERBOSE, 1)      # Default verbosity is 1
-
+    report_categories = get(files_data, :REPORTCATEGORIES, [""])
+    report_sums = get(files_data, :REPORTSUMS, [""])
+    
     # Log the loaded configuration for debugging purposes
     @info "Loaded configuration: items_file = $items_file, anchor_file = $anchor_file, solver = $solver"
 
     # Return the Config struct
     return BasicConfig(items_file, anchor_file, constraints_file, forms_file, results_file,
                        tcc_file,
-                       plot_file, solver, verbose)
+                       plot_file, solver, verbose, report_categories, report_sums)
 end
 
 end # module ConfigLoader
