@@ -80,7 +80,7 @@ end
 # Main function to generate and plot characteristic curves, information curves, and simulation data
 function plot_results(parms::Parameters, conf::Config, results::DataFrame,
                       theta_range::AbstractVector=-3.0:0.1:3.0,
-                      plot_file::String="results/combined_plot.pdf")
+                      plot_file::String="results/combined_plot.pdf")::DataFrame
     # Generate plot data
     characteristic_curves = generate_characteristic_curves(parms, results, theta_range)
     information_curves = generate_information_curves(parms, results, theta_range)
@@ -139,10 +139,11 @@ function plot_results(parms::Parameters, conf::Config, results::DataFrame,
                          margin=15mm)
 
     # Write results to file
+    insertcols!(characteristic_curves, 1, :THETA => collect(theta_range)) 
     write_results_to_file(characteristic_curves, conf.tcc_file)
     println("TCC data saved to: ", conf.tcc_file)
     # Save the combined plot
     savefig(combined_plot, plot_file)
     println("Charts saved to: ", plot_file)
-    return combined_plot
+    return characteristic_curves
 end
