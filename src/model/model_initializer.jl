@@ -28,7 +28,8 @@ function read_constraints(file_path::String, parms::Parameters)
             lb = row[:LB]
             ub = row[:UB]
 
-            @assert(lb<=ub, "'ub' must be equal or greater than 'lb' in the $cond_id constraint")
+            @assert(lb<=ub,
+                    "'ub' must be equal or greater than 'lb' in the $cond_id constraint")
 
             # Parse the condition or set it to always true if empty
             condition = strip(condition_expr) == "" ? df -> trues(size(df, 1)) :
@@ -44,7 +45,7 @@ function read_constraints(file_path::String, parms::Parameters)
     end
 
     cond_keys = keys(constraints)
-    @assert(all(cond_keys.==unique(cond_keys)), "CONSTRAINT_ID keys must be unique")
+    @assert(all(cond_keys .== unique(cond_keys)), "CONSTRAINT_ID keys must be unique")
 
     # Identify and store conflict-related constraints
     conflict_constraints = Dict{String, Constraint}()
@@ -127,7 +128,7 @@ function apply_individual_constraint!(model::Model, parms::Parameters,
     items = 1:size(bank, 1)
 
     if constraint.type == "TEST"
-        if !(lb<=parms.n<=ub)
+        if !(lb <= parms.n <= ub)
             throw(DomainError("N=$(parms.n) are not between 'lb'=$lb and 'ub'=$ub in the TEST constraint"))
         end
         parms.max_items = ub
