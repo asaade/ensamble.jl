@@ -101,7 +101,8 @@ end
 handle_column_only(col_expr::AbstractString) = df -> df[!, Symbol(col_expr)]
 
 # Split the string at the first comma outside of brackets
-function split_outside_brackets(input_str::AbstractString)::Tuple{AbstractString, AbstractString}
+function split_outside_brackets(input_str::AbstractString)::Tuple{AbstractString,
+                                                                  AbstractString}
     level = 0  # Track bracket nesting
     split_pos = nothing
 
@@ -121,12 +122,13 @@ function split_outside_brackets(input_str::AbstractString)::Tuple{AbstractString
     if split_pos === nothing
         return input_str, ""
     else
-        return input_str[1:split_pos-1], input_str[split_pos+1:end]
+        return input_str[1:(split_pos - 1)], input_str[(split_pos + 1):end]
     end
 end
 
 # Handle column selection with condition
-function handle_column_and_condition(col_expr::AbstractString, condition_expr::AbstractString)
+function handle_column_and_condition(col_expr::AbstractString,
+                                     condition_expr::AbstractString)
     lhs, op, rhs = parse_condition(condition_expr)
     return df -> df[apply_condition(op, lhs, rhs, df), Symbol(col_expr)]
 end

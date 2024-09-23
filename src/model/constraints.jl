@@ -30,7 +30,8 @@ function constraint_item_count_aux(model::Model, parms::Parameters, selected::Bi
 end
 
 ## Include a number of items between minItems and maxItems from the list for the shadow test
-function constraint_item_count_shadow_aux(model::Model, parms::Parameters, selected::BitVector,
+function constraint_item_count_shadow_aux(model::Model, parms::Parameters,
+                                          selected::BitVector,
                                           minItems::Int, maxItems::Int = minItems)
     shadow_test = parms.shadow_test
     if shadow_test > 0
@@ -50,7 +51,8 @@ function constraint_item_count_shadow_aux(model::Model, parms::Parameters, selec
     return model
 end
 
-function constraint_item_count(model::Model, parms::Parameters, selected::BitVector, minItems::Int,
+function constraint_item_count(model::Model, parms::Parameters, selected::BitVector,
+                               minItems::Int,
                                maxItems::Int = minItems)
     @assert(minItems<=maxItems, "Error in item_count. maxItems < minItems")
 
@@ -70,10 +72,6 @@ function constraint_enemies_in_form(model::Model, parms::Parameters, selected)
     data = DataFrame(; selected = selected, index = 1:length(selected))
     dropmissing!(data, :selected)
 
-    if isa(selected, BitVector)
-        data = data[data.selected, :]
-    end
-
     groups = groupby(data, :selected; sort = false, skipmissing = true)
     for group in groups
         items = group[!, :index]
@@ -89,9 +87,7 @@ function constraint_friends_in_form(model::Model, parms::Parameters, selected)
 
     data = DataFrame(; selected = selected, index = 1:length(selected))
     dropmissing!(data, :selected)
-    if isa(selected, BitVector)
-        data = data[data.selected, :]
-    end
+    
     groups = groupby(data, :selected; sort = false, skipmissing = true)
     for group in groups
         items = group[!, :index]
@@ -296,7 +292,8 @@ function constraint_add_anchor!(model::Model, parms::Parameters)
     return model
 end
 
-function constraint_max_use(model::Model, parms::Parameters, selected::BitVector, max_use::Int)
+function constraint_max_use(model::Model, parms::Parameters, selected::BitVector,
+                            max_use::Int)
     if max_use <= 0 || ismissing(max_use)
         max_use = 1
     end
