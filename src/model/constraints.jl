@@ -273,13 +273,36 @@ function objective_info_relative2(model::Model, parms::Parameters)
     return model
 end
 
+function constraint_include_items(model::Model, parms::Parameters, selected::BitVector)
+    x = model[:x]
+    num_items, forms = size(x)
+    items = collect(1:num_items)
+    items[selected]
+    for i in items
+        for f in 1:forms
+            JuMP.fix(x[i, f], 1; force=true)
+        end
+    end
+    return model
+end
+
+function constraint_exclude_items(model::Model, parms::Parameters, selected::BitVector)
+    x = model[:x]
+    num_items, forms = size(x)
+    items = collect(1:num_items)
+    items[selected]
+    @constraint(model, max_use[i in items],
+            sum([x[i, f] for f in 1:forms]) <= 1)
+    return model
+end
+
+
 function constraint_add_anchor!(model::Model, parms::Parameters)
     if parms.anchor_tests > 0
         x = model[:x]
         all_items, forms = size(x)
         items = collect(1:all_items)
         anchor_items = items[parms.bank.ANCHOR .> 0]
-
         # Force anchors in operational forms (ignore shadow)
         forms -= parms.shadow_test > 0 ? 1 : 0
 

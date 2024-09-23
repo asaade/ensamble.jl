@@ -9,3 +9,4 @@ ID,CONSTRAINT_ID,TYPE,CONDITION,LB,UB,ONOFF
 8,C8,AllOrNone,Friends,0,0,ON
 9,C9,MaxUse,,0,1,ON
 10,C10,overlap,,5,5,OFF
+8,C8,Exclude,CORR < 0.2,0,0,ON

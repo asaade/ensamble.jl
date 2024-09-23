@@ -150,6 +150,12 @@ function apply_individual_constraint!(model::Model, parms::Parameters,
     elseif constraint.type == "ALLORNONE"
         condition = constraint.condition(bank)
         constraint_friends_in_form(model, parms, condition)
+    elseif constraint.type == "INCLUDE"
+        condition = constraint.condition(bank)
+        constraint_include_items(model, parms, condition)
+    elseif constraint.type == "EXCLUDE"
+        condition = constraint.condition(bank)
+        constraint_exclude_items(model, parms, condition)
     elseif constraint.type == "MAXUSE"
         condition = constraint.condition(bank)
         parms.max_item_use = ub
@@ -189,20 +195,16 @@ function run_conflict_checks!(parms::Parameters,
     try
         friends_constraints = find_all_constraints_by_type(conflict_constraints, "ALLORNONE")
         enemies_constraints = find_all_constraints_by_type(conflict_constraints, "ENEMIES")
-
-        # Log constraint information for debugging
-        @debug "Friends constraints: ", friends_constraints
-        @debug "Enemies constraints: ", enemies_constraints
+        include_constraints = find_all_constraints_by_type(conflict_constraints, "ENEMIES")
+        friends_constrainst = vcat(friends_constraints, include_constraints)
 
         # Check conflicts between friends and enemies
         if !isempty(friends_constraints) && !isempty(enemies_constraints)
             for friends_constraint in friends_constraints
                 friends_values = friends_constraint.condition(parms.bank)
-                @debug "Friends values: ", friends_values
 
                 for enemies_constraint in enemies_constraints
                     enemies_values = enemies_constraint.condition(parms.bank)
-                    @debug "Enemies values: ", enemies_values
 
                     # Apply one-to-many conflict rule between friends and enemies
                     conflict_df = apply_conflict_rule(friends_values, enemies_values,
@@ -217,11 +219,10 @@ function run_conflict_checks!(parms::Parameters,
         # Check conflicts between anchors and enemies/friends
         if parms.anchor_tests > 0
             anchor_values = parms.bank.ANCHOR
-            @debug "Anchor values: ", anchor_values
-
+            
             for enemies_constraint in enemies_constraints
                 enemies_values = enemies_constraint.condition(parms.bank)
-                @debug "Enemies values for anchor check: ", enemies_values
+                
 
                 # One-to-many conflict rule between anchor and enemies
                 conflict_df = apply_conflict_rule(anchor_values, enemies_values,
@@ -233,8 +234,7 @@ function run_conflict_checks!(parms::Parameters,
 
             for friends_constraint in friends_constraints
                 friends_values = friends_constraint.condition(parms.bank)
-                @debug "Friends values for anchor check: ", friends_values
-
+                
                 # All-or-none conflict rule between anchor and friends
                 conflict_df = apply_conflict_rule(friends_values, anchor_values,
                                                   all_or_none_conflict_rule)
@@ -299,7 +299,6 @@ function one_to_many_conflict_rule(values1::Vector, values2::Vector)::Vector{Tup
     for (v1, v2) in zip(values1, values2)
         if !ismissing(v1) && !ismissing(v2) && v1 > 0 && v2 > 0
             pair = (v1, v2)
-            @debug "Checking pair: ", pair  # Log the pair for debugging
             counts[pair] = get(counts, pair, 0) + 1
         end
     end
@@ -351,7 +350,6 @@ function apply_conflict_rule(values1::Vector, values2::Vector, rule::Function)::
         return DataFrame(:col1 => map(x -> x[1], conflicting_pairs),
                          :col2 => map(x -> x[2], conflicting_pairs))
     else
-        @debug "No conflicts found with the given rule."
         return DataFrame()  # Return empty DataFrame if no conflicts are found
     end
 end
