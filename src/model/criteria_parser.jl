@@ -37,6 +37,7 @@ function validate_operator(op::AbstractString)
     if op ∉ keys(OPERATOR_MAP)
         throw(ArgumentError("Unsupported operator: $op"))
     end
+    return nothing
 end
 
 # Function to find the closest matching column name
@@ -68,7 +69,7 @@ function is_numeric(s::AbstractString)::Bool
 end
 
 # Process the right-hand side (rhs)
-function process_rhs(rhs::AbstractString)
+function process_rhs(rhs::AbstractString)::Union{Float64, String}
     if match(r"^\[.*\]$", rhs) !== nothing
         elements = split(strip(rhs, ['[', ']']), ",")
         return [is_numeric(el) ? parse(Float64, el) : strip(el, '"') for el in elements]
@@ -92,13 +93,13 @@ function parse_condition(condition_expr::AbstractString)::Tuple{Symbol, String, 
 end
 
 # Handle basic condition
-function handle_basic_condition(condition_expr::AbstractString)
+function handle_basic_condition(condition_expr::AbstractString)::Function
     lhs, op, rhs = parse_condition(condition_expr)
     return df -> apply_condition(op, lhs, rhs, df)
 end
 
 # Handle column-only selection
-handle_column_only(col_expr::AbstractString) = df -> df[!, Symbol(col_expr)]
+handle_column_only(col_expr::AbstractString)::Function = df -> df[!, Symbol(col_expr)]
 
 # Split the string at the first comma outside of brackets
 function split_outside_brackets(input_str::AbstractString)::Tuple{AbstractString,
@@ -128,7 +129,7 @@ end
 
 # Handle column selection with condition
 function handle_column_and_condition(col_expr::AbstractString,
-                                     condition_expr::AbstractString)
+                                     condition_expr::AbstractString)::Function
     lhs, op, rhs = parse_condition(condition_expr)
     return df -> df[apply_condition(op, lhs, rhs, df), Symbol(col_expr)]
 end
@@ -149,7 +150,7 @@ function handle_logical_expression(expr::AbstractString)
 end
 
 # Main function to parse criteria
-function parse_criteria(input_str::AbstractString; max_length::Int = 100)
+function parse_criteria(input_str::AbstractString; max_length::Int=100)::Function
     if length(input_str) > max_length
         throw(ArgumentError("Input string exceeds maximum allowed length of $max_length characters"))
     end

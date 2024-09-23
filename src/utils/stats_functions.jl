@@ -1,7 +1,8 @@
 module StatsFunctions
 
 # Export the key functions to be used by other modules
-export Probability, Information, calc_tau, calc_info_tau,
+export Probability,
+       Information, calc_tau, calc_info_tau,
        observed_score_distribution_continuous, lw_dist
 
 using Random, Distributions, QuadGK, Logging
@@ -24,7 +25,7 @@ Calculates the probability of success given the IRT parameters and ability level
   - Probability of success as `Float64`.
 """
 function Probability(θ::Float64, b::Float64, a::Float64, c::Float64;
-                     d::Float64 = 1.0)::Float64
+                     d::Float64=1.0)::Float64
     return c + (1 - c) / (1 + exp(-d * a * (θ - b)))
 end
 
@@ -46,7 +47,7 @@ Calculates the probability of success for a vector of items at a given ability l
   - A vector of probabilities of success for each item.
 """
 function Probability(θ::Float64, b::Vector{Float64}, a::Vector{Float64}, c::Vector{Float64};
-                     d::Float64 = 1.0)::Vector{Float64}
+                     d::Float64=1.0)::Vector{Float64}
     return c .+ (1 .- c) ./ (1 .+ exp.(-d .* a .* (θ .- b)))
 end
 
@@ -68,16 +69,16 @@ Calculates the item information function for a vector of items.
   - A vector of item information values.
 """
 function Information(θ::Float64, b::Vector{Float64}, a::Vector{Float64}, c::Vector{Float64};
-                     d::Float64 = 1.0)::Vector{Float64}
-    p = Probability.(θ, b, a, c; d = d)
+                     d::Float64=1.0)::Vector{Float64}
+    p = Probability.(θ, b, a, c; d=d)
     q = 1 .- p
     return (d .* a) .^ 2 .* (p .- c) .^ 2 .* q ./ ((1 .- c) .^ 2 .* p)
 end
 
 # Scalar version of Information function
 function Information(θ::Float64, b::Float64, a::Float64, c::Float64;
-                     d::Float64 = 1.0)::Float64
-    p = Probability(θ, b, a, c; d = d)
+                     d::Float64=1.0)::Float64
+    p = Probability(θ, b, a, c; d=d)
     q = 1 - p
     return (d * a)^2 * (p - c)^2 * q / ((1 - c)^2 * p)
 end
@@ -218,7 +219,7 @@ Calculates the observed score distribution using numerical integration.
 """
 function observed_score_distribution_continuous(item_params::Matrix{Float64},
                                                 ability_dist::Normal;
-                                                num_points::Int = 100)::Vector{Float64}
+                                                num_points::Int=100)::Vector{Float64}
     num_items = size(item_params, 2)
 
     function integrand(θ, x)
@@ -228,7 +229,7 @@ function observed_score_distribution_continuous(item_params::Matrix{Float64},
 
     observed_dist = zeros(Float64, num_items + 1)
     for x in 0:num_items
-        observed_dist[x + 1] = quadgk(θ -> integrand(θ, x), -Inf, Inf; order = num_points)[1]
+        observed_dist[x + 1] = quadgk(θ -> integrand(θ, x), -Inf, Inf; order=num_points)[1]
     end
 
     return observed_dist

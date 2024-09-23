@@ -36,7 +36,7 @@ end
 
 Run the optimization solver and check if the model is solved and feasible.
 """
-function run_optimization(model::Model)
+function run_optimization(model::Model)::Bool
     println(RUNNING_OPTIMIZATION_MESSAGE)
     optimize!(model)
     return is_solved_and_feasible(model)
@@ -49,7 +49,7 @@ end
 Remove items used in forms from the bank and update probabilities or
 information for the remaining items based on the method used.
 """
-function remove_used_items!(parms::Parameters, items_used::Vector{Int})
+function remove_used_items!(parms::Parameters, items_used::Vector{Int})::Parameters
     remaining = setdiff(1:length(parms.bank.ID), items_used)
     parms.bank = parms.bank[remaining, :]
 
@@ -70,7 +70,7 @@ end
 
 Generate a unique column name to avoid naming conflicts in the results DataFrame.
 """
-function generate_unique_column_name(results_df::DataFrame)
+function generate_unique_column_name(results_df::DataFrame)::String
     i = 1
     while "Form_$i" in names(results_df)
         i += 1
@@ -85,7 +85,8 @@ end
 Process the optimization results at each iteration and store them in a DataFrame.
 Used items ARE DELETED from the working copy of the bank to avoid its use in subsequent forms.
 """
-function process_and_store_results!(model::Model, parms::Parameters, results_df::DataFrame)
+function process_and_store_results!(model::Model, parms::Parameters,
+                                    results_df::DataFrame)::DataFrame
     solver_matrix = value.(model[:x])
     item_codes = parms.bank.ID
     items = 1:length(item_codes)
@@ -98,9 +99,12 @@ function process_and_store_results!(model::Model, parms::Parameters, results_df:
         form_length = length(codes_in_form)
         missing_rows = max_items - form_length
 
-        padded_codes_vector = missing_rows > 0 ?
-                              vcat(codes_in_form,
-                                   fill(MISSING_VALUE_FILLER, missing_rows)) : codes_in_form
+        padded_codes_vector = if missing_rows > 0
+            vcat(codes_in_form,
+                 fill(MISSING_VALUE_FILLER, missing_rows))
+        else
+            codes_in_form
+        end
         results_df[!, generate_unique_column_name(results_df)] = padded_codes_vector
 
         # Directly append the selected items to items_used
@@ -124,7 +128,7 @@ end
 Handle anchor items by adjusting the bank and relevant parms based on the
 specified anchor number.
 """
-function handle_anchor_items(parms::Parameters, old_par::Parameters)
+function handle_anchor_items(parms::Parameters, old_par::Parameters)::Parameters
     if parms.anchor_tests > 0
         parms.anchor_tests = parms.anchor_tests % old_par.anchor_tests + 1
         bank = parms.bank[parms.bank.ANCHOR .== 0, :]
@@ -133,10 +137,12 @@ function handle_anchor_items(parms::Parameters, old_par::Parameters)
 
         if parms.method == "TCC"
             parms.p = old_par.p[parms.bank.INDEX, :]
-        else parms.method in ["TIC", "TIC2", "TIC3"]
+        else
+            parms.method in ["TIC", "TIC2", "TIC3"]
             parms.info = old_par.info[parms.bank.INDEX, :]
         end
     end
+    return parms
 end
 
 # Main function to run the optimization process
@@ -146,7 +152,7 @@ end
 Main entry point for assembling tests. Loads configurations, runs the solver,
 and processes the results, then generates and saves a report.
 """
-function assemble_tests(config_file::String = "data/config.toml")
+function assemble_tests(config_file::String="data/config.toml")::DataFrame
     config, old_par = configure_system(config_file)
     # validate_parameters(old_par)
 
@@ -186,7 +192,7 @@ function assemble_tests(config_file::String = "data/config.toml")
             parms.f -= 1
         end
     end
-    
+
     # Display and save the final report
     final_report(old_par, results_df, config)
 

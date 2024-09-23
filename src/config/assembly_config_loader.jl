@@ -44,7 +44,7 @@ function load_assembly_config(config_data::Dict{Symbol, Any})::AssemblyConfig
     form_size = get(assembly_dict, :N, 0)
     num_forms = get(assembly_dict, :NUMFORMS, 1)
     f = num_forms  # Assuming the fixed number of forms is the same as num_forms
-    max_item_use = get(assembly_dict, :MAXITEMUSE, 1)  # Default to 1 if not provided
+    max_item_use = get(assembly_dict, :MAXITEMUSE, num_forms)  # Default to forms if not provided
     shadow_test = get(assembly_dict, :SHADOWTEST, 1)   # Default to 1 if not provided
     anchor_tests = get(assembly_dict, :ANCHORTESTS, 0) # Default to 0 if not provided
 

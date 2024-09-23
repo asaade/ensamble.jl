@@ -81,7 +81,7 @@ end
 # Helper function to calculate the probability matrix p
 function calculate_probabilities(theta::Vector{Float64}, a, b, c,
                                  D::Float64)::Matrix{Float64}
-    p = [StatsFunctions.Probability(t, b, a, c; d = D) for t in theta]
+    p = [StatsFunctions.Probability(t, b, a, c; d=D) for t in theta]
     p_matrix = reduce(hcat, p)
     return Matrix{Float64}(p_matrix)
 end
@@ -90,7 +90,7 @@ end
 function calculate_information(theta::Vector{Float64}, a::Vector{Float64},
                                b::Vector{Float64}, c::Vector{Float64},
                                D::Float64)::Matrix{Float64}
-    info = [StatsFunctions.Information(t, b, a, c; d = D) for t in theta]
+    info = [StatsFunctions.Information(t, b, a, c; d=D) for t in theta]
     info_matrix = reduce(hcat, info)
     return Matrix{Float64}(info_matrix)
 end

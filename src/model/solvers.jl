@@ -11,7 +11,7 @@ function load_solver_config(toml_file::String)
     return config
 end
 
-function configure_solver!(model::Model, parms::Parameters, solver_name::String = "cplex")
+function configure_solver!(model::Model, parms::Parameters, solver_name::String="cplex")
     parms.verbose > 1 && @info "Configuring $solver_name solver."
     config = load_solver_config("data/solver_config.toml")
     solver_options = config[lowercase(solver_name)]
