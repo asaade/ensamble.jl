@@ -7,13 +7,15 @@ using .Ensamble.Configuration
 # Print functions
 function print_title_and_separator(title::String)
     println("\n" * title)
-    return println(repeat("=", length(title)))
+    println(repeat("=", length(title)))
+    return nothing
 end
 
 function print_optimization_results(model::Model, parms::Parameters)
     parms.verbose > 1 && println(solution_summary(model))
-    println(TOLERANCE_LABEL, round(objective_value(model); digits = 4))
-    return println(SEPARATOR)
+    println(TOLERANCE_LABEL, round(objective_value(model); digits=4))
+    println(SEPARATOR)
+    return nothing
 end
 
 """
@@ -23,7 +25,8 @@ Display the results of the optimization, including the tolerance and objective v
 """
 function display_results(model::Model, parms::Parameters)
     print_title_and_separator(OPTIMIZATION_RESULTS_TITLE)
-    return print_optimization_results(model, parms)
+    print_optimization_results(model, parms)
+    return nothing
 end
 
 """
@@ -44,18 +47,19 @@ function display_item_distribution(results::DataFrame, bank::DataFrame)
         total_items = length(selected_items)
         anchor_items = sum(in(selected_items).(bank[bank.ANCHOR .> 0, :ID]))
         non_anchor_items = total_items - anchor_items
-        
+
         # Append row
         push!(table_data, [i, total_items, anchor_items, non_anchor_items])
     end
 
     # Convert to a matrix and display the table using PrettyTables.jl
     table_matrix = hcat(table_data...)
-    
-    # Display the table with title
-    pretty_table(table_matrix'; header = header, title = "Item Distribution", alignment = :r)
-end
 
+    # Display the table with title
+    pretty_table(table_matrix'; header=header, title="Item Distribution",
+                 alignment=:r)
+    return nothing
+end
 
 """
     display_column_sums(results::DataFrame, bank::DataFrame, column_names)
@@ -85,7 +89,8 @@ function display_column_sums(results::DataFrame, bank::DataFrame, column_names)
 
     # Iterate over each column name and gather the sums for each form
     for col in column_names
-        column_sums = [sum(bank[findall(in(skipmissing(results[:, i])), item_ids), col]) for i in 1:num_forms]
+        column_sums = [sum(bank[findall(in(skipmissing(results[:, i])), item_ids), col])
+                       for i in 1:num_forms]
         push!(table_data, column_sums)  # Add each column of sums to the table_data
     end
 
@@ -96,9 +101,11 @@ function display_column_sums(results::DataFrame, bank::DataFrame, column_names)
     header = ["Form ID"; column_names...]  # Prepare the header row
 
     # Print the table using PrettyTables.jl
-    pretty_table(table_matrix; header = header, title = "Sum of values at columns", alignment = :r)
+    pretty_table(table_matrix; header=header,
+                 title="Sum of values in columns $column_names",
+                 alignment=:r)
+    return nothing
 end
-
 
 """
     display_category_counts(results::DataFrame, bank::DataFrame, column_name::Union{String, Symbol}; max_categories::Int=10)
@@ -107,7 +114,9 @@ Displays a table with counts of items in the specified column grouped by their v
 If the total number of categories exceeds `max_categories` (default 10), rows with only zeros will be removed.
 Handles cases where the column contains `missing` values.
 """
-function display_category_counts(results::DataFrame, bank::DataFrame, column_name::Union{String, Symbol}; max_categories::Int=10)
+function display_category_counts(results::DataFrame, bank::DataFrame,
+                                 column_name::Union{String, Symbol};
+                                 max_categories::Int=10)
     num_forms = size(results, 2)  # Number of forms (columns in the results)
 
     # Ensure the column exists in the bank DataFrame
@@ -117,7 +126,7 @@ function display_category_counts(results::DataFrame, bank::DataFrame, column_nam
 
     # Extract the unique categories from the specified column, excluding missing values
     categories = sort(unique(collect(skipmissing(bank[!, Symbol(column_name)]))))
-    
+
     # Filter rows where the selected column is not missing
     non_missing_bank = filter(row -> !ismissing(row[Symbol(column_name)]), bank)
 
@@ -133,10 +142,11 @@ function display_category_counts(results::DataFrame, bank::DataFrame, column_nam
         for i in 1:num_forms
             selected_items = collect(skipmissing(results[:, i]))  # Get non-missing items for this form
             # Count how many items in the form belong to the current category
-            count = sum(non_missing_bank[in(selected_items).(non_missing_bank.ID), Symbol(column_name)] .== category)
+            count = sum(non_missing_bank[in(selected_items).(non_missing_bank.ID),
+                                         Symbol(column_name)] .== category)
             push!(category_counts, count)
         end
-        
+
         # Only append the row if it contains non-zero counts or if the total categories are <= max_categories
         if sum(category_counts) > 0 || length(categories) <= max_categories
             push!(table_data, [category; category_counts...])  # Don't convert category to string here
@@ -147,9 +157,10 @@ function display_category_counts(results::DataFrame, bank::DataFrame, column_nam
     table_matrix = reduce(hcat, table_data)
 
     # Display the table using PrettyTables.jl
-    pretty_table(table_matrix'; header = header, title = "Items by Category in $column_name", alignment = :r)
+    pretty_table(table_matrix'; header=header,
+                 title="Items by Category in $column_name", alignment=:r)
+    return nothing
 end
-
 
 """
     calculate_common_items(results::DataFrame)
@@ -173,12 +184,12 @@ end
 """
     display_common_items(results::DataFrame)
 
-Displays the matrix of common items between forms.
+Display the matrix of common items between forms.
 """
 function display_common_items(results::DataFrame)
     common_items_matrix = calculate_common_items(results)  # Assume this returns the matrix
     num_forms = size(results, 2)
-    
+
     # Prepare the header (Form IDs)
     header = [""; collect(1:num_forms)...]  # First column for row names, followed by form IDs
 
@@ -186,13 +197,13 @@ function display_common_items(results::DataFrame)
     table_matrix = hcat(collect(1:num_forms), common_items_matrix)  # Add row numbers (Form IDs) to the matrix
 
     # Display the table with title
-    pretty_table(table_matrix; header = header, title = "Items shared by Forms", alignment = :r)
+    pretty_table(table_matrix; header=header, title="Items shared by Forms",
+                 alignment=:r)
 
     return common_items_matrix
 end
 
-
-function display_final_results(parms::Parameters, results::DataFrame)
+function display_final_results(parms::Parameters, config::Config, results::DataFrame)
     bank = parms.bank
     items = bank.ID
     anchor_items = bank[bank.ANCHOR .> 0, :ID]
@@ -213,14 +224,20 @@ function display_final_results(parms::Parameters, results::DataFrame)
     display_item_distribution(results, bank)
 
     # Display item distribution by area across forms
-    display_category_counts(results, bank, "AREA")
+    if !isempty(config.report_categories)
+        for category in config.report_categories
+            display_category_counts(results, bank, category)
+        end
+    end
 
-    display_column_sums(results, bank, ["WORDS", "IMAGES"])
+    if !isempty(config.report_sums)
+        display_column_sums(results, bank, config.report_sums)
+    end
 
-    display_category_counts(results, bank, "FRIENDS")
-    
     # Display common items matrix
-    return display_common_items(results)
+    display_common_items(results)
+
+    return nothing
 end
 
 """
@@ -246,15 +263,16 @@ function save_forms(parms::Parameters, results::DataFrame, config)
     println("========================")
     println("Forms saved to: ", config.forms_file)
     println("Results saved to: ", config.results_file)
+    return nothing
 end
 
 function final_report(original_parms::Parameters, results::DataFrame, config::Config)
     # Display common items matrix and summary
-    display_final_results(original_parms, results)
-
+    display_final_results(original_parms, config, results)
+    # Save the forms and results
+    save_forms(original_parms, results, config)
     # Generate plots (this would remain unchanged from your original script)
     plot_results(original_parms, config, results)
 
-    # Save the forms and results
-    return save_forms(original_parms, results, config)
+    return nothing
 end

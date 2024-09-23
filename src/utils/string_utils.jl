@@ -1,6 +1,6 @@
 module StringUtils
 
-export upSymbol, upcase, upcaseKeys, safe_read_csv, safe_read_yaml, safe_read_toml
+export upSymbol, upcase, upcaseKeys, cleanValues, safe_read_csv, safe_read_yaml, safe_read_toml
 
 using CSV: CSV
 using YAML: YAML
@@ -24,7 +24,7 @@ is not convertible to a string, returns the input untouched.
 """
 function upSymbol(y)::Symbol
     try
-        return Symbol(uppercase(string(y)))
+        return Symbol(uppercase(strip(string(y))))
     catch
         return y
     end
@@ -48,6 +48,28 @@ function upcaseKeys(d::Dict{<:Union{String, Symbol}, Any})::Dict{Symbol, Any}
     return Dict(upSymbol(k) => isa(v, Dict) ? upcaseKeys(v) : v
                 for (k, v) in d)
 end
+
+
+"""
+    cleanValues(d::Dict{<:Union{String, Symbol}, Any}) -> Dict{Symbol, Any}
+
+Recursively strips all string values in a dictionary, and ensures the output dictionary is of type `Dict{Symbol, Any}`.
+
+# Arguments
+
+  - `d`: A dictionary with keys that are either `String` or `Symbol`.
+
+# Returns
+
+  - A standardized dictionary where all keys are symbols and converted to uppercase.
+"""
+function cleanValues(d::Dict{<:Union{String, Symbol}, Any})::Dict{Symbol, Any}
+    return Dict(k => isa(v, Dict) ? cleanValues(v) : isa(v, String) ? strip(v) : v
+                for (k, v) in d)
+end
+
+
+
 
 """
     upcase(x::Any) -> Any
@@ -86,7 +108,7 @@ Safely reads a CSV file and returns a DataFrame. Logs an error if the file canno
 """
 function safe_read_csv(file_path::String)::DataFrames.DataFrame
     try
-        return CSV.read(file_path, DataFrames.DataFrame; stripwhitespace = true)
+        return CSV.read(file_path, DataFrames.DataFrame; stripwhitespace=true)
     catch e
         @error "Error reading CSV file: $file_path. Error: $e"
         return DataFrames.DataFrame()
@@ -108,7 +130,7 @@ Safely reads a YAML file and returns a dictionary with upcased symbol keys.
 """
 function safe_read_yaml(file_path::String)::Dict{Symbol, Any}
     try
-        yaml_dict = YAML.load_file(file_path; dicttype = Dict{Union{String, Symbol}, Any})
+        yaml_dict = YAML.load_file(file_path; dicttype=Dict{Union{String, Symbol}, Any})
         return yaml_dict
     catch e
         @error "Error reading YAML file: $file_path. Error: $e"
