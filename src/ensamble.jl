@@ -121,29 +121,48 @@ function process_and_store_results!(model::Model, parms::Parameters,
     return results_df
 end
 
-# Handle anchor items for test assembly
 """
-    handle_anchor_items(parms::Parameters, old_par::Parameters)
+    handle_anchor_items(parms::Parameters, orig_parms::Parameters)::Parameters
 
-Handle anchor items by adjusting the bank and relevant parms based on the
-specified anchor number.
+Cycles through anchor tests, updates the bank by removing the old anchor items and adding the new anchor items, 
+and updates the relevant parameters (`p` or `info`) depending on the method in use.
 """
-function handle_anchor_items(parms::Parameters, old_par::Parameters)::Parameters
+function handle_anchor_items(parms::Parameters, orig_parms::Parameters)::Parameters
+    # Ensure anchor tests are available and cycle through them
     if parms.anchor_tests > 0
-        parms.anchor_tests = parms.anchor_tests % old_par.anchor_tests + 1
-        bank = parms.bank[parms.bank.ANCHOR .== 0, :]
-        anchors = old_par.bank[old_par.bank.ANCHOR .== parms.anchor_tests, :]
-        parms.bank = vcat(bank, anchors)
+        # Cycle to the next anchor test
+        total_anchors = orig_parms.anchor_tests
+        if total_anchors == 0
+            error("No anchor tests available to cycle through.")
+        end
+        
+        parms.anchor_tests = (parms.anchor_tests % total_anchors) + 1
 
+        # Remove old anchor items and add the new anchor test items
+        bank_without_anchors = filter(row -> row.ANCHOR == 0, parms.bank)
+        new_anchors = filter(row -> row.ANCHOR == parms.anchor_tests, orig_parms.bank)
+        parms.bank = vcat(bank_without_anchors, new_anchors)
+
+        # Update parameters based on the method
         if parms.method == "TCC"
-            parms.p = old_par.p[parms.bank.INDEX, :]
+            if "INDEX" in names(parms.bank)
+                parms.p = orig_parms.p[parms.bank.INDEX, :]
+            else
+                error("INDEX column missing in the bank for TCC method.")
+            end
+        elseif parms.method in ["TIC", "TIC2", "TIC3"]
+            if "INDEX" in names(parms.bank)
+                parms.info = orig_parms.info[parms.bank.INDEX, :]
+            else
+                error("INDEX column missing in the bank for TIC method.")
+            end
         else
-            parms.method in ["TIC", "TIC2", "TIC3"]
-            parms.info = old_par.info[parms.bank.INDEX, :]
+            error("Unsupported method: $(parms.method)")
         end
     end
     return parms
 end
+
 
 # Main function to run the optimization process
 """
@@ -176,7 +195,7 @@ function assemble_tests(config_file::String="data/config.toml")::DataFrame
         initialize_model!(model, parms, constraints)
 
         if run_optimization(model)
-            results_df = process_and_store_results!(model, parms, results_df)
+            results_df = process_and_store_results!(model, parms, results_df) 
             display_results(model, parms)
             assembled_forms += parms.num_forms
             parms.f -= parms.num_forms

@@ -2,7 +2,7 @@
 
 julia_version = "1.10.4"
 manifest_format = "2.0"
-project_hash = "2f3ce3a3c76cbdae4f281853fa076da558f14b6e"
+project_hash = "85126521a36748ddfccec94563dff6e1bcedffce"
 
 [[deps.ASL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -355,6 +355,12 @@ deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "1c6317308b9dc757616f0b5cb379db10494443a7"
 uuid = "2e619515-83b5-522b-bb60-26c02a35a201"
 version = "2.6.2+0"
+
+[[deps.ExportAll]]
+deps = ["Test"]
+git-tree-sha1 = "8b16199c80d7a0bd7ac1d05d52b51e3e0a9f8c0f"
+uuid = "ad2082ca-a69e-11e9-38fa-e96309a31fe4"
+version = "0.1.2"
 
 [[deps.FFMPEG]]
 deps = ["FFMPEG_jll"]

@@ -2,8 +2,7 @@ using CSV
 using DataFrames
 using JuMP
 using StatsBase
-
-# include("utils.jl")
+using .Ensamble.Configuration.StringUtils
 
 # Module constants
 const APPLYING_CONSTRAINT_MESSAGE = "Applying constraint: "
@@ -17,6 +16,8 @@ Read constraints from a CSV file, returning a dictionary of Constraint objects.
 """
 function read_constraints(file_path::String, parms::Parameters)
     df = CSV.read(file_path, DataFrame; missingstring=nothing)
+    uppercase_dataframe!(df)
+    
     constraints = Dict{String, Constraint}()
 
     for row in eachrow(df)

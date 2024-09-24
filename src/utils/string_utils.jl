@@ -1,6 +1,6 @@
 module StringUtils
 
-export upSymbol, upcase, upcaseKeys, cleanValues, safe_read_csv, safe_read_yaml, safe_read_toml
+export upSymbol, upcase, upcaseKeys, cleanValues, uppercase_dataframe!, safe_read_csv, safe_read_yaml, safe_read_toml
 
 using CSV: CSV
 using YAML: YAML
@@ -69,7 +69,24 @@ function cleanValues(d::Dict{<:Union{String, Symbol}, Any})::Dict{Symbol, Any}
 end
 
 
+"""
+    uppercase_dataframe!(df::DataFrames.DataFrame)
 
+Convert all strings in the DataFrame to uppercase, in place.
+This operates on each column that is of type `String` or `AbstractString`.
+"""
+function uppercase_dataframe!(df::DataFrames.DataFrame)
+    for col in eachcol(df)
+        if eltype(col) <: AbstractString  # Only process string columns
+            for i in 1:length(col)
+                if !ismissing(col[i])  # Handle missing values
+                    col[i] = uppercase(col[i])
+                end
+            end
+        end
+    end
+    return df
+end
 
 """
     upcase(x::Any) -> Any
