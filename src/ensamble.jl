@@ -5,6 +5,7 @@ export assemble_tests
 using JuMP
 using DataFrames
 using Logging, LoggingExtras
+using PrettyTables
 
 include("constants.jl")
 
@@ -37,7 +38,7 @@ end
 Run the optimization solver and check if the model is solved and feasible.
 """
 function run_optimization(model::Model)::Bool
-    println(RUNNING_OPTIMIZATION_MESSAGE)
+    @info RUNNING_OPTIMIZATION_MESSAGE
     optimize!(model)
     return is_solved_and_feasible(model)
 end
@@ -124,7 +125,7 @@ end
 """
     handle_anchor_items(parms::Parameters, orig_parms::Parameters)::Parameters
 
-Cycles through anchor tests, updates the bank by removing the old anchor items and adding the new anchor items, 
+Cycles through anchor tests, updates the bank by removing the old anchor items and adding the new anchor items,
 and updates the relevant parameters (`p` or `info`) depending on the method in use.
 """
 function handle_anchor_items(parms::Parameters, orig_parms::Parameters)::Parameters
@@ -135,7 +136,7 @@ function handle_anchor_items(parms::Parameters, orig_parms::Parameters)::Paramet
         if total_anchors == 0
             error("No anchor tests available to cycle through.")
         end
-        
+
         parms.anchor_tests = (parms.anchor_tests % total_anchors) + 1
 
         # Remove old anchor items and add the new anchor test items
@@ -184,6 +185,7 @@ function assemble_tests(config_file::String="data/config.toml")::DataFrame
     end
 
     assembled_forms = 0
+    tolerances::Vector{Float64} = []
 
     while parms.f > 0
         parms.num_forms = min(parms.num_forms, parms.f)
@@ -195,7 +197,8 @@ function assemble_tests(config_file::String="data/config.toml")::DataFrame
         initialize_model!(model, parms, constraints)
 
         if run_optimization(model)
-            results_df = process_and_store_results!(model, parms, results_df) 
+            results_df = process_and_store_results!(model, parms, results_df)
+            tolerances = vcat(tolerances, round(objective_value(model); digits=4))
             display_results(model, parms)
             assembled_forms += parms.num_forms
             parms.f -= parms.num_forms
@@ -213,7 +216,12 @@ function assemble_tests(config_file::String="data/config.toml")::DataFrame
     end
 
     # Display and save the final report
-    final_report(old_par, results_df, config)
+    results_tables = final_report(old_par, results_df, config, tolerances)
+
+    # Iterate through the dictionary and print each table
+    for (key, table) in results_tables
+        println("\n$key\n$table")
+    end
 
     return results_df
 end

@@ -162,7 +162,7 @@ and constraints based on the provided parameters.
 function initialize_model!(model::Model,
                            parms::Parameters,
                            constraints::Dict{String, Constraint})
-    println(INITIALIZING_MODEL_MESSAGE)
+    @info INITIALIZING_MODEL_MESSAGE
     num_items = size(parms.bank, 1)
     num_forms = parms.num_forms + (parms.shadow_test > 0 ? 1 : 0)
 
@@ -266,7 +266,7 @@ function apply_constraints!(model::Model, parms::Parameters,
                             constraints::Dict{String, Constraint})
     # Apply all constraints
     for (constraint_id, constraint) in constraints
-        parms.verbose > 1 && println(APPLYING_CONSTRAINT_MESSAGE, constraint_id)
+        @debug string(APPLYING_CONSTRAINT_MESSAGE, " ", constraint_id)
         apply_individual_constraint!(model, parms, constraint)
     end
     return model
