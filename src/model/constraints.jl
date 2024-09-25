@@ -13,7 +13,7 @@ end
 """
     constraint_items_per_form(model::Model, parms::Parameters, minItems::Int, maxItems::Int=minItems)
 
-Sets a constraint on the number of items in each form (test). The number of items must be between `minItems` 
+Sets a constraint on the number of items in each form (test). The number of items must be between `minItems`
 and `maxItems` for each form.
 """
 function constraint_items_per_form(model::Model, parms::Parameters, minItems::Int, maxItems::Int=minItems)
@@ -96,7 +96,7 @@ end
 """
     constraint_friends_in_form(model::Model, parms::Parameters, selected)
 
-Adds constraints that force friend items (items that should always be together) to be assigned 
+Adds constraints that force friend items (items that should always be together) to be assigned
 to the same test form.
 """
 function constraint_friends_in_form(model::Model, parms::Parameters, selected)
@@ -139,7 +139,7 @@ end
 """
     constraint_exclude_items(model::Model, parms::Parameters, selected::BitVector)
 
-Ensures that the selected items do not appear in any test form. 
+Ensures that the selected items do not appear in any test form.
 Throws an error if any of the selected items are part of the anchor test items.
 """
 function constraint_exclude_items(model::Model, parms::Parameters, selected::BitVector)
@@ -160,7 +160,7 @@ function constraint_exclude_items(model::Model, parms::Parameters, selected::Bit
 
     # Apply the constraint to prevent these items from appearing in any form
     @constraint(model, [i in selected_items], sum(x[i, f] for f in 1:forms) == 0)
-    
+
     return model
 end
 
@@ -170,10 +170,10 @@ end
 
 Forces the inclusion of the selected items in all test forms.
 """
-function constraint_include_items(model::Model, parms::Parameters, selected::BitVector)
+function constraint_include_items(model::Model, selected::BitVector)
     x = model[:x]
     forms = size(x, 2)  # Number of forms (columns in x)
-    
+
     # Collect the indices of the selected items
     selected_items = collect(1:size(x, 1))[selected]
 
@@ -220,7 +220,7 @@ Constrains the maximum number of times an item can appear in the test forms, exc
 function constraint_max_use(model::Model, parms::Parameters, selected::BitVector, max_use::Int)
     x = model[:x]
     forms = get_num_forms(x, parms.shadow_test)  # Number of operational forms
-    
+
     # Proceed only if max_use is less than the number of forms
     if max_use < forms
         # Collect the indices of the selected items, excluding anchor items
@@ -238,7 +238,7 @@ end
 """
     constraint_forms_overlap(model::Model, parms::Parameters, minItems::Int, maxItems::Int=minItems)
 
-Constrains the number of overlapping items between test forms. The overlap between two forms must be 
+Constrains the number of overlapping items between test forms. The overlap between two forms must be
 between `minItems` and `maxItems`.
 """
 function constraint_forms_overlap(model::Model, parms::Parameters, minItems::Int, maxItems::Int=minItems)
@@ -270,9 +270,11 @@ end
 """
     objective_match_characteristic_curve!(model::Model, parms::Parameters)
 
-Matches the characteristic curve by constraining the sum of the item parameters raised to a power `r` for each form 
+Matches the characteristic curve by constraining the sum of the item parameters raised to a power `r` for each form
 and point `k`. Applies stricter weight adjustments for shadow tests, if present.
 """
+
+
 function objective_match_characteristic_curve!(model::Model, parms::Parameters)
     R, K = 1:(parms.r), 1:(parms.k)
     P, tau = parms.p, parms.tau
@@ -315,7 +317,7 @@ end
 """
     objective_match_information_curve!(model::Model, parms::Parameters)
 
-Constrains the information curve, ensuring that the sum of `info[i, k] * x[i, f]` stays within bounds 
+Constrains the information curve, ensuring that the sum of `info[i, k] * x[i, f]` stays within bounds
 (`tau_info[k] ± y`) for operational forms and shadow tests.
 """
 function objective_match_information_curve!(model::Model, parms::Parameters)
@@ -356,7 +358,7 @@ end
 """
     objective_max_info(model::Model, parms::Parameters)
 
-Maximizes information at each point `k`, ensuring that the sum of `info[i, k] * x[i, f]` meets or exceeds the 
+Maximizes information at each point `k`, ensuring that the sum of `info[i, k] * x[i, f]` meets or exceeds the
 weighted target `R[k] * y` for both operational forms and shadow tests.
 """
 function objective_max_info(model::Model, parms::Parameters)
@@ -388,7 +390,7 @@ end
 """
     objective_info_relative2(model::Model, parms::Parameters)
 
-Maximizes information at alternating points `k` across forms, ensuring that each form meets or exceeds the weighted 
+Maximizes information at alternating points `k` across forms, ensuring that each form meets or exceeds the weighted
 target `R[k] * y` at its corresponding point.
 """
 function objective_info_relative2(model::Model, parms::Parameters)
@@ -397,7 +399,7 @@ function objective_info_relative2(model::Model, parms::Parameters)
     info = parms.info
     x, y = model[:x], model[:y]
     items, forms = size(x)
-    
+
     k = 0
     for f in 1:forms
         # Alternate k for each form
