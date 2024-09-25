@@ -196,5 +196,3 @@ Thanks to all contributors and users of Ensamble.jl for supporting this project.
 - [JuMP: Modeling Language for Mathematical Optimization](https://jump.dev/)
 
 ---
-
-This final version eliminates redundancies, includes information on Julia, JuMP, and IRT models, and acknowledges the foundational methodology from Wim van der Linden's work.
