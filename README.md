@@ -50,6 +50,7 @@ Several other tools exist for automatic test assembly, particularly in R, such a
 - [TestDesign](https://cran.r-project.org/web/packages/TestDesign/index.html)
 - [eatATA](https://cran.r-project.org/web/packages/eatATA/index.html)
 - [catR](https://cran.r-project.org/web/packages/catR/index.html)
+- [ATA.jl (Julia)](https://giadasp.github.io/ATA.jl/docs/)
 
 These tools offer similar features, but Ensamble.jl stands out by providing faster performance through Julia and more flexibility using JuMP for optimization.
 
@@ -146,7 +147,7 @@ Ensure your item bank contains IRT parameters (e.g., difficulty, discrimination,
 
 ### 2. Define Test Constraints
 
-Configure your test constraints in the `config.toml` file, including:
+Configure your test constraints in the `config.toml` and `contraints.csv` files, including:
 - Number of forms
 - Test length (min/max)
 - Content areas (e.g., math, reading)
