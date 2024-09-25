@@ -228,7 +228,7 @@ function constraint_max_use(model::Model, parms::Parameters, selected::BitVector
         non_anchor_items = filter(i -> parms.bank.ANCHOR[i] == 0, selected_items)
 
         # Apply the constraint to limit the maximum usage of non-anchor items across forms
-        @constraint(model, max_use[i in non_anchor_items], sum(x[i, f] for f in 1:forms) + parms.bank.ITEM_USE[i] <= max_use)
+        @constraint(model, max_use[i in forms], sum(x[i, f] for f in 1:forms) + parms.bank.ITEM_USE[i] <= max_use)
     end
 
     return model
