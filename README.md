@@ -111,7 +111,7 @@ These tools offer similar features, but Ensamble.jl stands out by providing fast
 
 Ensamble.jl integrates three main components:
 
-1. **Item Response Theory (IRT)**: Models item parameters to predict how well items perform across ability levels.
+1. **Item Response Theory (IRT)**: Models item parameters to predict how the items perform across ability levels.
 2. **Mixed Integer Programming (MIP)**: Optimizes item selection to meet test constraints like content balance, test length, item overlap, anchor usage, and statistical properties.
 3. **Solvers**: Ensamble.jl supports several solvers to perform MIP optimization, offering flexibility based on available resources.
 
@@ -122,10 +122,11 @@ Ensamble.jl integrates three main components:
 Ensamble.jl supports multiple solvers, giving users flexibility in choosing the best tool for their needs:
 
 1. **[IBM CPLEX](https://www.ibm.com/analytics/cplex-optimizer)**: A powerful commercial solver for large-scale, complex problems.
-2. **[CBC (Coin-OR)](https://coin-or.github.io/Cbc/)**: A widely-used open-source solver for smaller applications.
-3. **[SCIP](https://scipopt.org/)**: An open-source solver suited for constraint programming.
-4. **[GLPK](https://www.gnu.org/software/glpk/)**: Free and open-source, though less efficient for large problems.
-5. **[HiGHS](https://highs.dev/)**: An open-source solver optimized for high-performance MIP and LP problems.
+2. **[Gurobi](https://www.gurobi.com/)**: Another well-known leader in the commercial solvers arena.
+3. **[HiGHS](https://highs.dev/)**: An open-source solver optimized for high-performance MIP and LP problems.
+4. **[CBC (Coin-OR)](https://coin-or.github.io/Cbc/)**: A widely-used open-source solver for smaller applications.
+5. **[SCIP](https://scipopt.org/)**: An open-source solver suited for constraint programming.
+6. **[GLPK](https://www.gnu.org/software/glpk/)**: Free and open-source, though less efficient for large problems.
 
 ---
 
