@@ -12,8 +12,6 @@ using Measures  # For margin handling
 using ..Configuration
 using ..Utils
 
-
-
 # Function to extract a, b, c parameters from the bank based on selected items
 function fetch_irt_parms(bank::DataFrame, selected_items::Vector{String})
     selected_items_idx = bank.ID .∈ Ref(skipmissing(selected_items))

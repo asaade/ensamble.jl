@@ -1,6 +1,7 @@
 module StringUtils
 
-export upSymbol, upcase, upcaseKeys, cleanValues, uppercase_dataframe!, safe_read_csv, safe_read_yaml, safe_read_toml
+export upSymbol, upcase, upcaseKeys, cleanValues, uppercase_dataframe!, safe_read_csv,
+       safe_read_yaml, safe_read_toml
 
 using CSV: CSV
 using YAML: YAML
@@ -49,7 +50,6 @@ function upcaseKeys(d::Dict{<:Union{String, Symbol}, Any})::Dict{Symbol, Any}
                 for (k, v) in d)
 end
 
-
 """
     cleanValues(d::Dict{<:Union{String, Symbol}, Any}) -> Dict{Symbol, Any}
 
@@ -67,7 +67,6 @@ function cleanValues(d::Dict{<:Union{String, Symbol}, Any})::Dict{Symbol, Any}
     return Dict(k => isa(v, Dict) ? cleanValues(v) : isa(v, String) ? strip(v) : v
                 for (k, v) in d)
 end
-
 
 """
     uppercase_dataframe!(df::DataFrames.DataFrame)

@@ -75,7 +75,6 @@ mutable struct Parameters
     verbose::Int                    # verbosity from BasicConfig
 end
 
-
 """
     transform_config_to_flat(basic_config::BasicConfig)::Config
 
@@ -93,8 +92,7 @@ function transform_config_to_flat(basic_config::BasicConfig)::Config
                   basic_config.solver,
                   basic_config.verbose,
                   basic_config.report_categories,
-                  basic_config.report_sums
-    )
+                  basic_config.report_sums)
 end
 
 """

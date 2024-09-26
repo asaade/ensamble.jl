@@ -18,8 +18,10 @@ end
 Sets a constraint on the number of items in each form (test). The number of items must be between `minItems`
 and `maxItems` for each form.
 """
-function constraint_items_per_form(model::Model, parms::Parameters, minItems::Int, maxItems::Int=minItems)
-    return constraint_item_count(model::Model, parms::Parameters, trues(size(parms.bank, 1)), minItems::Int, maxItems::Int)
+function constraint_items_per_form(model::Model, parms::Parameters, minItems::Int,
+                                   maxItems::Int=minItems)
+    return constraint_item_count(model::Model, parms::Parameters,
+                                 trues(size(parms.bank, 1)), minItems::Int, maxItems::Int)
 end
 
 """
@@ -28,7 +30,8 @@ end
 Combines the item count constraints for both operational forms and the shadow test (if applicable).
 Ensures that the number of selected items is within the specified range.
 """
-function constraint_item_count(model::Model, parms::Parameters, selected::BitVector, minItems::Int, maxItems::Int=minItems)
+function constraint_item_count(model::Model, parms::Parameters, selected::BitVector,
+                               minItems::Int, maxItems::Int=minItems)
     @assert(minItems <= maxItems, "Error in item_count: maxItems < minItems")
 
     x = model[:x]
@@ -42,13 +45,16 @@ function constraint_item_count(model::Model, parms::Parameters, selected::BitVec
     # Apply constraints for shadow test if applicable
     if parms.shadow_test > 0
         shadow_test_col = size(x, 2)  # Last column is shadow test
-        @constraint(model, sum(x[i, shadow_test_col] for i in items) >= minItems * parms.shadow_test)
-        @constraint(model, sum(x[i, shadow_test_col] for i in items) <= maxItems * parms.shadow_test)
+        @constraint(model,
+                    sum(x[i, shadow_test_col] for i in items) >=
+                    minItems * parms.shadow_test)
+        @constraint(model,
+                    sum(x[i, shadow_test_col] for i in items) <=
+                    maxItems * parms.shadow_test)
     end
 
     return model
 end
-
 
 """
     constraint_item_sum(model::Model, parms::Parameters, vals, minVal, maxVal=minVal)
@@ -68,19 +74,24 @@ function constraint_item_sum(model::Model, parms::Parameters, vals, minVal, maxV
     cond = size(vals, 2) == 1 ? trues(length(vals)) : vals[:, 1]
 
     # Apply sum constraints for operational forms
-    @constraint(model, [f = 1:forms], sum(x[i, f] * val[i] for i in 1:items if cond[i]) >= minVal)
-    @constraint(model, [f = 1:forms], sum(x[i, f] * val[i] for i in 1:items if cond[i]) <= maxVal)
+    @constraint(model, [f = 1:forms],
+                sum(x[i, f] * val[i] for i in 1:items if cond[i]) >= minVal)
+    @constraint(model, [f = 1:forms],
+                sum(x[i, f] * val[i] for i in 1:items if cond[i]) <= maxVal)
 
     # Apply sum constraints for shadow test if applicable
     if parms.shadow_test > 0
         zcol = size(x, 2)  # Last column for shadow test
-        @constraint(model, sum(x[i, zcol] * val[i] for i in 1:items if cond[i]) >= minVal * parms.shadow_test)
-        @constraint(model, sum(x[i, zcol] * val[i] for i in 1:items if cond[i]) <= maxVal * parms.shadow_test)
+        @constraint(model,
+                    sum(x[i, zcol] * val[i] for i in 1:items if cond[i]) >=
+                    minVal * parms.shadow_test)
+        @constraint(model,
+                    sum(x[i, zcol] * val[i] for i in 1:items if cond[i]) <=
+                    maxVal * parms.shadow_test)
     end
 
     return model
 end
-
 
 """
     group_items_by_selected(selected::Vector)
@@ -93,7 +104,6 @@ function group_items_by_selected(selected::Vector)
     dropmissing!(data, :selected)
     return groupby(data, :selected; sort=false, skipmissing=true)
 end
-
 
 """
     constraint_friends_in_form(model::Model, parms::Parameters, selected)
@@ -117,7 +127,6 @@ function constraint_friends_in_form(model::Model, parms::Parameters, selected)
     end
 end
 
-
 """
     constraint_enemies_in_form(model::Model, parms::Parameters, selected)
 
@@ -136,7 +145,6 @@ function constraint_enemies_in_form(model::Model, parms::Parameters, selected)
         @constraint(model, [f = 1:forms], sum(x[i, f] for i in items) <= 1)
     end
 end
-
 
 """
     constraint_exclude_items(model::Model, parms::Parameters, selected::BitVector)
@@ -166,7 +174,6 @@ function constraint_exclude_items(model::Model, parms::Parameters, selected::Bit
     return model
 end
 
-
 """
     constraint_include_items(model::Model, parms::Parameters, selected::BitVector)
 
@@ -187,8 +194,6 @@ function constraint_include_items(model::Model, selected::BitVector)
     end
     return model
 end
-
-
 
 """
     constraint_add_anchor!(model::Model, parms::Parameters)
@@ -213,13 +218,13 @@ function constraint_add_anchor!(model::Model, parms::Parameters)
     return model
 end
 
-
 """
     constraint_max_use(model::Model, parms::Parameters, selected::BitVector, max_use::Int)
 
 Constrains the maximum number of times an item can appear in the test forms, excluding anchor items.
 """
-function constraint_max_use(model::Model, parms::Parameters, selected::BitVector, max_use::Int)
+function constraint_max_use(model::Model, parms::Parameters, selected::BitVector,
+                            max_use::Int)
     x = model[:x]
     forms = get_num_forms(x, parms.shadow_test)  # Number of operational forms
 
@@ -230,12 +235,12 @@ function constraint_max_use(model::Model, parms::Parameters, selected::BitVector
         non_anchor_items = filter(i -> parms.bank.ANCHOR[i] == 0, selected_items)
 
         # Apply the constraint to limit the maximum usage of non-anchor items across forms
-        @constraint(model, max_use[i in forms], sum(x[i, f] for f in 1:forms) + parms.bank.ITEM_USE[i] <= max_use)
+        @constraint(model, max_use[i in forms],
+                    sum(x[i, f] for f in 1:forms) + parms.bank.ITEM_USE[i] <= max_use)
     end
 
     return model
 end
-
 
 """
     constraint_forms_overlap(model::Model, parms::Parameters, minItems::Int, maxItems::Int=minItems)
@@ -243,7 +248,8 @@ end
 Constrains the number of overlapping items between test forms. The overlap between two forms must be
 between `minItems` and `maxItems`.
 """
-function constraint_forms_overlap(model::Model, parms::Parameters, minItems::Int, maxItems::Int=minItems)
+function constraint_forms_overlap(model::Model, parms::Parameters, minItems::Int,
+                                  maxItems::Int=minItems)
     @assert(0 <= minItems <= maxItems, "Error in forms_overlap: maxItems < minItems")
     if parms.shadow_test < 1 && parms.anchor_tests == 0
         x = model[:x]
@@ -254,10 +260,13 @@ function constraint_forms_overlap(model::Model, parms::Parameters, minItems::Int
         items = items[(parms.bank.ANCHOR .!= parms.anchor_tests)]
 
         if minItems == maxItems
-            @constraint(model, [t1 = 1:(num_forms - 1), t2 = (t1 + 1):num_forms], sum(z[i, t1, t2] for i in items) == maxItems)
+            @constraint(model, [t1 = 1:(num_forms - 1), t2 = (t1 + 1):num_forms],
+                        sum(z[i, t1, t2] for i in items) == maxItems)
         else
-            @constraint(model, [t1 = 1:(num_forms - 1), t2 = (t1 + 1):num_forms], sum(z[i, t1, t2] for i in items) <= maxItems)
-            @constraint(model, [t1 = 1:(num_forms - 1), t2 = (t1 + 1):num_forms], sum(z[i, t1, t2] for i in items) >= minItems)
+            @constraint(model, [t1 = 1:(num_forms - 1), t2 = (t1 + 1):num_forms],
+                        sum(z[i, t1, t2] for i in items) <= maxItems)
+            @constraint(model, [t1 = 1:(num_forms - 1), t2 = (t1 + 1):num_forms],
+                        sum(z[i, t1, t2] for i in items) >= minItems)
         end
 
         @constraint(model, [i = items], 2 * z[i, t1, t2] <= x[i, t1] + x[i, t2])
@@ -275,7 +284,6 @@ end
 Matches the characteristic curve by constraining the sum of the item parameters raised to a power `r` for each form
 and point `k`. Applies stricter weight adjustments for shadow tests, if present.
 """
-
 
 function objective_match_characteristic_curve!(model::Model, parms::Parameters)
     R, K = 1:(parms.r), 1:(parms.k)
@@ -314,7 +322,6 @@ function objective_match_characteristic_curve!(model::Model, parms::Parameters)
 
     return model
 end
-
 
 """
     objective_match_information_curve!(model::Model, parms::Parameters)
@@ -356,7 +363,6 @@ function objective_match_information_curve!(model::Model, parms::Parameters)
     return model
 end
 
-
 """
     objective_max_info(model::Model, parms::Parameters)
 
@@ -387,7 +393,6 @@ function objective_max_info(model::Model, parms::Parameters)
 
     return model
 end
-
 
 """
     objective_info_relative2(model::Model, parms::Parameters)

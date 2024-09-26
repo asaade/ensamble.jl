@@ -16,7 +16,6 @@ using .CriteriaParser
 include("constraints.jl")
 include("solvers.jl")
 
-
 # Module constants
 const APPLYING_CONSTRAINT_MESSAGE = "Applying constraint: "
 const INITIALIZING_MODEL_MESSAGE = "Initializing optimization model..."
@@ -31,7 +30,8 @@ Find the closest valid label from the `valid_labels` list based on string simila
 (using Levenshtein distance).
 """
 function find_closest(input::String, valid_labels::Vector{String})::String
-    distances = [evaluate(Levenshtein(), lowercase(input), lowercase(label)) for label in valid_labels]
+    distances = [evaluate(Levenshtein(), lowercase(input), lowercase(label))
+                 for label in valid_labels]
     closest_label_index = argmin(distances)  # Find index of the closest match
     return valid_labels[closest_label_index]
 end
@@ -72,7 +72,8 @@ function validate_bounds!(lb, ub, cond_id::String)
     if isnothing(lb) || isnothing(ub)
         error("LB and UB are required for constraint '$cond_id'.")
     end
-    @assert(isa(lb, Number) && isa(ub, Number), "LB and UB must be valid numbers in '$cond_id'.")
+    @assert(isa(lb, Number) && isa(ub, Number),
+            "LB and UB must be valid numbers in '$cond_id'.")
     @assert(lb <= ub, "UB must be greater than or equal to LB in '$cond_id'.")
 end
 
@@ -161,8 +162,6 @@ function read_constraints(file_path::String, parms::Parameters)
 
     return constraints
 end
-
-
 
 """
     initialize_model!(model::Model, parms::Parameters, constraints::Dict{String, Constraint})
@@ -292,7 +291,8 @@ The failure or logging of these checks will not affect the other constraints.
 function run_conflict_checks!(parms::Parameters,
                               conflict_constraints::Dict{String, Constraint})
     try
-        friends_constraints = find_all_constraints_by_type(conflict_constraints, "ALLORNONE")
+        friends_constraints = find_all_constraints_by_type(conflict_constraints,
+                                                           "ALLORNONE")
         enemies_constraints = find_all_constraints_by_type(conflict_constraints, "ENEMIES")
         include_constraints = find_all_constraints_by_type(conflict_constraints, "INCLUDE")
         friends_constraints = vcat(friends_constraints, include_constraints)
@@ -321,7 +321,6 @@ function run_conflict_checks!(parms::Parameters,
 
             for enemies_constraint in enemies_constraints
                 enemies_values = enemies_constraint.condition(parms.bank)
-
 
                 # One-to-many conflict rule between anchor and enemies
                 conflict_df = apply_conflict_rule(anchor_values, enemies_values,

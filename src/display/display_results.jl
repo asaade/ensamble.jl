@@ -56,7 +56,7 @@ end
 Throws an error if the `results` DataFrame is empty.
 """
 function check_empty_results!(results::DataFrame)
-    isempty(results) && throw(ArgumentError("Results DataFrame is empty."))
+    return isempty(results) && throw(ArgumentError("Results DataFrame is empty."))
 end
 
 """
@@ -110,7 +110,6 @@ function collect_anchors(results::DataFrame, bank::DataFrame)::String
     return pretty_table(String, table_matrix; header=header, alignment=:r)
 end
 
-
 """
     collect_column_sums(results::DataFrame, bank::DataFrame, column_names) -> String
 
@@ -132,13 +131,14 @@ function collect_column_sums(results::DataFrame, bank::DataFrame, column_names):
     table_data = [form_ids]
 
     for col in column_names
-        column_sums = [sum(bank[findall(in(skipmissing(results[:, i])), item_ids), col]) for i in 1:num_forms]
+        column_sums = [sum(bank[findall(in(skipmissing(results[:, i])), item_ids), col])
+                       for i in 1:num_forms]
         push!(table_data, column_sums)
     end
 
-    return pretty_table(String, hcat(table_data...); header=["Form ID"; column_names...], alignment=:r)
+    return pretty_table(String, hcat(table_data...); header=["Form ID"; column_names...],
+                        alignment=:r)
 end
-
 
 """
     collect_category_counts(results::DataFrame, bank::DataFrame, column_name::Union{String, Symbol}; max_categories::Int=10) -> String
@@ -146,7 +146,9 @@ end
 Generates a table with counts of items in the specified column grouped by their value (category) for each form.
 If the number of categories exceeds `max_categories`, the table is transposed with forms as columns.
 """
-function collect_category_counts(results::DataFrame, bank::DataFrame, column_name::Union{String, Symbol}; max_categories::Int=10)::String
+function collect_category_counts(results::DataFrame, bank::DataFrame,
+                                 column_name::Union{String, Symbol};
+                                 max_categories::Int=10)::String
     check_empty_results!(results)
     check_column_exists!(String(column_name), bank)
 
@@ -158,7 +160,9 @@ function collect_category_counts(results::DataFrame, bank::DataFrame, column_nam
     table_data = []
     for i in 1:num_forms
         selected_items = skipmissing(results[:, i])
-        form_counts = [sum(non_missing_bank[in(selected_items).(non_missing_bank.ID), Symbol(column_name)] .== category) for category in categories]
+        form_counts = [sum(non_missing_bank[in(selected_items).(non_missing_bank.ID),
+                                            Symbol(column_name)] .== category)
+                       for category in categories]
         push!(table_data, [i; form_counts...])
     end
 
@@ -180,12 +184,6 @@ function collect_category_counts(results::DataFrame, bank::DataFrame, column_nam
     end
 end
 
-
-
-
-
-
-
 """
     collect_common_items(results::DataFrame) -> String
 
@@ -203,7 +201,8 @@ function collect_common_items(results::DataFrame)::String
     end
 
     header = [""; collect(1:num_forms)...]
-    return pretty_table(String, hcat(collect(1:num_forms), common_items_matrix); header=header, alignment=:r)
+    return pretty_table(String, hcat(collect(1:num_forms), common_items_matrix);
+                        header=header, alignment=:r)
 end
 
 """
@@ -220,24 +219,21 @@ function collect_final_summary(parms::Parameters, results::DataFrame)::String
     non_anchor_used = setdiff(items_used, anchors_used)
 
     # Separate labels and values into two columns for PrettyTables
-    labels = [
-        LABEL_TOTAL_FORMS,
-        LABEL_ITEMS_USED,
-        LABEL_NON_ANCHOR_ITEMS,
-        LABEL_ANCHOR_ITEMS,
-        LABEL_ITEMS_NOT_USED
-    ]
+    labels = [LABEL_TOTAL_FORMS,
+              LABEL_ITEMS_USED,
+              LABEL_NON_ANCHOR_ITEMS,
+              LABEL_ANCHOR_ITEMS,
+              LABEL_ITEMS_NOT_USED]
 
-    values = [
-        size(results, 2),
-        length(items_used),
-        length(non_anchor_used),
-        length(anchors_used),
-        length(items) - length(anchor_items) - length(items_used)
-    ]
+    values = [size(results, 2),
+              length(items_used),
+              length(non_anchor_used),
+              length(anchors_used),
+              length(items) - length(anchor_items) - length(items_used)]
 
     header = ["Concept", "Count"]
-    return pretty_table(String, hcat(labels, string.(values)); header=header, alignment=[:l, :r])
+    return pretty_table(String, hcat(labels, string.(values)); header=header,
+                        alignment=[:l, :r])
 end
 
 """
@@ -250,7 +246,7 @@ function collect_tolerances(tolerances::Vector{Float64})::String
     forms_id = [string("Form ", lpad(s, 2)) for s in 1:length(tolerances)]
     table_dict = Dict(k => rpad(v, 6, "0") for (k, v) in zip(forms_id, tolerances))
 
-    return pretty_table(String, table_dict, sortkeys=true; header=header, alignment=:c)
+    return pretty_table(String, table_dict; sortkeys=true, header=header, alignment=:c)
 end
 
 """
@@ -258,7 +254,8 @@ end
 
 Generates the final report of the test assembly process, gathering tables and summaries into a Dict for later processing.
 """
-function collect_results_tables(parms::Parameters, config::Config, results::DataFrame, tolerances::Vector{Float64})::Dict{String, String}
+function collect_results_tables(parms::Parameters, config::Config, results::DataFrame,
+                                tolerances::Vector{Float64})::Dict{String, String}
     results_dict = Dict{String, String}()
 
     results_dict["Summary"] = collect_final_summary(parms, results)
@@ -266,12 +263,14 @@ function collect_results_tables(parms::Parameters, config::Config, results::Data
 
     if !isempty(config.report_categories)
         for category in config.report_categories
-            results_dict["$category count"] = collect_category_counts(results, parms.bank, category)
+            results_dict["$category count"] = collect_category_counts(results, parms.bank,
+                                                                      category)
         end
     end
 
     if !isempty(config.report_sums)
-        results_dict["Column sums"] = collect_column_sums(results, parms.bank, config.report_sums)
+        results_dict["Column sums"] = collect_column_sums(results, parms.bank,
+                                                          config.report_sums)
     end
 
     results_dict["Common items"] = collect_common_items(results)
@@ -289,7 +288,8 @@ function save_forms(parms::Parameters, results::DataFrame, config::Config)
     bank = deepcopy(parms.bank)
 
     for v in names(results)
-        bank[!, Symbol(v)] = map(x -> ismissing(x) ? "" : (x == 1 ? v : ""), bank.ID .∈ Ref(skipmissing(results[:, v])))
+        bank[!, Symbol(v)] = map(x -> ismissing(x) ? "" : (x == 1 ? v : ""),
+                                 bank.ID .∈ Ref(skipmissing(results[:, v])))
     end
 
     write_results_to_file(bank, config.forms_file)
@@ -307,7 +307,8 @@ end
 
 Generates the final report of the optimization process and returns it as a Dict for further use.
 """
-function final_report(parms::Parameters, results::DataFrame, config::Config, tolerances::Vector{Float64})::Dict{String, String}
+function final_report(parms::Parameters, results::DataFrame, config::Config,
+                      tolerances::Vector{Float64})::Dict{String, String}
     report_tables = collect_results_tables(parms, config, results, tolerances)
 
     save_forms(parms, results, config)
@@ -315,7 +316,6 @@ function final_report(parms::Parameters, results::DataFrame, config::Config, tol
 
     return report_tables
 end
-
 
 """
     generate_report(report_data::Dict{String, String}) -> String
@@ -368,6 +368,5 @@ function generate_report(report_data::Dict{String, String})::String
 
     return report
 end
-
 
 end

@@ -2,7 +2,6 @@ module IRTDataLoader
 
 export IRTModelData, load_irt_data
 
-
 using DataFrames
 
 using ..Utils
@@ -29,14 +28,17 @@ Loads and calculates IRT-related parameters like theta, p, tau, and information 
 based on the input configuration and item bank.
 
 # Arguments
-- `config_data::Dict{Symbol, Any}`: Configuration dictionary containing IRT-related settings.
-- `bank::DataFrame`: DataFrame with item parameters (`A`, `B`, `C`) used for IRT calculations.
+
+  - `config_data::Dict{Symbol, Any}`: Configuration dictionary containing IRT-related settings.
+  - `bank::DataFrame`: DataFrame with item parameters (`A`, `B`, `C`) used for IRT calculations.
 
 # Returns
-- An `IRTModelData` struct containing IRT parameters and matrices for the assembly process.
+
+  - An `IRTModelData` struct containing IRT parameters and matrices for the assembly process.
 
 # Throws
-- `ArgumentError` if required fields are missing or invalid in the configuration or bank.
+
+  - `ArgumentError` if required fields are missing or invalid in the configuration or bank.    # Check if the required IRT configuration exists
 """
 function load_irt_data(config_data::Dict{Symbol, Any}, bank::DataFrame)::IRTModelData
     # Check if the required IRT configuration exists
@@ -61,8 +63,8 @@ function load_irt_data(config_data::Dict{Symbol, Any}, bank::DataFrame)::IRTMode
     a, b, c = extract_item_params(bank)
 
     k = length(theta)
-    D = get(irt_dict, :D, 1.0) |> Float64
-    r = get(irt_dict, :R, 1) |> Int
+    D = Float64(get(irt_dict, :D, 1.0))
+    r = Int(get(irt_dict, :R, 1))
     N = get(config_data[:FORMS], :N, 1)
 
     # Validate target weights and points
@@ -91,7 +93,8 @@ end
 Extracts the item parameters (a, b, c) from the item bank. Throws an error if required columns are missing.
 
 # Throws
-- `ArgumentError` if the required item parameters (A, B, C) are missing in the bank DataFrame.
+
+  - `ArgumentError` if the required item parameters (A, B, C) are missing in the bank DataFrame.
 """
 function extract_item_params(bank::DataFrame)
     for param in [:A, :B, :C]
@@ -114,10 +117,12 @@ end
 Calculates the probability matrix (p) at each theta point using IRT models.
 
 # Throws
-- `ArgumentError` if the lengths of the parameter vectors (a, b, c) do not match.
+
+  - `ArgumentError` if the lengths of the parameter vectors (a, b, c) do not match.
 """
 function calculate_probabilities(theta::Vector{Float64}, a::Vector{Float64},
-                                 b::Vector{Float64}, c::Vector{Float64}, D::Float64)::Matrix{Float64}
+                                 b::Vector{Float64}, c::Vector{Float64},
+                                 D::Float64)::Matrix{Float64}
     if !(length(a) == length(b) == length(c))
         throw(ArgumentError("Length of item parameters (a, b, c) must be the same."))
     end
@@ -133,7 +138,8 @@ end
 Calculates the information matrix at each theta point using IRT models.
 """
 function calculate_information(theta::Vector{Float64}, a::Vector{Float64},
-                               b::Vector{Float64}, c::Vector{Float64}, D::Float64)::Matrix{Float64}
+                               b::Vector{Float64}, c::Vector{Float64},
+                               D::Float64)::Matrix{Float64}
     if !(length(a) == length(b) == length(c))
         throw(ArgumentError("Length of item parameters (a, b, c) must be the same."))
     end
@@ -148,7 +154,8 @@ end
 Retrieves or calculates the tau matrix based on the probability matrix (p). If the values for tau are
 provided in the config, it is used; otherwise, it is calculated.
 """
-function get_tau(irt_dict::Dict{Symbol, Any}, p_matrix::Matrix{Float64}, r::Int, k::Int, N::Int)::Matrix{Float64}
+function get_tau(irt_dict::Dict{Symbol, Any}, p_matrix::Matrix{Float64}, r::Int, k::Int,
+                 N::Int)::Matrix{Float64}
     tau = get(irt_dict, :TAU_INFO, nothing)
 
     if tau !== nothing && !isempty(tau)
@@ -164,7 +171,8 @@ end
 Retrieves or calculates the tau_info vector based on the information matrix. If tau_info is provided
 in the config, it is used; otherwise, it is calculated.
 """
-function get_tau_info(irt_dict::Dict{Symbol, Any}, info_matrix::Matrix{Float64}, k::Int, N::Int)::Vector{Float64}
+function get_tau_info(irt_dict::Dict{Symbol, Any}, info_matrix::Matrix{Float64}, k::Int,
+                      N::Int)::Vector{Float64}
     tau = get(irt_dict, :TAU_INFO, nothing)
 
     if tau !== nothing && !isempty(tau)
