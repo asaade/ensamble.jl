@@ -1,4 +1,5 @@
 module Ensamble
+__precompile__()
 
 export assemble_tests
 # Import necessary packages

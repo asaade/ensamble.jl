@@ -20,12 +20,6 @@ const LABEL_NON_ANCHOR_ITEMS = "Non-anchor items used:"
 const LABEL_ANCHOR_ITEMS = "Anchor items used:"
 const LABEL_ITEMS_NOT_USED = "Items not used (without anchor):"
 
-const ANCHOR_USED_MESSAGE = "Anchor items used: "
-const COMMON_ITEMS_MATRIX_TITLE = "\nCommon Items Matrix:"
-const FORMS_ASSEMBLED_MESSAGE = "Total forms assembled: "
-const ITEMS_USED_MESSAGE = "Items used (includes anchor): "
-const NONANCHOR_USED_MESSAGE = "Non-anchor items used: "
-const REMAINING_ITEMS_MESSAGE = "Items not used (without anchor): "
 
 """
     print_title_and_separator(title::String)
@@ -92,7 +86,7 @@ function collect_anchors(results::DataFrame, bank::DataFrame)::String
     check_column_exists!("ANCHOR", bank)
 
     num_forms = size(results, 2)
-    header = ["Form ID", "Total Items", "Anchor Items", "Non-anchor Items"]
+    header = ["Form ID", "Total", "Anchor", "Non-anchor"]
     table_data = []
 
     for i in 1:num_forms

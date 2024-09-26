@@ -72,12 +72,13 @@ end
     uppercase_dataframe!(df::DataFrames.DataFrame)
 
 Convert all strings in the DataFrame to uppercase, in place.
-This operates on each column that is of type `String` or `AbstractString`.
+This operates on each column that is of type `String` or `AbstractString`,
+and skips over missing values.
 """
 function uppercase_dataframe!(df::DataFrames.DataFrame)
     for col in eachcol(df)
         if eltype(col) <: AbstractString  # Only process string columns
-            for i in 1:length(col)
+            for i in eachindex(col)
                 if !ismissing(col[i])  # Handle missing values
                     col[i] = uppercase(col[i])
                 end
@@ -86,6 +87,7 @@ function uppercase_dataframe!(df::DataFrames.DataFrame)
     end
     return df
 end
+
 
 """
     upcase(x::Any) -> Any
