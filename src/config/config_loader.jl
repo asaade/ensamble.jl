@@ -1,5 +1,5 @@
 module ConfigLoader
-using ..StringUtils
+using ..Utils
 
 export BasicConfig, load_config
 
@@ -40,7 +40,7 @@ function load_config(config_data::Dict{Symbol, Any})::BasicConfig
     end
 
     config_data = cleanValues(config_data)
-    
+
     files_data = config_data[:FILES]
 
     # Extract necessary fields and provide defaults if needed
@@ -55,7 +55,7 @@ function load_config(config_data::Dict{Symbol, Any})::BasicConfig
     verbose = get(files_data, :VERBOSE, 1)      # Default verbosity is 1
     report_categories = get(files_data, :REPORTCATEGORIES, [""])
     report_sums = get(files_data, :REPORTSUMS, [""])
-    
+
     # Log the loaded configuration for debugging purposes
     @info "Loaded configuration: items_file = $items_file, anchor_file = $anchor_file, solver = $solver"
 

@@ -1,9 +1,18 @@
+module Charts
+
+export plot_results, write_results_to_file
+
+using CSV
 using DataFrames
 using Plots
 using StatsPlots
 using Distributions
 using Measures  # For margin handling
-using .Configuration
+
+using ..Configuration
+using ..Utils
+
+
 
 # Function to extract a, b, c parameters from the bank based on selected items
 function fetch_irt_parms(bank::DataFrame, selected_items::Vector{String})
@@ -139,11 +148,13 @@ function plot_results(parms::Parameters, conf::Config, results::DataFrame,
                          margin=15mm)
 
     # Write results to file
-    insertcols!(characteristic_curves, 1, :THETA => collect(theta_range)) 
+    insertcols!(characteristic_curves, 1, :THETA => collect(theta_range))
     write_results_to_file(characteristic_curves, conf.tcc_file)
     println("TCC data saved to: ", conf.tcc_file)
     # Save the combined plot
     savefig(combined_plot, plot_file)
     println("Charts saved to: ", plot_file)
     return characteristic_curves
+end
+
 end

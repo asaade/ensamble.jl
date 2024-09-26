@@ -1,15 +1,25 @@
 module Configuration
 
-# Export main configuration-related functions and types
-export AssemblyConfig, IRTModelData,
-       configure, Config, Parameters, Constraint,
-       upSymbol, upcase, upcaseKeys, safe_read_csv,
-       safe_read_csv, safe_read_toml,
-       Probability, Information,
-       observed_score_distribution_continuous, lw_dist
-
 using DataFrames
 using Logging: Logging
+
+using ..Utils
+
+# Include all the necessary module files
+include("config_loader.jl")    # Loads configuration file names
+include("assembly_config_loader.jl")  # Loads and checks form configurations
+include("bank_data_loader.jl")  # Loads and checks item bank and anchor test data
+include("irt_data_loader.jl")  # Configures and calculates IRT model data
+
+# Use modules in the current scope for Configuration
+using .ConfigLoader
+using .AssemblyConfigLoader
+using .BankDataLoader
+using .IRTDataLoader
+
+# Export main configuration-related functions and types
+export AssemblyConfig, IRTModelData,
+       configure, Config, Parameters, Constraint
 
 # Set global log level (e.g., show info, warnings and errors)
 Logging.global_logger(Logging.ConsoleLogger(stderr, Logging.Info))
@@ -69,21 +79,6 @@ mutable struct Parameters
     verbose::Int                    # verbosity from BasicConfig
 end
 
-# Include all the necessary module files
-include("utils/string_utils.jl")      # Auxiliary string manipulation methods
-include("utils/stats_functions.jl")   # Auxiliary Statistical and IRT methods
-include("config/config_loader.jl")    # Loads configuration file names
-include("config/assembly_config_loader.jl")  # Loads and checks form configurations
-include("config/bank_data_loader.jl")  # Loads and checks item bank and anchor test data
-include("config/irt_data_loader.jl")  # Configures and calculates IRT model data
-
-# Use modules in the current scope for Configuration
-using .StringUtils
-using .StatsFunctions
-using .ConfigLoader
-using .AssemblyConfigLoader
-using .BankDataLoader
-using .IRTDataLoader
 
 """
     transform_config_to_flat(basic_config::BasicConfig)::Config

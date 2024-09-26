@@ -1,7 +1,31 @@
+module DisplayResults
+
+export final_report, generate_report, display_results
+
 using JuMP
 using DataFrames
+using Dates
 using PrettyTables
-using .Ensamble.Configuration
+
+using ..Configuration
+using ..Utils
+
+include("charts.jl")
+using .Charts
+
+# Constants for labels used across the reporting functions
+const LABEL_TOTAL_FORMS = "Total forms assembled:"
+const LABEL_ITEMS_USED = "Total items used (includes anchor):"
+const LABEL_NON_ANCHOR_ITEMS = "Non-anchor items used:"
+const LABEL_ANCHOR_ITEMS = "Anchor items used:"
+const LABEL_ITEMS_NOT_USED = "Items not used (without anchor):"
+
+const ANCHOR_USED_MESSAGE = "Anchor items used: "
+const COMMON_ITEMS_MATRIX_TITLE = "\nCommon Items Matrix:"
+const FORMS_ASSEMBLED_MESSAGE = "Total forms assembled: "
+const ITEMS_USED_MESSAGE = "Items used (includes anchor): "
+const NONANCHOR_USED_MESSAGE = "Non-anchor items used: "
+const REMAINING_ITEMS_MESSAGE = "Items not used (without anchor): "
 
 """
     print_title_and_separator(title::String)
@@ -60,7 +84,8 @@ end
 """
     collect_anchors(results::DataFrame, bank::DataFrame) -> String
 
-Returns the item distribution summary (total items, anchor, non-anchor) as a table string.
+Returns the item distribution summary (total items, anchor, non-anchor) as a transposed table string.
+Forms will appear in the rows, and item types will be in the columns.
 """
 function collect_anchors(results::DataFrame, bank::DataFrame)::String
     check_empty_results!(results)
@@ -78,8 +103,13 @@ function collect_anchors(results::DataFrame, bank::DataFrame)::String
         push!(table_data, [i, total_items, anchor_items, non_anchor_items])
     end
 
-    return pretty_table(String, hcat(table_data...); header=header, alignment=:r)
+    # Convert the table data to a matrix and transpose it
+    table_matrix = hcat(table_data...)'
+
+    # Return the PrettyTable formatted string with the transposed matrix
+    return pretty_table(String, table_matrix; header=header, alignment=:r)
 end
+
 
 """
     collect_column_sums(results::DataFrame, bank::DataFrame, column_names) -> String
@@ -109,10 +139,12 @@ function collect_column_sums(results::DataFrame, bank::DataFrame, column_names):
     return pretty_table(String, hcat(table_data...); header=["Form ID"; column_names...], alignment=:r)
 end
 
+
 """
     collect_category_counts(results::DataFrame, bank::DataFrame, column_name::Union{String, Symbol}; max_categories::Int=10) -> String
 
-Returns a table with counts of items in the specified column grouped by their value (category) for each form.
+Generates a table with counts of items in the specified column grouped by their value (category) for each form.
+If the number of categories exceeds `max_categories`, the table is transposed with forms as columns.
 """
 function collect_category_counts(results::DataFrame, bank::DataFrame, column_name::Union{String, Symbol}; max_categories::Int=10)::String
     check_empty_results!(results)
@@ -121,25 +153,38 @@ function collect_category_counts(results::DataFrame, bank::DataFrame, column_nam
     num_forms = size(results, 2)
     categories = sort(unique(collect(skipmissing(bank[!, Symbol(column_name)]))))
     non_missing_bank = filter(row -> !ismissing(row[Symbol(column_name)]), bank)
-    header = ["Category"; [string("Form ", i) for i in 1:num_forms]...]
+
+    # Prepare the table data with form IDs as rows and category counts as columns
     table_data = []
-
-    for category in categories
-        category_counts = []
-        for i in 1:num_forms
-            selected_items = skipmissing(results[:, i])
-            count = sum(non_missing_bank[in(selected_items).(non_missing_bank.ID), Symbol(column_name)] .== category)
-            push!(category_counts, count)
-        end
-
-        # Include row if there are counts or if categories are below max limit
-        if sum(category_counts) > 0 || length(categories) <= max_categories
-            push!(table_data, [category; category_counts...])
-        end
+    for i in 1:num_forms
+        selected_items = skipmissing(results[:, i])
+        form_counts = [sum(non_missing_bank[in(selected_items).(non_missing_bank.ID), Symbol(column_name)] .== category) for category in categories]
+        push!(table_data, [i; form_counts...])
     end
 
-    return pretty_table(String, hcat(table_data...)'; header=header, alignment=:r)
+    if length(categories) <= max_categories
+        # Case 1: Number of categories is manageable (categories as columns)
+        header = ["Form ID"; categories...]
+        table_matrix = hcat(table_data...)
+        return pretty_table(String, table_matrix'; header=header, alignment=:r)
+
+    else
+        # Case 2: Transpose the table when the number of categories is large (forms as columns)
+        header = ["Category"; [string("Form ", i) for i in 1:num_forms]...]
+
+        # Construct the transposed table
+        # We need to transpose both the categories and the counts
+        table_matrix = hcat([categories]..., [row[2:end] for row in table_data]...)
+
+        return pretty_table(String, table_matrix; header=header, alignment=:r)
+    end
 end
+
+
+
+
+
+
 
 """
     collect_common_items(results::DataFrame) -> String
@@ -269,4 +314,60 @@ function final_report(parms::Parameters, results::DataFrame, config::Config, tol
     plot_results(parms, config, results)
 
     return report_tables
+end
+
+
+"""
+    generate_report(report_data::Dict{String, String}) -> String
+
+Generates a formatted report using the results from final_report, with sections for summary,
+anchor usage, category counts, column sums, common items, and tolerances.
+"""
+function generate_report(report_data::Dict{String, String})::String
+    report = ""
+
+    # Title Section
+    report *= "Report on Automatic Test Assembly Results\n"
+    report *= "Generated using Ensamble.jl\n"
+    report *= "Date: $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))\n\n"
+
+    # Add Summary
+    report *= "Summary of Final Results\n"
+    report *= report_data["Summary"]
+    report *= "\n\n"
+
+    # Add Optimization Tolerances
+    report *= "Optimization Tolerances\n"
+    report *= report_data["Optimization tolerances"]
+    report *= "\n\n"
+
+    # Add Common Items Matrix
+    report *= "Common Items Matrix\n"
+    report *= report_data["Common items"]
+    report *= "\n\n"
+
+    # Add Anchor Usage
+    report *= "Anchor Item Usage\n"
+    report *= report_data["ANCHOR use"]
+    report *= "\n\n"
+
+    # Add Category Counts (handle multiple categories dynamically)
+    category_keys = filter(key -> endswith(key, "count"), keys(report_data))
+    for category_key in category_keys
+        report *= "Category Counts for $(replace(category_key, " count" => ""))\n"
+        report *= report_data[category_key]
+        report *= "\n\n"
+    end
+
+    # Add Column Sums (if present)
+    if haskey(report_data, "Column sums")
+        report *= "Column Sums\n"
+        report *= report_data["Column sums"]
+        report *= "\n\n"
+    end
+
+    return report
+end
+
+
 end

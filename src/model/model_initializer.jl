@@ -1,10 +1,21 @@
+module ModelInitializer
+
+export read_constraints, initialize_model!, configure_solver!
+
 using CSV
 using DataFrames
 using JuMP
 using StatsBase
 using StringDistances
 
-using .Ensamble.Configuration.StringUtils
+using ..Utils
+
+include("criteria_parser.jl")
+using .CriteriaParser
+
+include("constraints.jl")
+include("solvers.jl")
+
 
 # Module constants
 const APPLYING_CONSTRAINT_MESSAGE = "Applying constraint: "
@@ -440,4 +451,6 @@ function apply_conflict_rule(values1::Vector, values2::Vector, rule::Function)::
     else
         return DataFrame()  # Return empty DataFrame if no conflicts are found
     end
+end
+
 end

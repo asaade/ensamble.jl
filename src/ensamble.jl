@@ -9,17 +9,20 @@ using PrettyTables
 
 include("constants.jl")
 
-# Include external modules (organized by functionality)
-include("configuration.jl")
-using .Configuration
-
-include("config/validation.jl")
-include("model/constraints.jl")
-include("model/criteria_parser.jl")
-include("model/model_initializer.jl")
-include("model/solvers.jl")
-include("display/charts.jl")
+# Include external modules
+include("utils/utils.jl")
+include("config/configuration.jl")
 include("display/display_results.jl")
+include("model/model_initializer.jl")
+using .Utils
+using .Configuration
+using .DisplayResults
+using .ModelInitializer
+
+using Logging: Logging
+# Set global log level (e.g., show info, warnings and errors)
+Logging.global_logger(Logging.ConsoleLogger(stderr, Logging.Info))
+
 
 """
 load_configuration(config_file::String)::Tuple{Dict, Parameters}
@@ -87,7 +90,7 @@ Process the optimization results at each iteration and store them in a DataFrame
 Used items ARE DELETED from the working copy of the bank to avoid its use in subsequent forms.
 """
 function process_and_store_results!(model::Model, parms::Parameters,
-                                    results_df::DataFrame)::DataFrame
+    results_df::DataFrame)::DataFrame
     solver_matrix = value.(model[:x])
     item_codes = parms.bank.ID
     items = 1:length(item_codes)
@@ -95,14 +98,14 @@ function process_and_store_results!(model::Model, parms::Parameters,
     max_items = parms.max_items
 
     for f in 1:(parms.num_forms)
-        selected_items = items[solver_matrix[:, f] .> 0.9]
+        selected_items = items[solver_matrix[:, f].>0.9]
         codes_in_form = item_codes[selected_items]
         form_length = length(codes_in_form)
         missing_rows = max_items - form_length
 
         padded_codes_vector = if missing_rows > 0
             vcat(codes_in_form,
-                 fill(MISSING_VALUE_FILLER, missing_rows))
+                fill(MISSING_VALUE_FILLER, missing_rows))
         else
             codes_in_form
         end
@@ -116,7 +119,7 @@ function process_and_store_results!(model::Model, parms::Parameters,
     items_used = sort(unique(items_used))
 
     parms.bank[items_used, :ITEM_USE] .+= 1
-    items_used = items_used[parms.bank[items_used, :ITEM_USE] .>= parms.max_item_use]
+    items_used = items_used[parms.bank[items_used, :ITEM_USE].>=parms.max_item_use]
 
     remove_used_items!(parms, items_used)
     return results_df
@@ -173,10 +176,10 @@ Main entry point for assembling tests. Loads configurations, runs the solver,
 and processes the results, then generates and saves a report.
 """
 function assemble_tests(config_file::String="data/config.toml")::DataFrame
-    config, old_par = configure_system(config_file)
-    # validate_parameters(old_par)
+    config, original_parms = configure_system(config_file)
+    # validate_parameters(original_parms)
 
-    parms = deepcopy(old_par)
+    parms = deepcopy(original_parms)
     constraints = read_constraints(config.constraints_file, parms)
     results_df = DataFrame()
 
@@ -190,7 +193,7 @@ function assemble_tests(config_file::String="data/config.toml")::DataFrame
     while parms.f > 0
         parms.num_forms = min(parms.num_forms, parms.f)
         parms.shadow_test = max(0, parms.f - parms.num_forms)
-        handle_anchor_items(parms, old_par)
+        handle_anchor_items(parms, original_parms)
 
         model = Model()
         configure_solver!(model, parms, config.solver)
@@ -215,13 +218,18 @@ function assemble_tests(config_file::String="data/config.toml")::DataFrame
         end
     end
 
-    # Display and save the final report
-    results_tables = final_report(old_par, results_df, config, tolerances)
 
-    # Iterate through the dictionary and print each table
-    for (key, table) in results_tables
-        println("\n$key\n$table")
-    end
+    # Assuming you have the required parameters, results, config, and tolerances
+    report_data = final_report(original_parms, results_df, config, tolerances)
+
+    # Generate the report as a string
+    report = generate_report(report_data)
+
+    # # Print the report to the console
+    # println(report)
+
+    # Optionally, save the report to a file
+    write("results/test_assembly_report.txt", report)
 
     return results_df
 end

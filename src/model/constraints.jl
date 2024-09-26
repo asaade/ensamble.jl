@@ -1,5 +1,7 @@
 using JuMP
 
+using ..Configuration
+
 # Helper function to handle shadow test adjustments for form count
 function get_num_forms(x, shadow_test)
     forms = size(x, 2)

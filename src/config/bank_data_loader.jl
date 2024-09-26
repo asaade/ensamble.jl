@@ -1,10 +1,10 @@
 module BankDataLoader
+export read_bank_file
 
 using DataFrames
-# using Logging
-using ..StringUtils
 
-export read_bank_file
+using ..Utils
+
 
 data_path = "data"
 
@@ -37,9 +37,9 @@ Reads the item file and returns a DataFrame.
 """
 function read_items_file(items_file::AbstractString)::DataFrame
     try
-        bank = StringUtils.safe_read_csv(items_file)
+        bank = safe_read_csv(items_file)
         rename!(bank, uppercase.(names(bank)))
-        bank = StringUtils.upcase.(bank)
+        bank = upcase.(bank)
         return bank
     catch e
         error("Error loading item bank: $e")
@@ -54,9 +54,9 @@ Reads the anchor items file and returns a DataFrame.
 function read_anchor_file(anchor_file::AbstractString)::DataFrame
     if !isempty(anchor_file)
         try
-            anchor_data = StringUtils.safe_read_csv(anchor_file)
+            anchor_data = safe_read_csv(anchor_file)
             rename!(anchor_data, uppercase.(names(anchor_data)))
-            anchor_data = StringUtils.upcase.(anchor_data)
+            anchor_data = upcase.(anchor_data)
             return anchor_data
         catch e
             error("Error loading item bank: $e")
