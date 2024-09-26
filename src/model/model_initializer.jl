@@ -8,20 +8,20 @@ using JuMP
 using StatsBase
 using StringDistances
 
+using ..Configuration
 using ..Utils
 
-include("criteria_parser.jl")
-using .CriteriaParser
-
 include("constraints.jl")
+include("criteria_parser.jl")
 include("solvers.jl")
+using .Constraints
+using .CriteriaParser
+using .SolverConfiguration
 
 # Module constants
 const APPLYING_CONSTRAINT_MESSAGE = "Applying constraint: "
 const INITIALIZING_MODEL_MESSAGE = "Initializing optimization model..."
 const MODEL_FILE = "./results/model.lp"
-
-using CSV, DataFrames, StringDistances
 
 """
     find_closest(input::String, valid_labels::Vector{String}) -> String

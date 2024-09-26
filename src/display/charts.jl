@@ -8,11 +8,23 @@ using Plots
 using StatsPlots
 using Distributions
 using Measures  # For margin handling
-
 using ..Configuration
 using ..Utils
 
-# Function to extract a, b, c parameters from the bank based on selected items
+"""
+    fetch_irt_parms(bank::DataFrame, selected_items::Vector{String}) -> Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}}
+
+Extracts the IRT item parameters (a, b, c) from the `bank` DataFrame for the selected items.
+
+# Arguments
+
+  - `bank::DataFrame`: DataFrame containing the item bank with columns `A`, `B`, and `C`.
+  - `selected_items::Vector{String}`: Vector of item IDs for which parameters are extracted.
+
+# Returns
+
+  - A tuple `(a, b, c)` where `a`, `b`, and `c` are vectors containing the respective IRT parameters.
+"""
 function fetch_irt_parms(bank::DataFrame, selected_items::Vector{String})
     selected_items_idx = bank.ID .∈ Ref(skipmissing(selected_items))
     a = bank[selected_items_idx, :A]
@@ -21,7 +33,22 @@ function fetch_irt_parms(bank::DataFrame, selected_items::Vector{String})
     return a, b, c
 end
 
-# Simulate results based on ability distribution
+"""
+    simulate_observed_scores(parms::Parameters, results::DataFrame, ability_dist::Distribution=Normal(0.0, 1.0)) -> DataFrame
+
+Simulates observed test scores for test takers based on the proposed ability distribution using
+the Lord and Wingersky Recursion Formula.
+
+# Arguments
+
+  - `parms::Parameters`: Struct containing the system's parameters, included in the item bank.
+  - `results::DataFrame`: DataFrame containing the selected items for each form.
+  - `ability_dist::Distribution`: Ability distribution of the test takers (default: Normal(0.0, 1.0)).
+
+# Returns
+
+  - A `DataFrame` containing the simulated observed scores for each form.
+"""
 function simulate_observed_scores(parms::Parameters, results::DataFrame,
                                   ability_dist::Distribution=Normal(0.0, 1.0))
     bank = parms.bank
@@ -34,7 +61,7 @@ function simulate_observed_scores(parms::Parameters, results::DataFrame,
         selected_items = collect(skipmissing(results[:, i]))
         a, b, c = fetch_irt_parms(bank, selected_items)
 
-        # Simulate the observed scores based on item parameters
+        # Simulate observed scores based on item parameters
         item_params::Matrix{Float64} = hcat(a, b, c)'  # Transpose for matrix structure
         dist = observed_score_distribution_continuous(item_params, ability_dist)
         padded_dist = vcat(dist, fill(missing, max_length - length(dist)))
@@ -44,7 +71,22 @@ function simulate_observed_scores(parms::Parameters, results::DataFrame,
     return observed_dist
 end
 
-# Generate characteristic curves for each form
+"""
+    generate_characteristic_curves(parms::Parameters, results::DataFrame, theta_range::AbstractVector, r::Int=1) -> DataFrame
+
+Generates characteristic curves for each form based on the selected items and theta values.
+
+# Arguments
+
+  - `parms::Parameters`: Struct containing the system's parameters, included in the item bank.
+  - `results::DataFrame`: DataFrame containing the selected items for each form.
+  - `theta_range::AbstractVector`: Range of theta values (ability levels) to generate curves for.
+  - `r::Int`: Exponent applied to the probabilities (default: 1).
+
+# Returns
+
+  - A `DataFrame` containing the characteristic curves for each form.
+"""
 function generate_characteristic_curves(parms::Parameters, results::DataFrame,
                                         theta_range::AbstractVector, r::Int=1)
     bank = parms.bank
@@ -61,7 +103,21 @@ function generate_characteristic_curves(parms::Parameters, results::DataFrame,
     return curves
 end
 
-# Generate information curves for each form
+"""
+    generate_information_curves(parms::Parameters, results::DataFrame, theta_range::AbstractVector) -> DataFrame
+
+Generates information curves for each form based on the selected items and theta values.
+
+# Arguments
+
+  - `parms::Parameters`: Struct containing the system's parameters, included in the item bank.
+  - `results::DataFrame`: DataFrame containing the selected items for each form.
+  - `theta_range::AbstractVector`: Range of theta values (ability levels) to generate information curves for.
+
+# Returns
+
+  - A `DataFrame` containing the information curves for each form.
+"""
 function generate_information_curves(parms::Parameters, results::DataFrame,
                                      theta_range::AbstractVector)
     bank = parms.bank
@@ -78,17 +134,44 @@ function generate_information_curves(parms::Parameters, results::DataFrame,
     return curves
 end
 
-# Function to write results to a CSV file
+"""
+    write_results_to_file(curve_data::DataFrame, output_file::String)
+
+Writes the DataFrame containing the characteristic or information curves to a CSV file.
+
+# Arguments
+
+  - `curve_data::DataFrame`: DataFrame containing the curves to be saved.
+  - `output_file::String`: Path to the output CSV file.
+"""
 function write_results_to_file(curve_data::DataFrame, output_file::String)
     CSV.write(output_file, curve_data)
     return nothing
 end
 
-# Main function to generate and plot characteristic curves, information curves, and simulation data
+"""
+    plot_results(parms::Parameters, conf::Config, results::DataFrame,
+                 theta_range::AbstractVector=-3.0:0.1:3.0, plot_file::String="results/combined_plot.pdf") -> DataFrame
+
+Generates and plots characteristic curves, information curves, and simulated observed scores,
+and saves the combined plot and results to files.
+
+# Arguments
+
+  - `parms::Parameters`: Struct containing the system's parameters, included in the item bank.
+  - `conf::Config`: Configuration struct containing file paths for saving results.
+  - `results::DataFrame`: DataFrame containing the selected items for each form.
+  - `theta_range::AbstractVector`: Range of theta values (default: -3.0:0.1:3.0) for generating the curves.
+  - `plot_file::String`: Path to save the combined plot (default: "results/combined_plot.pdf").
+
+# Returns
+
+  - A `DataFrame` containing the characteristic curves for each form.
+"""
 function plot_results(parms::Parameters, conf::Config, results::DataFrame,
                       theta_range::AbstractVector=-3.0:0.1:3.0,
                       plot_file::String="results/combined_plot.pdf")::DataFrame
-    # Generate plot data
+    # Generate characteristic and information curves
     characteristic_curves = generate_characteristic_curves(parms, results, theta_range)
     information_curves = generate_information_curves(parms, results, theta_range)
 
@@ -106,52 +189,46 @@ function plot_results(parms::Parameters, conf::Config, results::DataFrame,
                                                     Normal(1.0, 0.7))
     end
 
-    # Set up a light theme with bright colors
+    # Set plot theme and size
     theme(:default)
-    gr(; size=(750, 1200))  # Adjust size ratio to (750, 1200)
+    gr(; size=(750, 1200))
 
-    # Create subplots with individual titles
+    # Plot characteristic curves
     p1 = @df characteristic_curves plot(theta_range, cols(),
                                         title="Characteristic Curves",
-                                        xlabel="θ", ylabel="Score", linewidth=2,
-                                        label="",
-                                        grid=(:on, :lightgray, :solid, 1, 0.9),
-                                        tickfontsize=12, titlefontsize=16)
+                                        xlabel="θ", ylabel="Score", linewidth=2, label="")
 
     if parms.method == "TCC"
         p1 = scatter!(parms.theta, parms.tau[1, :]; label="", markersize=5)
     end
 
-    p2 = @df information_curves plot(theta_range, cols(), title="Information Curves",
+    # Plot information curves
+    p2 = @df information_curves plot(theta_range, cols(),
+                                     title="Information Curves",
                                      xlabel="θ", ylabel="Information", linewidth=2,
-                                     label="", grid=(:on, :lightgray, :solid, 1, 0.9),
-                                     tickfontsize=12, titlefontsize=16)
+                                     label="")
 
-    # Only one simulation chart with all variations
+    # Plot observed score simulations
     p3 = @df simulation_data1 plot(1:size(simulation_data1, 1), cols(),
                                    title="Observed Scores (Simulations)",
                                    xlabel="Items", ylabel="Percentage", linewidth=2,
-                                   label="", grid=(:on, :lightgray, :solid, 1, 0.9),
-                                   tickfontsize=12, titlefontsize=16)
-
-    # Add the other simulations to the same plot
+                                   label="")
     p3 = @df simulation_data2 plot!(1:size(simulation_data2, 1), cols(), linewidth=2,
                                     label="")
     p3 = @df simulation_data3 plot!(1:size(simulation_data3, 1), cols(), linewidth=2,
                                     label="")
 
-    # Combine plots into a 3-row layout with increased margins and both individual and general titles
-    combined_plot = plot(p1, p2, p3; layout=(3, 1), size=(750, 1200),
-                         # title="Combined IRT Analysis",
-                         margin=15mm)
+    # Combine plots into a single layout
+    combined_plot = plot(p1, p2, p3; layout=(3, 1), size=(750, 1200), margin=15mm)
 
-    # Write results to file
+    # Save characteristic curves and plot
     insertcols!(characteristic_curves, 1, :THETA => collect(theta_range))
     write_results_to_file(characteristic_curves, conf.tcc_file)
-    println("TCC data saved to: ", conf.tcc_file)
-    # Save the combined plot
     savefig(combined_plot, plot_file)
+
+    println("TCC data saved to: ", conf.tcc_file)
     println("Charts saved to: ", plot_file)
+
     return characteristic_curves
 end
 
