@@ -41,7 +41,7 @@ the Lord and Wingersky Recursion Formula.
 
 # Arguments
 
-  - `parms::Parameters`: Struct containing the system's parameters, included in the item bank.
+  - `parms::Parameters`: Struct containing the system's parameters in the item bank.
   - `results::DataFrame`: DataFrame containing the selected items for each form.
   - `ability_dist::Distribution`: Ability distribution of the test takers (default: Normal(0.0, 1.0)).
 
@@ -78,7 +78,7 @@ Generates characteristic curves for each form based on the selected items and th
 
 # Arguments
 
-  - `parms::Parameters`: Struct containing the system's parameters, included in the item bank.
+  - `parms::Parameters`: Struct containing the system's parameters in the item bank.
   - `results::DataFrame`: DataFrame containing the selected items for each form.
   - `theta_range::AbstractVector`: Range of theta values (ability levels) to generate curves for.
   - `r::Int`: Exponent applied to the probabilities (default: 1).
@@ -110,7 +110,7 @@ Generates information curves for each form based on the selected items and theta
 
 # Arguments
 
-  - `parms::Parameters`: Struct containing the system's parameters, included in the item bank.
+  - `parms::Parameters`: Struct containing the system's parameters in the item bank.
   - `results::DataFrame`: DataFrame containing the selected items for each form.
   - `theta_range::AbstractVector`: Range of theta values (ability levels) to generate information curves for.
 
@@ -151,18 +151,18 @@ end
 
 """
     plot_results(parms::Parameters, conf::Config, results::DataFrame,
-                 theta_range::AbstractVector=-3.0:0.1:3.0, plot_file::String="results/combined_plot.pdf") -> DataFrame
+                 theta_range::AbstractVector=-3.0:0.1:3.0, plot_file::String="results/combined_plot.png") -> DataFrame
 
 Generates and plots characteristic curves, information curves, and simulated observed scores,
 and saves the combined plot and results to files.
 
 # Arguments
 
-  - `parms::Parameters`: Struct containing the system's parameters, included in the item bank.
+  - `parms::Parameters`: Struct containing the system's parameters in the item bank.
   - `conf::Config`: Configuration struct containing file paths for saving results.
   - `results::DataFrame`: DataFrame containing the selected items for each form.
   - `theta_range::AbstractVector`: Range of theta values (default: -3.0:0.1:3.0) for generating the curves.
-  - `plot_file::String`: Path to save the combined plot (default: "results/combined_plot.pdf").
+  - `plot_file::String`: Path to save the combined plot (default: "results/combined_plot.png").
 
 # Returns
 
@@ -170,12 +170,43 @@ and saves the combined plot and results to files.
 """
 function plot_results(parms::Parameters, conf::Config, results::DataFrame,
                       theta_range::AbstractVector=-3.0:0.1:3.0,
-                      plot_file::String="results/combined_plot.pdf")::DataFrame
-    # Generate characteristic and information curves
+                      plot_file::String="results/combined_plot.png")::DataFrame
+
+    # Step 1: Generate curves
+    characteristic_curves, information_curves = generate_curves(parms, results, theta_range)
+
+    # Step 2: Handle simulations based on TIC3 method logic
+    simulation_data1, simulation_data2, simulation_data3 = generate_simulations(parms,
+                                                                                results)
+
+    # Step 3: Generate and combine plots
+    combined_plot = create_combined_plot(parms, theta_range, characteristic_curves,
+                                         information_curves, simulation_data1,
+                                         simulation_data2, simulation_data3)
+
+    # Step 4: Save results and plots to files
+    save_results(characteristic_curves, theta_range, conf, combined_plot, plot_file)
+
+    return characteristic_curves
+end
+
+"""
+    generate_curves(parms::Parameters, results::DataFrame, theta_range::AbstractVector) -> Tuple{DataFrame, DataFrame}
+
+Generates both characteristic curves and information curves.
+"""
+function generate_curves(parms::Parameters, results::DataFrame, theta_range::AbstractVector)
     characteristic_curves = generate_characteristic_curves(parms, results, theta_range)
     information_curves = generate_information_curves(parms, results, theta_range)
+    return characteristic_curves, information_curves
+end
 
-    # Handle special logic for TIC3 method
+"""
+    generate_simulations(parms::Parameters, results::DataFrame) -> Tuple{DataFrame, DataFrame, DataFrame}
+
+Handles simulation data generation based on the TIC3 method logic.
+"""
+function generate_simulations(parms::Parameters, results::DataFrame)
     if parms.method != "TIC3"
         simulation_data1 = simulate_observed_scores(parms, results, Normal(0.0, 1.0))
         simulation_data2 = simulate_observed_scores(parms, results, Normal(-1.0, 1.0))
@@ -188,48 +219,69 @@ function plot_results(parms::Parameters, conf::Config, results::DataFrame,
         simulation_data3 = simulate_observed_scores(parms, DataFrame(; data=results[:, 3]),
                                                     Normal(1.0, 0.7))
     end
+    return simulation_data1, simulation_data2, simulation_data3
+end
 
-    # Set plot theme and size
+"""
+    create_combined_plot(parms::Parameters, theta_range::AbstractVector, characteristic_curves::DataFrame, information_curves::DataFrame,
+                         simulation_data1::DataFrame, simulation_data2::DataFrame, simulation_data3::DataFrame) -> Plot
+
+Creates and combines the characteristic, information, and simulation plots into a single layout.
+"""
+function create_combined_plot(parms::Parameters, theta_range::AbstractVector,
+                              characteristic_curves::DataFrame,
+                              information_curves::DataFrame,
+                              simulation_data1::DataFrame, simulation_data2::DataFrame,
+                              simulation_data3::DataFrame)
+
+    # Load plotting libraries
     theme(:default)
-    gr(; size=(750, 1200))
+    gr(; size=(950, 850))
 
     # Plot characteristic curves
-    p1 = @df characteristic_curves plot(theta_range, cols(),
-                                        title="Characteristic Curves",
+    p1 = @df characteristic_curves plot(theta_range, cols(), title="Characteristic Curves",
                                         xlabel="θ", ylabel="Score", linewidth=2, label="")
-
     if parms.method == "TCC"
-        p1 = scatter!(parms.theta, parms.tau[1, :]; label="", markersize=5)
+        p1 = scatter!(parms.theta, parms.tau[1, :]; label="", markersize=3)
     end
 
     # Plot information curves
-    p2 = @df information_curves plot(theta_range, cols(),
-                                     title="Information Curves",
+    p2 = @df information_curves plot(theta_range, cols(), title="Information Curves",
                                      xlabel="θ", ylabel="Information", linewidth=2,
                                      label="")
 
     # Plot observed score simulations
     p3 = @df simulation_data1 plot(1:size(simulation_data1, 1), cols(),
-                                   title="Observed Scores (Simulations)",
-                                   xlabel="Items", ylabel="Percentage", linewidth=2,
-                                   label="")
+                                   title="Observed Scores (Simulations)", xlabel="Items",
+                                   ylabel="Percentage", linewidth=2, label="")
     p3 = @df simulation_data2 plot!(1:size(simulation_data2, 1), cols(), linewidth=2,
                                     label="")
     p3 = @df simulation_data3 plot!(1:size(simulation_data3, 1), cols(), linewidth=2,
                                     label="")
 
     # Combine plots into a single layout
-    combined_plot = plot(p1, p2, p3; layout=(3, 1), size=(750, 1200), margin=15mm)
+    combined_plot = plot(p1, p2, p3; layout=(2, 2), size=(950, 850), margin=8mm)
 
-    # Save characteristic curves and plot
+    return combined_plot
+end
+
+"""
+    save_results(characteristic_curves::DataFrame, theta_range::AbstractVector, conf::Config, combined_plot::Plot, plot_file::String)
+
+Saves the characteristic curves to a file and the combined plot to a PNG.
+"""
+function save_results(characteristic_curves::DataFrame, theta_range::AbstractVector,
+                      conf::Config, combined_plot::AbstractPlot, plot_file::String)
+    # Add theta range to characteristic curves and save
     insertcols!(characteristic_curves, 1, :THETA => collect(theta_range))
     write_results_to_file(characteristic_curves, conf.tcc_file)
+
+    # Save the combined plot
     savefig(combined_plot, plot_file)
 
     println("TCC data saved to: ", conf.tcc_file)
     println("Charts saved to: ", plot_file)
-
-    return characteristic_curves
+    return nothing
 end
 
 end
