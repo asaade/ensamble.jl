@@ -58,7 +58,7 @@ function simulate_observed_scores(parms::Parameters, results::DataFrame,
     column_names = names(results)
 
     for i in 1:num_forms
-        selected_items = collect(skipmissing(results[:, i]))
+        selected_items = results[:, i]
         a, b, c = fetch_irt_parms(bank, selected_items)
 
         # Simulate observed scores based on item parameters
@@ -94,7 +94,7 @@ function generate_characteristic_curves(parms::Parameters, results::DataFrame,
     curves = DataFrame()
 
     for i in 1:num_forms
-        selected_items = collect(skipmissing(results[:, i]))
+        selected_items = results[:, i]
         a, b, c = fetch_irt_parms(bank, selected_items)
         scores = map(theta -> sum(Probability.(theta, b, a, c) .^ r), theta_range)
         curves[!, names(results)[i]] = round.(scores, digits=2)
@@ -125,7 +125,7 @@ function generate_information_curves(parms::Parameters, results::DataFrame,
     curves = DataFrame()
 
     for i in 1:num_forms
-        selected_items = collect(skipmissing(results[:, i]))
+        selected_items = results[:, i]
         a, b, c = fetch_irt_parms(bank, selected_items)
         information = map(theta -> sum(Information.(theta, b, a, c)), theta_range)
         curves[!, names(results)[i]] = round.(information, digits=2)
