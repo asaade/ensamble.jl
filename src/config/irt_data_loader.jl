@@ -6,7 +6,9 @@ using DataFrames
 
 using ..Utils
 
-# Define the IRTModelData struct
+"""
+Define the IRTModelData struct to hold the precalculated IRT data
+"""
 mutable struct IRTModelData
     method::AbstractString
     theta::Vector{Float64}
@@ -59,12 +61,9 @@ function load_irt_data(config_data::Dict{Symbol, Any}, bank::DataFrame)::IRTMode
         throw(ArgumentError("Invalid or missing 'THETA'. It must be a vector of Float64 values."))
     end
 
-    # Validate the item bank and extract item parameters
-    a, b, c = extract_item_params(bank)
-
     k = length(theta)
     D = Float64(get(irt_dict, :D, 1.0))
-    r = Int(get(irt_dict, :R, 1))
+    r = Int(get(irt_dict, :R, 2))
     N = get(config_data[:FORMS], :N, 1)
 
     # Validate target weights and points
@@ -75,9 +74,12 @@ function load_irt_data(config_data::Dict{Symbol, Any}, bank::DataFrame)::IRTMode
         throw(ArgumentError("The length of 'RELATIVETARGETWEIGHTS' and 'RELATIVETARGETPOINTS' must match."))
     end
 
+    # Validate the item bank and extract item parameters
+    a, b, c = extract_item_params(bank)
+
     # Calculate probability matrix (p) and information matrix
-    p_matrix = calculate_probabilities(theta, a, b, c, D)
-    info_matrix = calculate_information(theta, a, b, c, D)
+    p_matrix = calculate_probabilities(theta, b, a, c, D)
+    info_matrix = calculate_information(theta, b, a, c, D)
 
     # Calculate tau and tau_info
     tau = get_tau(irt_dict, p_matrix, r, k, N)
@@ -103,16 +105,18 @@ function extract_item_params(bank::DataFrame)
         end
     end
 
-    a = bank[!, :A]
-    b = bank[!, :B]
-    c = bank[!, :C]
+    a = bank.A
+    b = bank.B
+    c = bank.C
 
     return a, b, c
 end
 
 """
-    calculate_probabilities(theta::Vector{Float64}, a::Vector{Float64},
-                            b::Vector{Float64}, c::Vector{Float64}, D::Float64) -> Matrix{Float64}
+    calculate_probabilities(theta::Vector{Float64},
+                    b::Vector{Float64},
+                    a::Vector{Float64},
+                    c::Vector{Float64}, D::Float64) -> Matrix{Float64}
 
 Calculates the probability matrix (p) at each theta point using IRT models.
 
@@ -120,8 +124,10 @@ Calculates the probability matrix (p) at each theta point using IRT models.
 
   - `ArgumentError` if the lengths of the parameter vectors (a, b, c) do not match.
 """
-function calculate_probabilities(theta::Vector{Float64}, a::Vector{Float64},
-                                 b::Vector{Float64}, c::Vector{Float64},
+function calculate_probabilities(theta::Vector{Float64},
+                                 b::Vector{Float64},
+                                 a::Vector{Float64},
+                                 c::Vector{Float64},
                                  D::Float64)::Matrix{Float64}
     if !(length(a) == length(b) == length(c))
         throw(ArgumentError("Length of item parameters (a, b, c) must be the same."))
@@ -132,13 +138,13 @@ function calculate_probabilities(theta::Vector{Float64}, a::Vector{Float64},
 end
 
 """
-    calculate_information(theta::Vector{Float64}, a::Vector{Float64},
-                          b::Vector{Float64}, c::Vector{Float64}, D::Float64) -> Matrix{Float64}
+    calculate_information(theta::Vector{Float64}, b::Vector{Float64},
+                           a::Vector{Float64}, c::Vector{Float64}, D::Float64) -> Matrix{Float64}
 
 Calculates the information matrix at each theta point using IRT models.
 """
-function calculate_information(theta::Vector{Float64}, a::Vector{Float64},
-                               b::Vector{Float64}, c::Vector{Float64},
+function calculate_information(theta::Vector{Float64},
+                               b::Vector{Float64}, a::Vector{Float64}, c::Vector{Float64},
                                D::Float64)::Matrix{Float64}
     if !(length(a) == length(b) == length(c))
         throw(ArgumentError("Length of item parameters (a, b, c) must be the same."))
