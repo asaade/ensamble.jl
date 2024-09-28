@@ -1,8 +1,7 @@
 module Configuration
 
 # Export main configuration-related functions and types
-export AssemblyConfig, IRTModelData,
-       configure, Config, Parameters, Constraint
+export configure, Config, Parameters, Constraint
 
 using DataFrames
 
@@ -19,10 +18,6 @@ using .ConfigLoader
 using .AssemblyConfigLoader
 using .BankDataLoader
 using .IRTDataLoader
-
-# Default paths for configuration and data directories
-const CONFIG_PATH = "config"
-const DATA_PATH = "data"
 
 # Define a struct for holding constraint information
 struct Constraint
@@ -141,7 +136,7 @@ function configure(inFile::String="data/config.toml")::Tuple{Config, Parameters}
     config_data = upcaseKeys(safe_read_toml(inFile))
 
     # Load configuration, forms, item bank, and IRT data
-    basic_config::BasicConfig = load_config(config_data)           # This was renamed to avoid name clashes
+    basic_config::BasicConfig = load_config(config_data)
     forms_config::AssemblyConfig = load_assembly_config(config_data)
     bank::DataFrame = read_bank_file(basic_config.items_file,
                                      basic_config.anchor_items_file)

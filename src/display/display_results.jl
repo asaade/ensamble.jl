@@ -20,7 +20,6 @@ const LABEL_NON_ANCHOR_ITEMS = "Non-anchor items used:"
 const LABEL_ANCHOR_ITEMS = "Anchor items used:"
 const LABEL_ITEMS_NOT_USED = "Items not used (without anchor):"
 
-
 """
     print_title_and_separator(title::String)
 
