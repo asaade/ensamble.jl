@@ -127,9 +127,6 @@ function read_constraints(file_path::String, parms::Parameters)
             end
 
             # Store the constraint in the dictionary
-            if haskey(constraints, cond_id)
-                error("Duplicate CONSTRAINT_ID '$cond_id' detected. Please ensure all CONSTRAINT_IDs are unique.")
-            end
             constraints[cond_id] = Constraint(cond_id, type, eval(condition), lb, ub)
         end
     end
@@ -231,9 +228,6 @@ function apply_individual_constraint!(model::Model, parms::Parameters,
     # items = 1:size(bank, 1)
 
     if constraint.type == "TEST"
-        if !(lb <= parms.n <= ub)
-            throw(DomainError("N=$(parms.n) are not between 'lb'=$lb and 'ub'=$ub in the TEST constraint"))
-        end
         parms.max_items = ub
         constraint_items_per_form(model, parms, lb, ub)
     elseif constraint.type == "NUMBER"
@@ -255,8 +249,8 @@ function apply_individual_constraint!(model::Model, parms::Parameters,
         condition = constraint.condition(bank)
         constraint_exclude_items(model, parms, condition)
     elseif constraint.type == "MAXUSE"
-        condition = constraint.condition(bank)
         parms.max_item_use = ub
+        condition = constraint.condition(bank)
         constraint_max_use(model, parms, condition, ub)
     elseif constraint.type == "OVERLAP"
         constraint_forms_overlap(model, parms, lb, ub)
@@ -282,67 +276,81 @@ function apply_constraints!(model::Model, parms::Parameters,
     return model
 end
 
-"""
-    run_conflict_checks!(parms::Parameters, conflict_constraints::Dict{String, Constraint})
 
-Run all conflict checks (Friends, Enemies, Anchor combinations) after applying non-conflict constraints.
-The failure or logging of these checks will not affect the other constraints.
 """
-function run_conflict_checks!(parms::Parameters,
-                              conflict_constraints::Dict{String, Constraint})
+    normalize_condition_values(values::Vector) -> Vector{Any}
+
+Converts Boolean vectors to group values (`true` becomes a group identifier) and normalizes other vector types.
+Missing values are preserved. This ensures the function can handle both Boolean and other types of group values.
+"""
+function normalize_condition_values(values)::Vector{Any}
+    if size(values, 2) > 1
+        values = values[1, :]
+    end
+    if isa(values[1], Bool)
+        # Convert Boolean vectors to group values where `true` becomes 1 (grouped), and `false`/`missing` remain unchanged
+        return [x ? 1 : missing for x in values]
+    else
+        # Return non-Boolean vectors as is, ensuring missing values are preserved
+        return values
+    end
+end
+
+
+function run_conflict_checks!(parms::Parameters, conflict_constraints::Dict{String, Constraint})
+    friends_constraints = find_all_constraints_by_type(conflict_constraints, "ALLORNONE")
+    enemies_constraints = find_all_constraints_by_type(conflict_constraints, "ENEMIES")
+    include_constraints = find_all_constraints_by_type(conflict_constraints, "INCLUDE")
+    friends_constraints = vcat(friends_constraints, include_constraints)
+
+    # Check conflicts between friends and enemies
     try
-        friends_constraints = find_all_constraints_by_type(conflict_constraints,
-                                                           "ALLORNONE")
-        enemies_constraints = find_all_constraints_by_type(conflict_constraints, "ENEMIES")
-        include_constraints = find_all_constraints_by_type(conflict_constraints, "INCLUDE")
-        friends_constraints = vcat(friends_constraints, include_constraints)
-
-        # Check conflicts between friends and enemies
         if !isempty(friends_constraints) && !isempty(enemies_constraints)
             for friends_constraint in friends_constraints
-                friends_values = friends_constraint.condition(parms.bank)
+                friends_values = normalize_condition_values(friends_constraint.condition(parms.bank))
 
                 for enemies_constraint in enemies_constraints
-                    enemies_values = enemies_constraint.condition(parms.bank)
+                    enemies_values = normalize_condition_values(enemies_constraint.condition(parms.bank))
 
                     # Apply one-to-many conflict rule between friends and enemies
-                    conflict_df = apply_conflict_rule(friends_values, enemies_values,
-                                                      one_to_many_conflict_rule)
+                    conflict_df = apply_conflict_rule(friends_values, enemies_values, one_to_many_conflict_rule)
                     if !isempty(conflict_df)
                         log_conflicts("Friends-Enemies", conflict_df)
                     end
                 end
             end
         end
+    catch e
+        @warn "Conflict checks for Friends-Enemies failed: $e"
+    end
 
+    try
         # Check conflicts between anchors and enemies/friends
         if parms.anchor_tests > 0
-            anchor_values = parms.bank.ANCHOR
+            anchor_values = normalize_condition_values(parms.bank.ANCHOR)
 
             for enemies_constraint in enemies_constraints
-                enemies_values = enemies_constraint.condition(parms.bank)
+                enemies_values = normalize_condition_values(enemies_constraint.condition(parms.bank))
 
                 # One-to-many conflict rule between anchor and enemies
-                conflict_df = apply_conflict_rule(anchor_values, enemies_values,
-                                                  one_to_many_conflict_rule)
+                conflict_df = apply_conflict_rule(anchor_values, enemies_values, one_to_many_conflict_rule)
                 if !isempty(conflict_df)
                     log_conflicts("Anchor-Enemies", conflict_df)
                 end
             end
 
             for friends_constraint in friends_constraints
-                friends_values = friends_constraint.condition(parms.bank)
+                friends_values = normalize_condition_values(friends_constraint.condition(parms.bank))
 
                 # All-or-none conflict rule between anchor and friends
-                conflict_df = apply_conflict_rule(friends_values, anchor_values,
-                                                  all_or_none_conflict_rule)
+                conflict_df = apply_conflict_rule(friends_values, anchor_values, all_or_none_conflict_rule)
                 if !isempty(conflict_df)
                     log_conflicts("Anchor-Friends", conflict_df)
                 end
             end
         end
     catch e
-        @warn "Conflict checks for Friends, Enemies, and Anchor failed: $e"
+        @warn "Conflict checks for Anchors-Friends/Enemies failed: $e"
     end
 end
 
@@ -352,13 +360,9 @@ end
 Helper function to retrieve a constraint by its type.
 """
 function find_constraint_by_type(constraints::Dict{String, Constraint}, type::String)
-    for constraint in values(constraints)
-        if constraint.type == type
-            return constraint
-        end
-    end
-    return nothing
+    return findfirst(c -> c.type == type, values(constraints))
 end
+
 
 """
     find_all_constraints_by_type(constraints::Dict{String, Constraint}, type::String)
@@ -376,14 +380,15 @@ end
 Logs conflicts found in data.
 If a conflict is found, the first `max_rows_to_log` rows of the conflict will be logged.
 """
-function log_conflicts(conflict_type::String, conflicting_rows::DataFrame,
-                       max_rows_to_log::Int=5)
-    if size(conflicting_rows, 1) > 0
-        @warn "Conflicting $conflict_type found"
+function log_conflicts(conflict_type::String, conflicting_rows::DataFrame, max_rows_to_log::Int=5)
+    num_conflicts = size(conflicting_rows, 1)
+    if num_conflicts > 0
+        @warn "$num_conflicts conflicting $conflict_type found"
         @warn "Displaying the first $max_rows_to_log rows of the conflict:",
               first(conflicting_rows, max_rows_to_log)
     end
 end
+
 
 """
     one_to_many_conflict_rule(values1::Vector, values2::Vector)::Vector{Tuple}
@@ -391,34 +396,30 @@ end
 Checks for one-to-many conflicts between two sets of values.
 E.g., Multiple friends linked to the same enemy or anchors linked to multiple enemies.
 """
-function one_to_many_conflict_rule(values1::Vector, values2::Vector)::Vector{Tuple}
-    # Count occurrences of each (value1, value2) pair
+function one_to_many_conflict_rule(values1, values2)::Vector{Tuple}
     counts = Dict{Tuple{Any, Any}, Int}()
     for (v1, v2) in zip(values1, values2)
-        if !ismissing(v1) && !ismissing(v2) && v1 > 0 && v2 > 0
+        if !ismissing(v1) && !ismissing(v2)
             pair = (v1, v2)
             counts[pair] = get(counts, pair, 0) + 1
         end
     end
 
-    # Return conflicting pairs where a friend or enemy appears more than once
+    # Return conflicting pairs where the same value appears more than once
     return [key for key in keys(counts) if counts[key] > 1]
 end
 
 """
-    all_or_none_conflict_rule(values1::Vector, values2::Vector)::Vector{Tuple}
+    all_or_none_conflict_rule(friends_values::Vector, anchor_values::Vector)::Vector{Tuple}
 
 Checks for all-or-none conflicts between two sets of values.
 E.g., All friends in a group should be linked to the same anchor.
 """
-function all_or_none_conflict_rule(friends_values::Vector,
-                                   anchor_values::Vector)::Vector{Tuple}
-    # Group by friends_values and check if anchor_values has consistent values for each group
+function all_or_none_conflict_rule(friends_values::Vector, anchor_values::Vector)::Vector{Tuple}
     group_dict = Dict{Any, Set{Any}}()
 
     for (friend, anchor) in zip(friends_values, anchor_values)
-        if !ismissing(friend) && !ismissing(anchor) && friend > 0 && anchor > 0
-            # Group friends by category (friend) and record their associated anchors
+        if !ismissing(friend) && !ismissing(anchor)
             if !haskey(group_dict, friend)
                 group_dict[friend] = Set{Any}()
             end
@@ -427,11 +428,10 @@ function all_or_none_conflict_rule(friends_values::Vector,
     end
 
     # Return groups where friends are associated with multiple anchors (conflicts)
-    conflicting_pairs = [(friend, anchors)
-                         for (friend, anchors) in group_dict if length(anchors) > 1]
-
-    return conflicting_pairs
+    return [(friend, anchors) for (friend, anchors) in group_dict if length(anchors) > 1]
 end
+
+
 
 """
     apply_conflict_rule(values1::Vector, values2::Vector, rule::Function)::DataFrame

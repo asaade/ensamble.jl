@@ -1,5 +1,7 @@
 module CriteriaParser
 
+export parse_criteria
+
 using DataFrames
 using StringDistances
 
@@ -179,9 +181,9 @@ it returns a vector. Otherwise, it attempts to convert the value into a float or
 
   - A vector if it's a list, a float if numeric, or a string otherwise.
 """
-function process_rhs(rhs::AbstractString)::Union{Float64, String}
+function process_rhs(rhs::AbstractString) #::Union{Float64, AbstractString}
     if match(r"^\[.*\]$", rhs) !== nothing
-        elements = split(strip(rhs, ['[', ']']), ",")
+        elements = map(String, split(strip(rhs, ['[', ']']), ","))
         return [is_numeric(el) ? parse(Float64, el) : strip(el, '"') for el in elements]
     elseif is_numeric(rhs)
         return parse(Float64, rhs)

@@ -91,7 +91,7 @@ function collect_anchors(results::DataFrame, bank::DataFrame)::String
     for i in 1:num_forms
         selected_items = collect(skipmissing(results[:, i]))
         total_items = length(selected_items)
-        anchor_items = sum(in(selected_items).(bank[bank.ANCHOR .> 0, :ID]))
+        anchor_items = sum(in(selected_items).(bank[bank.ANCHOR .!== missing, :ID]))
         non_anchor_items = total_items - anchor_items
         push!(table_data, [i, total_items, anchor_items, non_anchor_items])
     end
@@ -164,7 +164,6 @@ function collect_category_counts(results::DataFrame, bank::DataFrame,
         header = ["Form ID"; categories...]
         table_matrix = hcat(table_data...)
         return pretty_table(String, table_matrix'; header=header, alignment=:r)
-
     else
         # Case 2: Transpose the table when the number of categories is large (forms as columns)
         header = ["Category"; [string("Form ", i) for i in 1:num_forms]...]
@@ -172,6 +171,9 @@ function collect_category_counts(results::DataFrame, bank::DataFrame,
         # Construct the transposed table
         # We need to transpose both the categories and the counts
         table_matrix = hcat([categories]..., [row[2:end] for row in table_data]...)
+
+        valid_rows = [any(row[2:end] .!= 0) for row in eachrow(table_matrix)]
+        table_matrix = table_matrix[valid_rows, :]
 
         return pretty_table(String, table_matrix; header=header, alignment=:r)
     end
@@ -206,7 +208,7 @@ Generates a summary of the final assembly, including total forms, items used, an
 function collect_final_summary(parms::Parameters, results::DataFrame)::String
     bank = parms.bank
     items = bank.ID
-    anchor_items = bank[bank.ANCHOR .> 0, :ID]
+    anchor_items = bank[bank.ANCHOR .!== missing, :ID]
     items_used = unique(skipmissing(reduce(vcat, eachcol(results))))
     anchors_used = anchor_items[anchor_items .∈ Ref(items_used)]
     non_anchor_used = setdiff(items_used, anchors_used)
@@ -305,7 +307,7 @@ function final_report(parms::Parameters, results::DataFrame, config::Config,
     report_tables = collect_results_tables(parms, config, results, tolerances)
 
     save_forms(parms, results, config)
-    plot_results(parms, config, results)
+    # plot_results(parms, config, results)
 
     return report_tables
 end

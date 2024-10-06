@@ -17,9 +17,10 @@ function read_bank_file(itemsfile::AbstractString, anchorsfile::AbstractString):
     anchor = read_anchor_file(anchorsfile)
     anchor_forms = size(anchor, 2)
     @info "Loaded $anchor_forms anchor forms from $anchorsfile"
-    add_anchor_labels!(bank, anchor)
-    select_valid_items!(bank)
-    add_aux_labels!(bank)
+    bank = add_anchor_labels!(bank, anchor)
+    bank = select_valid_items!(bank)
+    bank = unique!(bank, :ID)
+    bank = add_aux_labels!(bank)
     return bank
 end
 
@@ -63,7 +64,7 @@ Adds a column to the DataFrame with and ID number for the anchor test or zero.
 """
 function add_anchor_labels!(bank::DataFrame, anchor_tests::DataFrame)::DataFrame
     anchor_forms = size(anchor_tests, 2)
-    bank.ANCHOR = fill(0, size(bank, 1))
+    bank.ANCHOR = Vector{Union{Missing, Int}}(missing, nrow(bank))
 
     for i in 1:anchor_forms
         dfv = view(bank, bank.ID .∈ Ref(anchor_tests[:, i]), :)
@@ -95,8 +96,7 @@ function select_valid_items!(bank::DataFrame)::DataFrame
     # unique!(bank, :ID)
     bank.A = coalesce.(bank.A, 1.0)
     bank.C = coalesce.(bank.C, 0.0)
-    filter!(row -> (0.4 <= row.A <= 2.0 && -3.5 <= row.B <= 3.5 && 0.0 <= row.C <= 0.5),
-            bank)
+    filter!(row -> (0.4 <= row.A <= 2.0 && -3.5 <= row.B <= 3.5 && 0.0 <= row.C <= 0.5), bank)
     invalid_items = original_size - size(bank, 1)
     invalid_items > 0 && @warn string(invalid_items, " invalid items in bank.")
     return bank

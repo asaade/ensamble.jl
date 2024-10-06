@@ -3,6 +3,8 @@ __precompile__()
 
 export assemble_tests
 
+# using Infiltrator
+
 # Import necessary packages
 using JuMP
 using DataFrames
@@ -144,8 +146,8 @@ function handle_anchor_items(parms::Parameters, orig_parms::Parameters)::Paramet
         parms.anchor_tests = (parms.anchor_tests % total_anchors) + 1
 
         # Remove old anchor items and add the new anchor test items
-        bank_without_anchors = filter(row -> row.ANCHOR == 0, parms.bank)
-        new_anchors = filter(row -> row.ANCHOR == parms.anchor_tests, orig_parms.bank)
+        bank_without_anchors = filter(row -> ismissing(row.ANCHOR), parms.bank)
+        new_anchors = filter(row -> !ismissing(row.ANCHOR) && row.ANCHOR == parms.anchor_tests, orig_parms.bank)
         parms.bank = vcat(bank_without_anchors, new_anchors)
 
         # Update parameters based on the method
@@ -176,10 +178,12 @@ Main entry point for assembling tests. Loads configurations, runs the solver,
 and processes the results, then generates and saves a report.
 """
 function assemble_tests(config_file::String="data/config.toml")::DataFrame
-    config, original_parms = configure_system(config_file)
-    # validate_parameters(original_parms)
+    config, orig_parms = configure_system(config_file)
+    # @infiltrate
 
-    parms = deepcopy(original_parms)
+    # validate_parameters(orig_parms)
+
+    parms = deepcopy(orig_parms)
     constraints = read_constraints(config.constraints_file, parms)
     results_df = DataFrame()
 
@@ -193,7 +197,8 @@ function assemble_tests(config_file::String="data/config.toml")::DataFrame
     while parms.f > 0
         parms.num_forms = min(parms.num_forms, parms.f)
         parms.shadow_test = max(0, parms.f - parms.num_forms)
-        handle_anchor_items(parms, original_parms)
+        # @infiltrate
+        handle_anchor_items(parms, orig_parms)
 
         model = Model()
         configure_solver!(model, parms, config.solver)
@@ -219,13 +224,10 @@ function assemble_tests(config_file::String="data/config.toml")::DataFrame
     end
 
     # Assuming you have the required parameters, results, config, and tolerances
-    report_data = final_report(original_parms, results_df, config, tolerances)
+    report_data = final_report(orig_parms, results_df, config, tolerances)
 
     # Generate the report as a string
     report = generate_report(report_data)
-
-    # # Print the report to the console
-    # println(report)
 
     # Optionally, save the report to a file
     write("results/test_assembly_report.txt", report)
