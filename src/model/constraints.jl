@@ -8,7 +8,7 @@ export constraint_items_per_form, constraint_item_count,
        objective_match_characteristic_curve!, objective_match_information_curve!,
        objective_max_info, objective_info_relative2
 
-#  using Infiltrator
+#
 
 using DataFrames
 using JuMP
@@ -232,7 +232,7 @@ function constraint_add_anchor!(model::Model, parms::Parameters)
         forms = operational_forms(x, parms.shadow_test)
         anchor_items = findall(parms.bank.ANCHOR .!== missing)
 
-        # @infiltrate
+
 
         for i in anchor_items
             for f in 1:forms

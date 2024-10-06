@@ -3,7 +3,7 @@ __precompile__()
 
 export assemble_tests
 
-# using Infiltrator
+
 
 # Import necessary packages
 using JuMP
@@ -179,7 +179,7 @@ and processes the results, then generates and saves a report.
 """
 function assemble_tests(config_file::String="data/config.toml")::DataFrame
     config, orig_parms = configure_system(config_file)
-    # @infiltrate
+
 
     # validate_parameters(orig_parms)
 
@@ -197,7 +197,7 @@ function assemble_tests(config_file::String="data/config.toml")::DataFrame
     while parms.f > 0
         parms.num_forms = min(parms.num_forms, parms.f)
         parms.shadow_test = max(0, parms.f - parms.num_forms)
-        # @infiltrate
+
         handle_anchor_items(parms, orig_parms)
 
         model = Model()
