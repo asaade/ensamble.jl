@@ -2,10 +2,10 @@ module StatsFunctions
 
 # Export the key functions to be used by other modules
 export Probability,
-       Information, calc_tau, calc_info_tau,
-       observed_score_distribution_continuous, lw_dist
+    Information, calc_tau, calc_info_tau,
+    observed_score_continuous, lw_dist
 
-using Random, Distributions, QuadGK, Logging
+using Random, Distributions, QuadGK
 
 """
     Probability(θ::Float64, b::Float64, a::Float64, c::Float64; d::Float64 = 1.0) -> Float64
@@ -15,8 +15,8 @@ Calculates the probability of success given the IRT parameters and ability level
 # Arguments
 
   - `θ`: The ability parameter.
-  - `a`: The discrimination parameter.
   - `b`: The difficulty parameter.
+  - `a`: The discrimination parameter.
   - `c`: The guessing parameter.
   - `d`: Scaling constant (default is 1.0).
 
@@ -59,8 +59,8 @@ Calculates the item information function for a vector of items.
 # Arguments
 
   - `θ`: The ability parameter.
-  - `a`: Vector of discrimination parameters.
   - `b`: Vector of difficulty parameters.
+  - `a`: Vector of discrimination parameters.
   - `c`: Vector of guessing parameters.
   - `d`: Scaling constant (default is 1.0).
 
@@ -175,7 +175,7 @@ function lw_dist(item_params::Matrix{Float64}, θ::Float64)::Vector{Float64}
 end
 
 """
-    observed_score_distribution(item_params::Matrix{Float64}, num_examinees::Int) -> Vector{Float64}
+    observed_score(item_params::Matrix{Float64}, num_examinees::Int) -> Vector{Float64}
 
 Calculates the observed score distribution for a group of examinees.
 
@@ -188,8 +188,8 @@ Calculates the observed score distribution for a group of examinees.
 
   - The observed score distribution as a vector.
 """
-function observed_score_distribution(item_params::Matrix{Float64},
-                                     num_examinees::Int)::Vector{Float64}
+function observed_score(item_params::Matrix{Float64},
+                        num_examinees::Int)::Vector{Float64}
     abilities = simulate_abilities(num_examinees)
     max_score = size(item_params, 2)
     cumulative_distribution = zeros(Float64, max_score + 1)
@@ -203,7 +203,7 @@ function observed_score_distribution(item_params::Matrix{Float64},
 end
 
 """
-    observed_score_distribution_continuous(item_params::Matrix{Float64}, ability_dist::Normal; num_points::Int = 100) -> Vector{Float64}
+    observed_score_continuous(item_params::Matrix{Float64}, ability_dist::Normal; num_points::Int = 100) -> Vector{Float64}
 
 Calculates the observed score distribution using numerical integration.
 
@@ -217,9 +217,9 @@ Calculates the observed score distribution using numerical integration.
 
   - The observed score distribution as a vector.
 """
-function observed_score_distribution_continuous(item_params::Matrix{Float64},
-                                                ability_dist::Normal;
-                                                num_points::Int=100)::Vector{Float64}
+function observed_score_continuous(item_params::Matrix{Float64},
+                                   ability_dist::Normal;
+                                   num_points::Int=100)::Vector{Float64}
     num_items = size(item_params, 2)
 
     function integrand(θ, x)

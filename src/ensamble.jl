@@ -207,7 +207,7 @@ function assemble_tests(config_file::String="data/config.toml")::DataFrame
         if run_optimization(model)
             results_df = process_and_store_results!(model, parms, results_df)
             tolerances = vcat(tolerances, round(objective_value(model); digits=4))
-            display_results(model, parms)
+            show_results(model, parms)
             assembled_forms += parms.num_forms
             parms.f -= parms.num_forms
             println("Forms assembled: $assembled_forms")
@@ -223,7 +223,6 @@ function assemble_tests(config_file::String="data/config.toml")::DataFrame
         end
     end
 
-    # Assuming you have the required parameters, results, config, and tolerances
     report_data = final_report(orig_parms, results_df, config, tolerances)
 
     # Generate the report as a string
