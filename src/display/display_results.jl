@@ -1,91 +1,79 @@
 module DisplayResults
 
-export final_report, generate_report, display_results
+export final_report, generate_report, show_results
 
-using JuMP
-using DataFrames
-using Dates
-using PrettyTables
-
-using ..Configuration
-using ..Utils
-
+using JuMP, DataFrames, Dates, PrettyTables
+using ..Configuration, ..Utils
 include("charts.jl")
 using .Charts
 
-# Constants for labels used across the reporting functions
-const LABEL_TOTAL_FORMS = "Total forms assembled:"
-const LABEL_ITEMS_USED = "Total items used (includes anchor):"
-const LABEL_NON_ANCHOR_ITEMS = "Non-anchor items used:"
-const LABEL_ANCHOR_ITEMS = "Anchor items used:"
-const LABEL_ITEMS_NOT_USED = "Items not used (without anchor):"
+# Constants for labels used in reporting
+const LABEL_FORMS = "Total forms:"
+const LABEL_ITEMS = "Total items (with anchor):"
+const LABEL_NON_ANCHOR = "Non-anchor items:"
+const LABEL_ANCHOR = "Anchor items:"
+const LABEL_UNUSED = "Unused items (non-anchor):"
 
 """
-    print_title_and_separator(title::String)
+    title_with_separator(title)
 
-Prints a title followed by a separator line for formatting.
+Prints a title with a separator.
 """
-function print_title_and_separator(title::String)
+function title_with_separator(title::String)
     println("\n" * title)
     println(repeat("=", length(title)))
-    return nothing
 end
 
 """
-    print_optimization_results(model::Model, parms::Parameters)
+    show_opt_results(model, parms)
 
-Prints the optimization results including the objective value and a tolerance summary.
+Displays the optimization results, including objective value.
 """
-function print_optimization_results(model::Model, parms::Parameters)
+function show_opt_results(model::Model, parms::Parameters)
     parms.verbose > 1 && println(solution_summary(model))
-    println("Value: ", round(objective_value(model); digits=4))
+    println("Objective: ", round(objective_value(model); digits=4))
     println("=====================================")
-    return nothing
 end
 
 """
-    check_empty_results!(results::DataFrame)
+    check_empty!(df)
 
-Throws an error if the `results` DataFrame is empty.
+Throws an error if the DataFrame is empty.
 """
-function check_empty_results!(results::DataFrame)
-    return isempty(results) && throw(ArgumentError("Results DataFrame is empty."))
+function check_empty!(df::DataFrame)
+    isempty(df) && throw(ArgumentError("Results are empty."))
 end
 
 """
-    check_column_exists!(column_name::String, bank::DataFrame)
+    check_column!(col_name, df)
 
-Checks if a column exists in the `bank` DataFrame, throws an error if not.
+Checks if a column exists in the DataFrame.
 """
-function check_column_exists!(column_name::String, bank::DataFrame)
-    if !(column_name in names(bank)) || isempty(column_name)
-        throw(ArgumentError("The column '$column_name' does not exist in the bank DataFrame or is invalid."))
-    end
+function check_column!(col_name::String, df::DataFrame)
+    col_name in names(df) || throw(ArgumentError("Column '$col_name' does not exist."))
 end
 
 """
-    display_results(model::Model, parms::Parameters)
+    show_results(model, parms)
 
-Display the optimization results for the current cycle, including tolerance and objective value.
+Displays optimization results, including tolerance and objective value.
 """
-function display_results(model::Model, parms::Parameters)
-    print_title_and_separator("Optimization Results:")
-    print_optimization_results(model, parms)
-    return nothing
+function show_results(model::Model, parms::Parameters)
+    title_with_separator("Optimization Results")
+    show_opt_results(model, parms)
 end
 
 """
-    collect_anchors(results::DataFrame, bank::DataFrame) -> String
+    anchor_summary(results, bank) -> String
 
-Returns the item distribution summary (total items, anchor, non-anchor) as a transposed table string.
-Forms will appear in the rows, and item types will be in the columns.
+Returns a table summarizing item distribution (total, anchor, non-anchor) for each form.
 """
-function collect_anchors(results::DataFrame, bank::DataFrame)::String
-    check_empty_results!(results)
-    check_column_exists!("ANCHOR", bank)
+function anchor_summary(results::DataFrame, bank::DataFrame)::String
+    check_empty!(results)
+    check_column!("ANCHOR", bank)
 
     num_forms = size(results, 2)
-    header = ["Form ID", "Total", "Anchor", "Non-anchor"]
+    header = ["Form", "Total", "Anchor", "Non-anchor"]
     table_data = []
 
     for i in 1:num_forms
@@ -96,188 +84,155 @@ function collect_anchors(results::DataFrame, bank::DataFrame)::String
         push!(table_data, [i, total_items, anchor_items, non_anchor_items])
     end
 
-    # Convert the table data to a matrix and transpose it
     table_matrix = hcat(table_data...)'
-
-    # Return the PrettyTable formatted string with the transposed matrix
-    return pretty_table(String, table_matrix; header=header, alignment=:r)
+    pretty_table(String, table_matrix; header=header, alignment=:r)
 end
 
 """
-    collect_column_sums(results::DataFrame, bank::DataFrame, column_names) -> String
+    col_sums(results, bank, cols) -> String
 
-Returns the sum of values from one or more specified columns in the bank DataFrame for each form.
+Returns a table showing the sum of values from specified columns for each form.
 """
-function collect_column_sums(results::DataFrame, bank::DataFrame, column_names)::String
-    check_empty_results!(results)
+function col_sums(results::DataFrame, bank::DataFrame, cols)::String
+    check_empty!(results)
 
     num_forms = size(results, 2)
     item_ids = bank[:, :ID]
-    column_names = typeof(column_names) in [String, Symbol] ? [column_names] : column_names
-    column_names = String.(column_names)
+    cols = String.(cols isa AbstractString ? [cols] : cols)
 
-    for column_name in column_names
-        check_column_exists!(column_name, bank)
+    for col in cols
+        check_column!(col, bank)
     end
 
     form_ids = collect(1:num_forms)
     table_data = [form_ids]
 
-    for col in column_names
-        column_sums = [sum(bank[findall(in(skipmissing(results[:, i])), item_ids), col])
-                       for i in 1:num_forms]
-        push!(table_data, column_sums)
+    for col in cols
+        col_sum = [sum(bank[findall(in(skipmissing(results[:, i])), item_ids), col])
+                   for i in 1:num_forms]
+        push!(table_data, col_sum)
     end
 
-    return pretty_table(String, hcat(table_data...); header=["Form ID"; column_names...],
-                        alignment=:r)
+    pretty_table(String, hcat(table_data...); header=["Form"; cols...], alignment=:r)
 end
 
 """
-    collect_category_counts(results::DataFrame, bank::DataFrame, column_name::Union{String, Symbol}; max_categories::Int=10) -> String
+    cat_counts(results, bank, col; max_cats=10) -> String
 
-Generates a table with counts of items in the specified column grouped by their value (category) for each form.
-If the number of categories exceeds `max_categories`, the table is transposed with forms as columns.
+Returns a table showing the counts of items grouped by category in the specified column for each form.
 """
-function collect_category_counts(results::DataFrame, bank::DataFrame,
-                                 column_name::Union{String, Symbol};
-                                 max_categories::Int=10)::String
-    check_empty_results!(results)
-    check_column_exists!(String(column_name), bank)
+function cat_counts(results::DataFrame, bank::DataFrame, col::Union{String, Symbol}; max_cats::Int=10)::String
+    check_empty!(results)
+    check_column!(String(col), bank)
 
     num_forms = size(results, 2)
-    categories = sort(unique(collect(skipmissing(bank[!, Symbol(column_name)]))))
-    non_missing_bank = filter(row -> !ismissing(row[Symbol(column_name)]), bank)
+    categories = sort(unique(collect(skipmissing(bank[!, Symbol(col)]))))
+    non_missing_bank = filter(row -> !ismissing(row[Symbol(col)]), bank)
 
-    # Prepare the table data with form IDs as rows and category counts as columns
     table_data = []
     for i in 1:num_forms
         selected_items = skipmissing(results[:, i])
-        form_counts = [sum(non_missing_bank[in(selected_items).(non_missing_bank.ID),
-                                            Symbol(column_name)] .== category)
+        form_counts = [sum(non_missing_bank[in(selected_items).(non_missing_bank.ID), Symbol(col)] .== category)
                        for category in categories]
         push!(table_data, [i; form_counts...])
     end
 
-    if length(categories) <= max_categories
-        # Case 1: Number of categories is manageable (categories as columns)
-        header = ["Form ID"; categories...]
+    if length(categories) <= max_cats
+        header = ["Form"; categories...]
         table_matrix = hcat(table_data...)
-        return pretty_table(String, table_matrix'; header=header, alignment=:r)
+        pretty_table(String, table_matrix'; header=header, alignment=:r)
     else
-        # Case 2: Transpose the table when the number of categories is large (forms as columns)
         header = ["Category"; [string("Form ", i) for i in 1:num_forms]...]
-
-        # Construct the transposed table
-        # We need to transpose both the categories and the counts
         table_matrix = hcat([categories]..., [row[2:end] for row in table_data]...)
-
         valid_rows = [any(row[2:end] .!= 0) for row in eachrow(table_matrix)]
-        table_matrix = table_matrix[valid_rows, :]
-
-        return pretty_table(String, table_matrix; header=header, alignment=:r)
+        pretty_table(String, table_matrix[valid_rows, :]; header=header, alignment=:r)
     end
 end
 
 """
-    collect_common_items(results::DataFrame) -> String
+    common_items(results) -> String
 
-Returns a matrix showing the number of common items between each pair of forms.
+Returns a matrix showing common items between each pair of forms.
 """
-function collect_common_items(results::DataFrame)::String
-    check_empty_results!(results)
+function common_items(results::DataFrame)::String
+    check_empty!(results)
 
     num_forms = size(results, 2)
-    common_items_matrix = zeros(Int, num_forms, num_forms)
+    common_matrix = zeros(Int, num_forms, num_forms)
 
     for i in 1:num_forms, j in 1:num_forms
         common = in(skipmissing(results[:, i])).(skipmissing(results[:, j]))
-        common_items_matrix[i, j] = sum(common)
+        common_matrix[i, j] = sum(common)
     end
 
     header = [""; collect(1:num_forms)...]
-    return pretty_table(String, hcat(collect(1:num_forms), common_items_matrix);
-                        header=header, alignment=:r)
+    pretty_table(String, hcat(collect(1:num_forms), common_matrix); header=header, alignment=:r)
 end
 
 """
-    collect_final_summary(parms::Parameters, results::DataFrame) -> String
+    final_summary(parms, results) -> String
 
-Generates a summary of the final assembly, including total forms, items used, anchor items, and remaining items.
+Returns a table summarizing the final assembly, including total forms, items used, and remaining items.
 """
-function collect_final_summary(parms::Parameters, results::DataFrame)::String
+function final_summary(parms::Parameters, results::DataFrame)::String
     bank = parms.bank
     items = bank.ID
     anchor_items = bank[bank.ANCHOR .!== missing, :ID]
-    items_used = unique(skipmissing(reduce(vcat, eachcol(results))))
-    anchors_used = anchor_items[anchor_items .∈ Ref(items_used)]
-    non_anchor_used = setdiff(items_used, anchors_used)
+    used_items = unique(skipmissing(reduce(vcat, eachcol(results))))
+    used_anchors = anchor_items[anchor_items .∈ Ref(used_items)]
+    used_non_anchors = setdiff(used_items, used_anchors)
 
-    # Separate labels and values into two columns for PrettyTables
-    labels = [LABEL_TOTAL_FORMS,
-              LABEL_ITEMS_USED,
-              LABEL_NON_ANCHOR_ITEMS,
-              LABEL_ANCHOR_ITEMS,
-              LABEL_ITEMS_NOT_USED]
+    labels = [LABEL_FORMS, LABEL_ITEMS, LABEL_NON_ANCHOR, LABEL_ANCHOR, LABEL_UNUSED]
+    values = [size(results, 2), length(used_items), length(used_non_anchors), length(used_anchors), length(items) - length(anchor_items) - length(used_items)]
 
-    values = [size(results, 2),
-              length(items_used),
-              length(non_anchor_used),
-              length(anchors_used),
-              length(items) - length(anchor_items) - length(items_used)]
-
-    header = ["Concept", "Count"]
-    return pretty_table(String, hcat(labels, string.(values)); header=header,
-                        alignment=[:l, :r])
+    pretty_table(String, hcat(labels, string.(values)); header=["Concept", "Count"], alignment=[:l, :r])
 end
 
 """
-    collect_tolerances(tolerances::Vector{Float64}) -> String
+    tolerances_table(tols) -> String
 
-Collects the tolerances for each form and returns them as a table string.
+Returns a table of tolerances for each form.
 """
-function collect_tolerances(tolerances::Vector{Float64})::String
-    header = ["Form ID"; "Tolerance"]
-    forms_id = [string("Form ", lpad(s, 2)) for s in 1:length(tolerances)]
-    table_dict = Dict(k => rpad(v, 6, "0") for (k, v) in zip(forms_id, tolerances))
+function tolerances_table(tols::Vector{Float64})::String
+    header = ["Form", "Tolerance"]
+    form_ids = [string("Form ", lpad(s, 2)) for s in 1:length(tols)]
+    table_data = Dict(k => rpad(v, 6, "0") for (k, v) in zip(form_ids, tols))
 
-    return pretty_table(String, table_dict; sortkeys=true, header=header, alignment=:c)
+    return pretty_table(String, table_data; header=header, alignment=:c)
 end
 
-"""
-    collect_results_tables(parms::Parameters, config::Config, results::DataFrame, tolerances::Vector{Float64}) -> Dict{String, String}
 
-Generates the final report of the test assembly process, gathering tables and summaries into a Dict for later processing.
 """
-function collect_results_tables(parms::Parameters, config::Config, results::DataFrame,
-                                tolerances::Vector{Float64})::Dict{String, String}
-    results_dict = Dict{String, String}()
+    gather_tables(parms, config, results, tols) -> Dict{String, String}
 
-    results_dict["Summary"] = collect_final_summary(parms, results)
-    results_dict["ANCHOR use"] = collect_anchors(results, parms.bank)
+Gathers summary tables into a dictionary for the final report.
+"""
+function gather_tables(parms::Parameters, config::Config, results::DataFrame, tols::Vector{Float64})::Dict{String, String}
+    tables = Dict{String, String}()
+
+    tables["Summary"] = final_summary(parms, results)
+    tables["Anchor"] = anchor_summary(results, parms.bank)
 
     if !isempty(config.report_categories)
-        for category in config.report_categories
-            results_dict["$category count"] = collect_category_counts(results, parms.bank,
-                                                                      category)
+        for cat in config.report_categories
+            tables["$cat counts"] = cat_counts(results, parms.bank, cat)
         end
     end
 
     if !isempty(config.report_sums)
-        results_dict["Column sums"] = collect_column_sums(results, parms.bank,
-                                                          config.report_sums)
+        tables["Column sums"] = col_sums(results, parms.bank, config.report_sums)
     end
 
-    results_dict["Common items"] = collect_common_items(results)
-    results_dict["Optimization tolerances"] = collect_tolerances(tolerances)
+    tables["Common items"] = common_items(results)
+    tables["Tolerances"] = tolerances_table(tols)
 
-    return results_dict
+    tables
 end
 
 """
-    save_forms(parms::Parameters, results::DataFrame, config::Config)
+    save_forms(parms, results, config)
 
-Saves the forms to a file, marking used items with a checkmark.
+Saves the forms and results to files.
 """
 function save_forms(parms::Parameters, results::DataFrame, config::Config)
     bank = deepcopy(parms.bank)
@@ -287,81 +242,61 @@ function save_forms(parms::Parameters, results::DataFrame, config::Config)
                                  bank.ID .∈ Ref(skipmissing(results[:, v])))
     end
 
-    write_results_to_file(bank, config.forms_file)
-    write_results_to_file(results, config.results_file)
+    save_to_csv(bank, config.forms_file)
+    save_to_csv(results, config.results_file)
 
-    println("\nSaved Forms and Results:")
-    println("========================")
+    println("\nSaved Forms and Results")
+    println("=======================")
     println("Modified bank saved to: ", config.forms_file)
-    println("Resulting forms saved to: ", config.results_file)
-    return nothing
+    println("Results saved to: ", config.results_file)
 end
 
 """
-    final_report(parms::Parameters, results::DataFrame, config::Config, tolerances::Vector{Float64}) -> Dict{String, String}
+    report(parms, results, config, tols) -> Dict{String, String}
 
-Generates the final report of the optimization process and returns it as a Dict for further use.
+Generates the final report and returns it as a dictionary.
 """
-function final_report(parms::Parameters, results::DataFrame, config::Config,
-                      tolerances::Vector{Float64})::Dict{String, String}
-    report_tables = collect_results_tables(parms, config, results, tolerances)
-
+function final_report(parms::Parameters, results::DataFrame, config::Config, tols::Vector{Float64})::Dict{String, String}
+    report_data = gather_tables(parms, config, results, tols)
     save_forms(parms, results, config)
     plot_results(parms, config, results)
-
-    return report_tables
+    report_data
 end
 
 """
-    generate_report(report_data::Dict{String, String}) -> String
+    generate_report(report_data) -> String
 
-Generates a formatted report using the results from final_report, with sections for summary,
-anchor usage, category counts, column sums, common items, and tolerances.
+Generates a formatted report with sections for summary, anchor usage,
+counts and sum for selected columns, and form optimization tolerances.
 """
 function generate_report(report_data::Dict{String, String})::String
-    report = ""
-
-    # Title Section
-    report *= "Report on Automatic Test Assembly Results\n"
-    report *= "Generated using Ensamble.jl\n"
+    report = "Report on Test Assembly Results\n"
+    report *= "Generated by Ensamble.jl\n"
     report *= "Date: $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))\n\n"
 
-    # Add Summary
-    report *= "Summary of Final Results\n"
-    report *= report_data["Summary"]
-    report *= "\n\n"
+    report *= "Summary\n"
+    report *= report_data["Summary"] * "\n\n"
 
-    # Add Optimization Tolerances
-    report *= "Optimization Tolerances\n"
-    report *= report_data["Optimization tolerances"]
-    report *= "\n\n"
+    report *= "Tolerances\n"
+    report *= report_data["Tolerances"] * "\n\n"
 
-    # Add Common Items Matrix
-    report *= "Common Items Matrix\n"
-    report *= report_data["Common items"]
-    report *= "\n\n"
+    report *= "Common Items\n"
+    report *= report_data["Common items"] * "\n\n"
 
-    # Add Anchor Usage
-    report *= "Anchor Item Usage\n"
-    report *= report_data["ANCHOR use"]
-    report *= "\n\n"
+    report *= "Anchor Items\n"
+    report *= report_data["Anchor"] * "\n\n"
 
-    # Add Category Counts (handle multiple categories dynamically)
-    category_keys = filter(key -> endswith(key, "count"), keys(report_data))
-    for category_key in category_keys
-        report *= "Category Counts for $(replace(category_key, " count" => ""))\n"
-        report *= report_data[category_key]
-        report *= "\n\n"
+    for cat_key in filter(key -> endswith(key, "counts"), keys(report_data))
+        report *= "Category Counts for $(replace(cat_key, " counts" => ""))\n"
+        report *= report_data[cat_key] * "\n\n"
     end
 
-    # Add Column Sums (if present)
     if haskey(report_data, "Column sums")
         report *= "Column Sums\n"
-        report *= report_data["Column sums"]
-        report *= "\n\n"
+        report *= report_data["Column sums"] * "\n\n"
     end
 
-    return report
+    report
 end
 
 end
