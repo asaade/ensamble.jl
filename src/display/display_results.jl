@@ -307,7 +307,7 @@ function final_report(parms::Parameters, results::DataFrame, config::Config,
     report_tables = collect_results_tables(parms, config, results, tolerances)
 
     save_forms(parms, results, config)
-    # plot_results(parms, config, results)
+    plot_results(parms, config, results)
 
     return report_tables
 end

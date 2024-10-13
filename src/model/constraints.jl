@@ -109,8 +109,8 @@ function constraint_item_sum(model::Model, parms::Parameters, vals, minVal, maxV
     items, forms = size(x)
     forms = operational_forms(x, parms.shadow_test)
 
-    val = size(vals, 2) == 1 ? vals[:, 1] : vals[:, 2]
-    cond = size(vals, 2) == 1 ? trues(length(vals)) : vals[:, 1]
+    val = ndims(vals) == 1 ? vals[:, 1] : vals[:, 2]
+    cond = ndims(vals) == 1 ? trues(length(vals)) : vals[:, 1]
 
     @constraint(model, [f = 1:forms],
                 sum(x[i, f] * val[i] for i in 1:items if cond[i]) >= minVal)

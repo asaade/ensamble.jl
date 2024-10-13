@@ -8,7 +8,7 @@ export assemble_tests
 # Import necessary packages
 using JuMP
 using DataFrames
-using Logging, LoggingExtras
+using Logging #, LoggingExtras
 using PrettyTables
 
 include("constants.jl")

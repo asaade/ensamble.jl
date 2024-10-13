@@ -3,10 +3,12 @@ module SolverConfiguration
 export configure_solver!
 
 using JuMP
+
+ENV["CPLEX_STUDIO_BINARIES"] = "/home/asaade/.bin/ILOG/CPLEX_Studio/cplex/bin/x86-64_linux/"
 using CPLEX
 using Cbc
-using GLPK
-using Gurobi
+# using GLPK
+# using Gurobi
 using HiGHS
 using SCIP
 

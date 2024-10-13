@@ -382,3 +382,32 @@ function parse_criteria(input_str::AbstractString; max_length::Int=100)::Functio
 end
 
 end  # module CriteriaParser
+
+
+# # Example usage
+# df = DataFrame(CLAVE = [1, 2, 3, 4], AREA = ["A", "B", "C", "D"], A = [0.6, 0.4, 0.9, 0.2])
+
+# expr1 = parse_criteria("CLAVE == 1")
+# result1 = eval(expr1)(df)
+# println(result1)
+
+# expr2 = parse_criteria("CLAVE in [1, 2, 3]")
+# result2 = eval(expr2)(df)
+# println(result2)
+
+# expr3 = parse_criteria("AREA, CLAVE >= 1")
+# result3 = eval(expr3)(df)
+# println(result3)
+
+# expr4 = parse_criteria("AREA")
+# result4 = eval(expr4)(df)
+# println(result5)
+
+
+# expr5 = parse_criteria("AREA in ['A', 'B']")
+# result5 = eval(expr5)(df)
+# println(result5)
+
+# expr6 = parse_criteria("")
+# result6 = eval(expr6)(df)
+# println(result6)  # Should always print true
