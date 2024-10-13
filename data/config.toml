@@ -1,11 +1,11 @@
 [FORMS]
 N = 60
-NumForms = 8
+NumForms = 12
 AnchorTests = 4
 ShadowTest = 1
 
 [IRT]
-METHOD = "TIC"
+METHOD = "TCC"
 THETA = [-2.5, -1.5, 0.0, 1.5, 2.5]
 TAU = []  # or it could be a vector of vectors [[0.5, 0.4], [0.6, 0.5], [0.7, 0.6], [0.8, 0.7]]
 TAU_INFO = [] # or a vector  [0.3, 0.4, 0.5, 0.6]
