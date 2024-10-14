@@ -13,7 +13,7 @@ using ..Configuration, ..Utils
 
 Extracts IRT parameters (a, b, c) for selected items.
 """
-function irt_params(bank::DataFrame, items::Vector{String})
+function irt_params(bank::DataFrame, items::Vector)
     idx = bank.ID .∈ Ref(skipmissing(items))
     return bank[idx, :A], bank[idx, :B], bank[idx, :C]
 end
@@ -26,8 +26,8 @@ Simulates test scores based on ability distribution.
 function simulate_scores(parms::Parameters, results::DataFrame, dist::Distribution=Normal(0, 1))
     bank = parms.bank
     n_items, n_forms = size(results)
-    n_items += 1  # Account for padded missing values
-    n_cols = length(names(results))
+    n_items += 1  # Account for padded 0 score
+    n_forms = size(results, 2)
 
     # Preallocate a matrix to store results (thread-safe)
     sim_matrix = Matrix{Union{Missing, Float64}}(missing, n_items, n_forms)
@@ -181,7 +181,8 @@ function combine_plots(parms::Parameters, theta_range::Union{AbstractVector, Abs
                             title="Test Form Characteristic Curves",
                             xlabel="Ability (θ)", ylabel="Expected Score",
                             linewidth=2, label="", grid=:both, legend=:topright,
-                            xticks=:auto, yticks=:auto, color=:viridis)
+                            xticks=:auto, yticks=:auto, color=:viridis,
+                            ylims = (0, parms.max_items))
     parms.method == "TCC" && scatter!(parms.theta, parms.tau[1, :]; label="", markersize=3)
 
     # Add information curves on the same graph using dual axes (right axis for info curves)
@@ -191,7 +192,7 @@ function combine_plots(parms::Parameters, theta_range::Union{AbstractVector, Abs
                             linewidth=2, label="", grid=:both, color=:plasma)
 
     # Overlay a reference line at θ = 0
-    vline!([0], color=:gray, linestyle=:dash)
+    vline!([0], color=:gray, linestyle=:dash, label="")
 
     # Plot simulated observed scores with score distribution (optional)
     p3 = @df sim_data plot(1:size(sim_data, 1), cols(),
@@ -200,59 +201,6 @@ function combine_plots(parms::Parameters, theta_range::Union{AbstractVector, Abs
 
     # Combine plots into a single layout with consistent sizes
     plot(p1, p2, p3; layout=(2, 2), size=(950, 850), margin=8mm)
-end
-
-
-"""
-    combine_plots_with_ability_distribution(parms::Parameters, theta_range::Union{AbstractVector, AbstractRange},
-                                            char_data::DataFrame, info_data::DataFrame,
-                                            sim_data::DataFrame, sample_size::Int=1000)
-
-Combines characteristic, information, and simulated score plots,
-with ability distribution, aligned by shared x-axis (ability θ).
-"""
-function combine_plots_with_ability_distribution(parms::Parameters, theta_range::Union{AbstractVector, AbstractRange},
-                                                  char_data::DataFrame, info_data::DataFrame,
-                                                  sim_data::DataFrame, sample_size::Int=1000)
-
-    theme(:default)
-    gr(; size=(950, 1200))  # Adjusted height for better vertical spacing
-
-    # Plot 1: Characteristic Curves with shared x-axis limits
-    p1 = @df char_data plot(theta_range, cols(), title="Characteristic Curves", xlabel="",
-                            ylabel="Expected Score", linewidth=2, label="", xlims=(-3, 3))
-
-    # Plot 2: Information Curves with shared x-axis limits
-    p2 = @df info_data plot(theta_range, cols(), title="Information Curves", xlabel="",
-                            ylabel="Information", linewidth=2, label="", xlims=(-3, 3))
-
-    # Simulated Scores Alignment with θ
-    # We already have the simulated scores data (sim_data), and we want to align its x-axis
-    # (items) with the θ ability levels. We'll use the characteristic curves to map this alignment.
-
-    # Transform the x-axis of the simulated scores based on expected score at each θ value
-    mean_expected_scores = mean(Matrix(char_data), dims=2)  # Average expected score across forms
-
-    # Use `mean_expected_scores` to map the item indices in `sim_data` to θ
-    n_items = size(sim_data, 1)  # Number of items in the simulated score data
-    item_indices = collect(1:n_items)  # Original item indices
-
-    # Assume that the expected scores correspond to some average behavior across items
-    # We can map these to the same θ scale used in p1 and p2
-    transformed_x = range(-3, 3, length=n_items)  # Rescale item indices to θ range (-3 to 3)
-
-    # Plot 3: Simulated Scores aligned with Ability (θ)
-    p3 = plot(transformed_x, mean(Matrix(sim_data), dims=2); title="Simulated Observed Scores with Ability Distribution",
-              xlabel="Ability (θ)", ylabel="Percentage", linewidth=2, label="Scores", color=:green, xlims=(-3, 3))
-
-    # Add ability distribution on the simulated score plot
-    ability_dist = rand(Normal(0, 1), sample_size)
-    hist = histogram!(ability_dist, alpha=0.3, normalize=true, label="θ Distribution", color=:red)
-
-    # Combine the plots into a single vertically aligned layout
-    combined_plot = plot(p1, p2, p3; layout=(3, 1), size=(950, 1200), margin=5mm)
-
-    return combined_plot
 end
 
 

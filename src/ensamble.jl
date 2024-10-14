@@ -3,8 +3,6 @@ __precompile__()
 
 export assemble_tests
 
-
-
 # Import necessary packages
 using JuMP
 using DataFrames
@@ -93,7 +91,7 @@ Process the optimization results at each iteration and store them in a DataFrame
 Used items ARE DELETED from the working copy of the bank to avoid its use in subsequent forms.
 """
 function process_and_store_results!(model::Model, parms::Parameters,
-                                    results_df::DataFrame)::DataFrame
+    results_df::DataFrame)::DataFrame
     solver_matrix = value.(model[:x])
     item_codes = parms.bank.ID
     items = 1:length(item_codes)
@@ -101,14 +99,14 @@ function process_and_store_results!(model::Model, parms::Parameters,
     max_items = parms.max_items
 
     for f in 1:(parms.num_forms)
-        selected_items = items[solver_matrix[:, f] .> 0.9]
+        selected_items = items[solver_matrix[:, f].>0.9]
         codes_in_form = item_codes[selected_items]
         form_length = length(codes_in_form)
         missing_rows = max_items - form_length
 
         padded_codes_vector = if missing_rows > 0
             vcat(codes_in_form,
-                 fill(MISSING_VALUE_FILLER, missing_rows))
+                fill(MISSING_VALUE_FILLER, missing_rows))
         else
             codes_in_form
         end
@@ -122,7 +120,7 @@ function process_and_store_results!(model::Model, parms::Parameters,
     items_used = sort(unique(items_used))
 
     parms.bank[items_used, :ITEM_USE] .+= 1
-    items_used = items_used[parms.bank[items_used, :ITEM_USE] .>= parms.max_item_use]
+    items_used = items_used[parms.bank[items_used, :ITEM_USE].>=parms.max_item_use]
 
     remove_used_items!(parms, items_used)
     return results_df
@@ -145,10 +143,12 @@ function handle_anchor_items(parms::Parameters, orig_parms::Parameters)::Paramet
 
         parms.anchor_tests = (parms.anchor_tests % total_anchors) + 1
 
-        # Remove old anchor items and add the new anchor test items
-        bank_without_anchors = filter(row -> ismissing(row.ANCHOR), parms.bank)
-        new_anchors = filter(row -> !ismissing(row.ANCHOR) && row.ANCHOR == parms.anchor_tests, orig_parms.bank)
-        parms.bank = vcat(bank_without_anchors, new_anchors)
+        # Select current anchor items based on the anchor test value
+        current_anchor_items = filter(row -> !ismissing(row.ANCHOR) && row.ANCHOR == parms.anchor_tests, orig_parms.bank)
+        non_anchor_items = filter(row -> ismissing(row.ANCHOR), parms.bank)
+
+        # Combine non-anchor items and current anchor items
+        parms.bank = vcat(non_anchor_items, current_anchor_items)
 
         # Update parameters based on the method
         if parms.method == "TCC"
@@ -180,11 +180,10 @@ and processes the results, then generates and saves a report.
 function assemble_tests(config_file::String="data/config.toml")::DataFrame
     config, orig_parms = configure_system(config_file)
 
-
     # validate_parameters(orig_parms)
 
+    constraints = read_constraints(config.constraints_file, orig_parms)
     parms = deepcopy(orig_parms)
-    constraints = read_constraints(config.constraints_file, parms)
     results_df = DataFrame()
 
     if parms.shadow_test > 0

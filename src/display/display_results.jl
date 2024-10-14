@@ -195,10 +195,10 @@ Returns a table of tolerances for each form.
 """
 function tolerances_table(tols::Vector{Float64})::String
     header = ["Form", "Tolerance"]
-    form_ids = [string("Form ", lpad(s, 2)) for s in 1:length(tols)]
+    form_ids = [i for i in 1:length(tols)]
     table_data = Dict(k => rpad(v, 6, "0") for (k, v) in zip(form_ids, tols))
 
-    return pretty_table(String, table_data; header=header, alignment=:c)
+    return pretty_table(String, table_data; header=header, sortkeys=true, alignment=:c)
 end
 
 

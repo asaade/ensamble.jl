@@ -112,6 +112,10 @@ function read_constraints(file_path::AbstractString, parms::Parameters)
                 validate_bounds!(lb, ub, cond_id)
             end
 
+            if type == "TEST"
+                parms.max_items = ub
+            end
+
             # Parse the condition or default to a true condition
             condition = strip(condition_expr) == "" ? df -> trues(size(df, 1)) : CriteriaParser.parse_criteria(condition_expr)
             constraints[cond_id] = Constraint(cond_id, type, eval(condition), lb, ub)
