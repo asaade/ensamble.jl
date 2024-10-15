@@ -332,7 +332,6 @@ end
 # Objective Functions for Test Assembly Optimization
 # ---------------------------------------------------------------------------
 
-
 """
     objective_match_characteristic_curve!(model::Model, parms::Parameters)
 
@@ -376,6 +375,52 @@ function objective_match_characteristic_curve!(model::Model, parms::Parameters)
                         ((tau[r, k] - anchor_contribution[k, r] + (w_shadow[r] * y)) * shadow_test))
         @constraint(model, [k = K, r = R],
                     sum(P[i, k]^r * x[i, zcol] for i in non_anchor_items) >=
+                        ((tau[r, k] - anchor_contribution[k, r] - (w_shadow[r] * y)) * shadow_test))
+    end
+
+    return model
+end
+
+
+function objective_match_characteristic_curve_polytomous!(model::Model, parms::Parameters)
+    R, K = 1:(parms.r), 1:(parms.k)
+    P = parms.p  # Polytomous probabilities (3D matrix: items x theta_points x categories)
+    tau = parms.tau
+    x, y = model[:x], model[:y]
+    items, forms = size(x)
+    zcol = forms
+    forms -= parms.shadow_test > 0 ? 1 : 0
+
+    # Weights for characteristic curve constraint
+    w = [1.0 for _ in R]
+
+    # Identify anchor and non-anchor items
+    anchor_items = findall(parms.bank.ANCHOR .!== missing)
+    non_anchor_items = filter(i -> ismissing(parms.bank.ANCHOR[i]), 1:items)
+
+    # Contribution of anchor items to characteristic curve (sum over all categories)
+    anchor_contribution = Dict()
+    for k in K, r in R
+        anchor_contribution[k, r] = sum(sum(P[i, k, :] .^ r) for i in anchor_items)
+    end
+
+    # Constraints for operational forms (include both anchor and non-anchor items, summing over categories)
+    @constraint(model, [f = 1:forms, k = K, r = R],
+                sum(sum(P[i, k, :] .^ r) * x[i, f] for i in 1:items) <= tau[r, k] + (w[r] * y))
+    @constraint(model, [f = 1:forms, k = K, r = R],
+                sum(sum(P[i, k, :] .^ r) * x[i, f] for i in 1:items) >= tau[r, k] - (w[r] * y))
+
+    # Constraints for shadow test (only non-anchor items, summing over categories)
+    if parms.shadow_test > 0
+        shadow_test = parms.shadow_test
+        w_shadow = [1.0, 0.8, 0.7, 0.75]
+
+        # Adjust constraints for the shadow test, subtracting anchor contribution
+        @constraint(model, [k = K, r = R],
+                    sum(sum(P[i, k, :] .^ r) * x[i, zcol] for i in non_anchor_items) <=
+                        ((tau[r, k] - anchor_contribution[k, r] + (w_shadow[r] * y)) * shadow_test))
+        @constraint(model, [k = K, r = R],
+                    sum(sum(P[i, k, :] .^ r) * x[i, zcol] for i in non_anchor_items) >=
                         ((tau[r, k] - anchor_contribution[k, r] - (w_shadow[r] * y)) * shadow_test))
     end
 
@@ -428,6 +473,46 @@ function objective_match_information_curve!(model::Model, parms::Parameters)
 end
 
 
+function objective_match_information_curve_polytomous!(model::Model, parms::Parameters)
+    K, info, tau_info = parms.k, parms.info, parms.tau_info
+    x, y = model[:x], model[:y]
+    items, forms = size(x)
+    zcol = forms
+    forms -= parms.shadow_test > 0 ? 1 : 0
+
+    # Identify anchor and non-anchor items
+    anchor_items = findall(parms.bank.ANCHOR .!== missing)
+    non_anchor_items = filter(i -> ismissing(parms.bank.ANCHOR[i]), 1:items)
+
+    # Contribution of anchor items to the information curve (sum over categories)
+    anchor_info_contribution = Dict()
+    for k in 1:K
+        anchor_info_contribution[k] = sum(sum(info[i, k, :]) for i in anchor_items)
+    end
+
+    # Constraints for operational forms (include both anchor and non-anchor items, summing over categories)
+    @constraint(model, [f = 1:forms, k = 1:K],
+                sum(sum(info[i, k, :]) * x[i, f] for i in 1:items) <= tau_info[k] + y)
+    @constraint(model, [f = 1:forms, k = 1:K],
+                sum(sum(info[i, k, :]) * x[i, f] for i in 1:items) >= tau_info[k] - y)
+
+    # Constraints for shadow test (only non-anchor items, summing over categories)
+    if parms.shadow_test > 0
+        shadow_test = parms.shadow_test
+
+        # Adjust constraints for the shadow test, subtracting anchor contribution
+        @constraint(model, [k = 1:K],
+                    sum(sum(info[i, k, :]) * x[i, zcol] for i in non_anchor_items) <=
+                        (tau_info[k] + y - anchor_info_contribution[k]) * shadow_test)
+        @constraint(model, [k = 1:K],
+                    sum(sum(info[i, k, :]) * x[i, zcol] for i in non_anchor_items) >=
+                        (tau_info[k] - y - anchor_info_contribution[k]) * shadow_test)
+    end
+
+    return model
+end
+
+
 """
     objective_max_info(model::Model, parms::Parameters)
 
@@ -461,6 +546,41 @@ function objective_max_info(model::Model, parms::Parameters)
     if shadow > 0
         @constraint(model, [k = 1:K],
                     sum(info[i, k] * x[i, forms + 1] for i in non_anchor_items) >=
+                        (R[k] * y * shadow - anchor_info_contribution[k]))
+    end
+
+    return model
+end
+
+
+function objective_max_info_polytomous!(model::Model, parms::Parameters)
+    R = parms.relative_target_weights
+    K = parms.k
+    info = parms.info  # Polytomous information matrix: items x theta_points x categories
+    x, y = model[:x], model[:y]
+    items, forms = size(x)
+
+    shadow = parms.shadow_test
+    forms -= shadow > 0 ? 1 : 0
+
+    # Identify anchor and non-anchor items
+    anchor_items = findall(parms.bank.ANCHOR .!== missing)
+    non_anchor_items = filter(i -> ismissing(parms.bank.ANCHOR[i]), 1:items)
+
+    # Calculate the contribution of anchor items for each k (sum over categories)
+    anchor_info_contribution = Dict()
+    for k in 1:K
+        anchor_info_contribution[k] = sum(sum(info[i, k, :]) for i in anchor_items)
+    end
+
+    # Constraints for operational forms (include both anchor and non-anchor items, summing over categories)
+    @constraint(model, [f = 1:forms, k = 1:K],
+                sum(sum(info[i, k, :]) * x[i, f] for i in 1:items) >= R[k] * y)
+
+    # Constraints for shadow test (exclude anchor items, summing over categories)
+    if shadow > 0
+        @constraint(model, [k = 1:K],
+                    sum(sum(info[i, k, :]) * x[i, forms + 1] for i in non_anchor_items) >=
                         (R[k] * y * shadow - anchor_info_contribution[k]))
     end
 
