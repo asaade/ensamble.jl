@@ -15,13 +15,19 @@ Extracts IRT parameters (a, b, c) for selected items.
 """
 function irt_params(bank::DataFrame, items::Vector)
     idx = bank.ID .∈ Ref(skipmissing(items))
-    return bank[idx, :A], bank[idx, :B], bank[idx, :C]
+    a = bank[idx, :A]
+    b = bank[idx, :B]
+    c = bank[idx, :C]
+    b_thresholds = bank[idx, :B_THRESHOLDS]
+    model_type = bank[idx, :MODEL_TYPE]
+    return a, b, c, b_thresholds, model_type
 end
+
 
 """
     simulate_scores(parms, results, dist=Normal(0, 1)) -> DataFrame
 
-Simulates test scores based on ability distribution.
+Simulates test scores based on ability distribution for both dichotomous and polytomous items.
 """
 function simulate_scores(parms::Parameters, results::DataFrame, dist::Distribution=Normal(0, 1))
     bank = parms.bank
@@ -34,11 +40,48 @@ function simulate_scores(parms::Parameters, results::DataFrame, dist::Distributi
 
     @threads for i in 1:n_forms
         selected = results[:, i]
-        a, b, c = irt_params(bank, selected)
-        item_params = Matrix(hcat(a, b, c)')  # Ensure it's a Matrix, not Adjoint
-        scores = observed_score_continuous(item_params, dist)
-        # Thread-local padded array
-        padded = vcat(scores, fill(missing, n_items - length(scores)))
+        a, b, c, b_thresh, model_type = irt_params(bank, selected)
+
+        # Initialize observed score distribution
+        total_items = 0
+        for i in 1:length(model_type)
+            if model_type[i] == "3PL"
+                total_items += 1  # Dichotomous item contributes 1 score point
+            else
+                total_items += length(b_thresh[i])  # Polytomous item contributes length of b_thresh
+            end
+        end
+
+        observed_dist = zeros(Float64, total_items + 1)  # Account for 0-based scores
+
+        # Prepare the parameter matrices for dichotomous items
+        dich_items_idx = findall(model_type .== "3PL")
+        poly_items_idx = findall(model_type .!= "3PL")
+
+        if !isempty(dich_items_idx)
+            # Prepare dichotomous items and simulate using continuous Lord-Wingersky method
+            dich_params = hcat(a[dich_items_idx], b[dich_items_idx], c[dich_items_idx])
+            dich_params = Matrix(dich_params)  # Ensure regular matrix
+            dich_scores = observed_score_continuous(dich_params, dist; model_type=fill("3PL", length(dich_items_idx)), b_thresh=nothing)
+        else
+            dich_scores = zeros(Float64, length(observed_dist))  # No dichotomous items
+        end
+
+        if !isempty(poly_items_idx)
+            # Simulate scores for polytomous items using polytomous response model
+            poly_scores = observed_score_continuous_polytomous(
+                θ -> polytomous_probabilities(a[poly_items_idx], b_thresh[poly_items_idx], model_type[poly_items_idx], θ),
+                dist
+            )
+        else
+            poly_scores = zeros(Float64, length(observed_dist))  # No polytomous items
+        end
+
+        # Combine dichotomous and polytomous scores
+        total_scores = dich_scores .+ poly_scores
+
+        # Thread-local padded array for any missing values
+        padded = vcat(total_scores, fill(missing, n_items - length(total_scores)))
         sim_matrix[:, i] = padded  # Thread-safe writing to matrix
     end
 
@@ -46,6 +89,7 @@ function simulate_scores(parms::Parameters, results::DataFrame, dist::Distributi
     sim_data = DataFrame(sim_matrix, Symbol.(names(results)))
     return sim_data
 end
+
 
 
 """
@@ -58,25 +102,37 @@ function char_curves(parms::Parameters, results::DataFrame, theta_range::Union{A
     n_forms = size(results, 2)
     n_thetas = length(theta_range)
 
-    # Preallocate storage for the result to avoid thread issues
     curves_matrix = Matrix{Float64}(undef, n_thetas, n_forms)
 
-    @threads for i in 1:n_forms
+    # @threads
+    for i in 1:n_forms
         selected = results[:, i]
-        a, b, c = irt_params(bank, selected)
-        scores = zeros(Float64, n_thetas)  # Thread-local variable
+        a, b, c, b_thresh, model_type = irt_params(bank, selected)
+        scores = zeros(Float64, n_thetas)
+
         for (j, theta) in enumerate(theta_range)
-            scores[j] = sum(Probability.(theta, b, a, c) .^ r)
+            for k in 1:length(selected)
+                if model_type[k] == "3PL"
+                    prob = Probability(theta, b[k], a[k], c[k])
+                elseif model_type[k] == "GRM"
+                    prob = prob_grm(a[k], b_thresh[k], theta)
+                elseif model_type[k] == "PCM"
+                    prob = prob_pcm(a[k], b_thresh[k], theta)
+                elseif model_type[k] == "GPCM"
+                    prob = prob_gpcm(a[k], b_thresh[k], theta)
+                else
+                    continue
+                end
+                scores[j] += sum(prob .^ r)  # Summing the probabilities for each category
+            end
         end
-        curves_matrix[:, i] = scores  # Store the result
+
+        curves_matrix[:, i] = scores
     end
 
-    # After the parallel loop, convert the matrix to a DataFrame
     curves = DataFrame(curves_matrix, Symbol.(names(results)))
-
     return round.(curves, digits=2)
 end
-
 
 
 """
@@ -89,24 +145,36 @@ function info_curves(parms::Parameters, results::DataFrame, theta_range::Union{A
     n_thetas = length(theta_range)
     n_forms = size(results, 2)
 
-    # Preallocate matrix for info curves (thread-safe)
     info_matrix = Matrix{Float64}(undef, n_thetas, n_forms)
 
-    @threads for i in 1:n_forms
+    #  @threads
+    for i in 1:n_forms
         selected = results[:, i]
-        a, b, c = irt_params(bank, selected)
-        info = zeros(Float64, n_thetas)  # Thread-local array for info calculations
+        a, b, c, b_thresh, model_type = irt_params(bank, selected)
+        info = zeros(Float64, n_thetas)
+
         for (j, theta) in enumerate(theta_range)
-            info[j] = sum(Information.(theta, b, a, c))
+            for k in 1:length(selected)
+                if model_type[k] == "3PL"
+                    info[j] += Information(theta, b[k], a[k], c[k])
+                elseif model_type[k] == "GRM"
+                    info[j] += info_grm(a[k], b_thresh[k], theta)
+                elseif model_type[k] == "PCM"
+                    info[j] += info_pcm(a[k], b_thresh[k], theta)
+                elseif model_type[k] == "GPCM"
+                    info[j] += info_gpcm(a[k], b_thresh[k], theta)
+                else
+                    continue
+                end
+            end
         end
-        info_matrix[:, i] = info  # Thread-safe writing to preallocated matrix
+
+        info_matrix[:, i] = info
     end
 
-    # Convert the matrix to a DataFrame after the threaded loop
     info_data = DataFrame(info_matrix, Symbol.(names(results)))
     return round.(info_data, digits=2)
 end
-
 
 
 """
@@ -125,17 +193,17 @@ end
 Generates and plots characteristic curves, information curves, and simulated scores.
 """
 function plot_results(parms::Parameters, conf::Config, results::DataFrame,
-                      theta_range::Union{AbstractVector, AbstractRange} = -3.0:0.1:3.0,
+                      theta_range::Union{AbstractVector, AbstractRange} = -4.0:0.1:4.0,
                       plot_file::String = "results/combined_plot.png")::DataFrame
 
     # Generate characteristic and information curves
     char_data, info_data = make_curves(parms, results, theta_range)
 
     # Generate simulation data
-    sim_data = make_sims(parms, results)
+    # sim_data = make_sims(parms, results)
 
     # Combine all plots
-    combined = combine_plots(parms, theta_range, char_data, info_data, sim_data)
+    combined = combine_plots(parms, theta_range, char_data, info_data) # , sim_data)
 
     # Save results and plots
     save_all(char_data, theta_range, conf, combined, plot_file)
@@ -170,15 +238,15 @@ end
 Combines characteristic, information, and simulation plots.
 """
 function combine_plots(parms::Parameters, theta_range::Union{AbstractVector, AbstractRange},
-                       char_data::DataFrame, info_data::DataFrame,
-                       sim_data::DataFrame)
+                       char_data::DataFrame, info_data::DataFrame)
+                       ## sim_data::DataFrame)
 
     theme(:default)
     gr(size=(950, 850), legend=:topright)
 
     # Plot characteristic curves with improved labels and styles
     p1 = @df char_data plot(theta_range, cols(),
-                            title="Test Form Characteristic Curves",
+                            title="Test Characteristic Curves",
                             xlabel="Ability (θ)", ylabel="Expected Score",
                             linewidth=2, label="", grid=:both, legend=:topright,
                             xticks=:auto, yticks=:auto, color=:viridis,
@@ -187,20 +255,21 @@ function combine_plots(parms::Parameters, theta_range::Union{AbstractVector, Abs
 
     # Add information curves on the same graph using dual axes (right axis for info curves)
     p2 = @df info_data plot(theta_range, cols(),
-                            title="Test Form Information Curves",
+                            title="Test Information Curves",
                             xlabel="Ability (θ)", ylabel="Information",
                             linewidth=2, label="", grid=:both, color=:plasma)
 
     # Overlay a reference line at θ = 0
     vline!([0], color=:gray, linestyle=:dash, label="")
 
-    # Plot simulated observed scores with score distribution (optional)
-    p3 = @df sim_data plot(1:size(sim_data, 1), cols(),
-                           title="Simulated Observed Scores", xlabel="Items", ylabel="Percentage",
-                           linewidth=2, label="", grid=:both, color=:inferno)
+    # # Plot simulated observed scores with score distribution (optional)
+    # p3 = @df sim_data plot(1:size(sim_data, 1), cols(),
+    #                        title="Simulated Observed Scores", xlabel="Items", ylabel="Percentage",
+    #                        linewidth=2, label="", grid=:both, color=:inferno)
 
-    # Combine plots into a single layout with consistent sizes
-    plot(p1, p2, p3; layout=(2, 2), size=(950, 850), margin=8mm)
+    # # Combine plots into a single layout with consistent sizes
+    # plot(p1, p2, p3; layout=(2, 2), size=(950, 850), margin=8mm)
+    plot(p1, p2; layout=(2, 1), size=(450, 850), margin=8mm)
 end
 
 

@@ -74,12 +74,18 @@ function load_irt_data(config_data::Dict{Symbol, Any}, bank::DataFrame)::IRTMode
         throw(ArgumentError("The length of 'RELATIVETARGETWEIGHTS' and 'RELATIVETARGETPOINTS' must match."))
     end
 
-    # Validate the item bank and extract item parameters
-    a, b, c = extract_item_params(bank)
+    # Extract item parameters, taking into account both dichotomous and polytomous items
+    a, b, c, b_thresholds, model_type = extract_item_params(bank)
 
-    # Calculate probability matrix (p) and information matrix
-    p_matrix = calculate_probabilities(theta, b, a, c, D)
-    info_matrix = calculate_information(theta, b, a, c, D)
+    # Validate model types
+    valid_models = ["3PL", "dichotomous", "GRM", "PCM", "GPCM"]
+    if any(mt -> !(mt in valid_models), model_type)
+        throw(ArgumentError("Invalid model type found in item bank. Supported types are: 3PL, dichotomous, GRM, PCM, GPCM."))
+    end
+
+    # Calculate probability and information matrices
+    p_matrix = calculate_probabilities(theta, b, a, c, b_thresholds, model_type, D)
+    info_matrix = calculate_information(theta, b, a, c, b_thresholds, model_type, D)
 
     # Calculate tau and tau_info
     tau = get_tau(irt_dict, p_matrix, r, k, N)
@@ -89,17 +95,15 @@ function load_irt_data(config_data::Dict{Symbol, Any}, bank::DataFrame)::IRTMode
                         relative_target_weights, relative_target_points, k, r, D)
 end
 
+
+
 """
-    extract_item_params(bank::DataFrame) -> Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}}
+    extract_item_params(bank::DataFrame) -> Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Vector{Float64}}, Vector{AbstractString}}
 
-Extracts the item parameters (a, b, c) from the item bank. Throws an error if required columns are missing.
-
-# Throws
-
-  - `ArgumentError` if the required item parameters (A, B, C) are missing in the bank DataFrame.
+Extracts the item parameters (A, B, C) and thresholds (for polytomous items) from the item bank.
 """
 function extract_item_params(bank::DataFrame)
-    for param in [:A, :B, :C]
+    for param in [:A, :B]
         if !(param in upSymbol.(names(bank)))
             throw(ArgumentError("Missing required column '$param' in item bank."))
         end
@@ -107,52 +111,128 @@ function extract_item_params(bank::DataFrame)
 
     a = bank.A
     b = bank.B
-    c = bank.C
+    c = "C" in names(bank) ? bank.C : fill(0.0, size(bank, 1))  # Optional guessing param
 
-    return a, b, c
+    # Ensure b_thresholds is a vector of vectors or missing values
+    b_thresholds = bank.B_THRESHOLDS
+    if !isa(b_thresholds, Vector{Vector{Union{Float64, Missing}}})
+        throw(ArgumentError("B_THRESHOLDS must be a vector of vectors or missing values."))
+    end
+
+    model_type = bank.MODEL_TYPE
+
+    return a, b, c, b_thresholds, model_type
 end
+
+
+
 
 """
     calculate_probabilities(theta::Vector{Float64},
                     b::Vector{Float64},
                     a::Vector{Float64},
-                    c::Vector{Float64}, D::Float64) -> Matrix{Float64}
+                    c::Vector{Float64},
+                    b_thresholds,
+                    model_type::Vector{AbstractString},
+                    D::Float64) -> Matrix{Float64}
 
-Calculates the probability matrix (p) at each theta point using IRT models.
-
-# Throws
-
-  - `ArgumentError` if the lengths of the parameter vectors (a, b, c) do not match.
+Calculates the probability matrix (p) for both dichotomous and polytomous items.
 """
 function calculate_probabilities(theta::Vector{Float64},
                                  b::Vector{Float64},
                                  a::Vector{Float64},
                                  c::Vector{Float64},
+                                 b_thresholds,
+                                 model_type,
                                  D::Float64)::Matrix{Float64}
-    if !(length(a) == length(b) == length(c))
-        throw(ArgumentError("Length of item parameters (a, b, c) must be the same."))
+    num_items = length(a)
+    num_theta = length(theta)
+    p_matrix = Matrix{Float64}(undef, num_items, num_theta)
+
+    for i in 1:num_items
+        if model_type[i] == "3PL"  # Dichotomous
+            p_matrix[i, :] = Probability.(theta, b[i], a[i], c[i]; d=D)
+        elseif model_type[i] == "GRM"
+            if !ismissing(b_thresholds[i])
+                p_matrix[i, :] = prob_grm(a[i], b_thresholds[i], theta)
+            else
+                throw(ArgumentError("Missing threshold values for item $(i) in GRM model."))
+            end
+        elseif model_type[i] == "PCM"
+            if !ismissing(b_thresholds[i])
+                p_matrix[i, :] = prob_pcm(a[i], b_thresholds[i], theta)
+            else
+                throw(ArgumentError("Missing threshold values for item $(i) in PCM model."))
+            end
+        elseif model_type[i] == "GPCM"
+            if !ismissing(b_thresholds[i])
+                p_matrix[i, :] = prob_gpcm(a[i], b_thresholds[i], theta)
+            else
+                throw(ArgumentError("Missing threshold values for item $(i) in GPCM model."))
+            end
+        else
+            throw(ArgumentError("Unsupported model type: $(model_type[i])"))
+        end
     end
 
-    p = [Probability(t, b, a, c; d=D) for t in theta]
-    return hcat(p...)  # Concatenate vectors horizontally
+    return p_matrix
 end
 
-"""
-    calculate_information(theta::Vector{Float64}, b::Vector{Float64},
-                           a::Vector{Float64}, c::Vector{Float64}, D::Float64) -> Matrix{Float64}
 
-Calculates the information matrix at each theta point using IRT models.
+"""
+    calculate_information(theta::Vector{Float64},
+                           b::Vector{Float64},
+                           a::Vector{Float64},
+                           c::Vector{Float64},
+                           b_thresholds,
+                           model_type::Vector{AbstractString},
+                           D::Float64) -> Matrix{Float64}
+
+Calculates the information matrix for both dichotomous and polytomous items.
 """
 function calculate_information(theta::Vector{Float64},
-                               b::Vector{Float64}, a::Vector{Float64}, c::Vector{Float64},
+                               b::Vector{Float64},
+                               a::Vector{Float64},
+                               c::Vector{Float64},
+                               b_thresholds,
+                               model_type,
                                D::Float64)::Matrix{Float64}
-    if !(length(a) == length(b) == length(c))
-        throw(ArgumentError("Length of item parameters (a, b, c) must be the same."))
+    num_items = length(a)
+    num_theta = length(theta)
+    info_matrix = Matrix{Float64}(undef, num_theta, num_items)  # Matrix: theta points x items
+
+    for t in 1:num_theta
+        for i in 1:num_items
+            θ = theta[t]
+            if model_type[i] == "3PL"  # Dichotomous
+                info_matrix[t, i] = Information(θ, b[i], a[i], c[i]; d=D)
+            elseif model_type[i] == "GRM"
+                if !ismissing(b_thresholds[i])
+                    info_matrix[t, i] = info_grm(a[i], b_thresholds[i], θ)
+                else
+                    throw(ArgumentError("Missing threshold values for item $(i) in GRM model."))
+                end
+            elseif model_type[i] == "PCM"
+                if !ismissing(b_thresholds[i])
+                    info_matrix[t, i] = info_pcm(a[i], b_thresholds[i], θ)
+                else
+                    throw(ArgumentError("Missing threshold values for item $(i) in PCM model."))
+                end
+            elseif model_type[i] == "GPCM"
+                if !ismissing(b_thresholds[i])
+                    info_matrix[t, i] = info_gpcm(a[i], b_thresholds[i], θ)
+                else
+                    throw(ArgumentError("Missing threshold values for item $(i) in GPCM model."))
+                end
+            else
+                throw(ArgumentError("Unsupported model type: $(model_type[i])"))
+            end
+        end
     end
 
-    info = [Information(t, b, a, c; d=D) for t in theta]
-    return hcat(info...)  # Concatenate vectors horizontally
+    return info_matrix'
 end
+
 
 """
     get_tau(irt_dict::Dict{Symbol, Any}, p_matrix::Matrix{Float64}, r::Int, k::Int, N::Int) -> Matrix{Float64}
