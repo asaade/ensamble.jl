@@ -2,7 +2,7 @@ module DisplayResults
 
 export final_report, generate_report, show_results, simulate_scores
 
-using JuMP, DataFrames, Dates, PrettyTables
+using JuMP, DataFrames, Dates, PrettyTables, DataFrames
 using ..Configuration, ..Utils
 include("charts.jl")
 using .Charts
@@ -229,6 +229,11 @@ function gather_tables(parms::Parameters, config::Config, results::DataFrame, to
     tables
 end
 
+function clean_bank!(bank::DataFrame)
+    bank.B_THRESHOLDS = replace(bank.B_THRESHOLDS, nothing => missing)
+    return bank
+end
+
 """
     save_forms(parms, results, config)
 
@@ -242,7 +247,7 @@ function save_forms(parms::Parameters, results::DataFrame, config::Config)
                                  bank.ID .∈ Ref(skipmissing(results[:, v])))
     end
 
-    save_to_csv(bank, config.forms_file)
+    save_to_csv(clean_bank!(bank), config.forms_file)
     save_to_csv(results, config.results_file)
 
     println("\nSaved Forms and Results")

@@ -412,65 +412,61 @@ function lw_dist_dichotomous(item_params::Matrix{Float64}, θ::Float64)::Vector{
 end
 
 
-
-function lw_dist(item_params::Vector{Vector{Float64}}, θ::Float64, model_type::Vector{String}, b_thresh)::Vector{Float64}
+"""
+    Computes the conditional distributions of number-correct (or observed) scores from the probabilities of category responses to items using Lord and Wingersky recursion formula.
+"""
+function lw_dist(item_params, θ::Float64, model_type, b_thresh)::Vector{Float64}
     num_items = length(item_params)
-    res = []
 
     # Initialize the first item's probability distribution
     if model_type[1] == "3PL"
-        a, b, c = item_params[1]  # Unpack 3PL parameters
+        a, b, c = item_params[1]
         prob_correct = Probability(θ, b, a, c)
         res = [1 - prob_correct, prob_correct]  # Dichotomous case
+    elseif b_thresh !== nothing && !isempty(b_thresh[1])
+        res = polytomous_probabilities(θ, item_params[1], b_thresh[1], model_type[1])  # Polytomous case
     else
-        if b_thresh !== nothing && !isempty(b_thresh[1])
-            res = polytomous_probabilities(θ, item_params[1], b_thresh[1], model_type[1])  # Polytomous case
-        else
-            error("Polytomous model with missing thresholds or empty thresholds.")
-        end
+        error("Polytomous model with missing or invalid thresholds.")
     end
 
     # Iterate through remaining items to update the score distribution
     for i in 2:num_items
         if model_type[i] == "3PL"
-            a, b, c = item_params[i]  # Unpack 3PL parameters
+            a, b, c = item_params[i]
             prob_correct = Probability(θ, b, a, c)
             prob_incorrect = 1 - prob_correct
 
-            # Create a new result vector to store the updated probabilities
+            # Preallocate new result vector
             new_res = zeros(Float64, length(res) + 1)
 
-            # Update the probabilities
-            new_res[1] = prob_incorrect * res[1]  # Probability of score 0
-
+            # Update probabilities for the dichotomous item
+            new_res[1] = prob_incorrect * res[1]
             for j in 2:length(res)
                 new_res[j] = prob_incorrect * res[j] + prob_correct * res[j - 1]
             end
+            new_res[end] = prob_correct * res[end]
 
-            new_res[end] = prob_correct * res[end]  # Probability of the maximum score
-            res = new_res
-        elseif b_thresh !== nothing && i <= length(b_thresh) && !isempty(b_thresh[i])
-            # Polytomous item case
+        elseif b_thresh !== nothing && !isempty(b_thresh[i]) && i <= length(b_thresh)
             prob_matrix = polytomous_probabilities(θ, item_params[i], b_thresh[i], model_type[i])
             num_cat = length(prob_matrix)
             new_res = zeros(Float64, length(res) + num_cat - 1)
 
-            # Update probabilities for each category of the polytomous item
+            # Update probabilities for the polytomous item
             for j in 1:length(res)
                 for k in 1:num_cat
                     new_res[j + k - 1] += res[j] * prob_matrix[k]
                 end
             end
-            res = new_res
         else
             error("Polytomous model with missing thresholds or invalid index.")
         end
+
+        # Update result for next iteration
+        res = new_res
     end
 
     return res
 end
-
-
 
 
 """

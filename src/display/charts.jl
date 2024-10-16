@@ -27,7 +27,6 @@ function irt_params(bank::DataFrame, items::Vector)
 end
 
 
-
 """
     simulate_scores(parms, results, dist=Normal(0, 1)) -> DataFrame
 
