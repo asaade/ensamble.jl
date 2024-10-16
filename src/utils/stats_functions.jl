@@ -3,7 +3,9 @@ module StatsFunctions
 # Export the key functions to be used by other modules
 export Probability,
     Information, calc_tau, calc_info_tau,
-    observed_score_continuous, lw_dist
+    observed_score_continuous, lw_dist,
+    UnifiedProbability, UnifiedInformation,
+    polytomous_probabilities
 
 using Random, Distributions, QuadGK
 
@@ -11,7 +13,7 @@ using Random, Distributions, QuadGK
 """
     UnifiedProbability(item::Dict, θ::Float64) -> Vector{Float64}
 
-Calculates the probability of response for either dichotomous or polytomous items,
+Calculates the probability of response for either 3PL or polytomous items,
 depending on the item type.
 
 # Arguments
@@ -19,13 +21,13 @@ depending on the item type.
   - `θ`: The ability parameter.
 
 # Returns
-  - A vector of probabilities for each response category (or for success/failure in dichotomous).
+  - A vector of probabilities for each response category (or for success/failure in 3PL).
 """
 function UnifiedProbability(item::Dict, θ::Float64)::Vector{Float64}
     model_type = item["POLY_MODEL_TYPE"]
 
     if model_type == "3PL"
-        # Use dichotomous probability function
+        # Use 3PL probability function
         return [Probability(θ, item["B"], item["A"], item["C"])]
     elseif model_type == "GRM"
         return prob_grm(item["A"], item["B"], θ)
@@ -43,7 +45,7 @@ end
 """
     UnifiedInformation(item::Dict, θ::Float64) -> Float64
 
-Calculates the information for either dichotomous or polytomous items, depending on the item type.
+Calculates the information for either 3PL or polytomous items, depending on the item type.
 
 # Arguments
   - `item`: A dictionary containing item parameters and model type.
@@ -56,7 +58,7 @@ function UnifiedInformation(item::Dict, θ::Float64)::Float64
     model_type = item["POLY_MODEL_TYPE"]
 
     if model_type == "3PL"
-        # Use dichotomous information function
+        # Use 3PL information function
         return Information(θ, item["B"], item["A"], item["C"])
     elseif model_type == "GRM"
         return info_grm(item["A"], item["B"], θ)
@@ -410,68 +412,58 @@ function lw_dist_dichotomous(item_params::Matrix{Float64}, θ::Float64)::Vector{
 end
 
 
-"""
-    lw_dist(item_params::Matrix{Float64}, θ::Float64, model_type::Vector{AbstractString}, b_thresh::Vector{Vector{Float64}}) -> Vector{Float64}
 
-Calculates the score distribution using the Lord and Wingersky recursion for both dichotomous and polytomous items.
+function lw_dist(item_params::Vector{Vector{Float64}}, θ::Float64, model_type::Vector{String}, b_thresh)::Vector{Float64}
+    num_items = length(item_params)
+    res = []
 
-# Arguments
-  - `item_params`: Matrix of item parameters (a, b, c).
-  - `θ`: Ability parameter.
-  - `model_type`: Vector of item model types.
-  - `b_thresh`: Thresholds for polytomous items.
-
-# Returns
-  - Score distribution as a vector.
-"""
-function lw_dist(item_params::Matrix{Float64}, θ::Float64, model_type::Vector{String}, b_thresh::Union{Nothing, Vector{Vector{Float64}}})::Vector{Float64}
-    num_items = size(item_params, 2)
-    res = Vector{Float64}()
-
-    # Start with the first item's probability distribution
-    if model_type[1] == "3PL" || model_type[1] == "dichotomous"
-        a, b, c = item_params[:, 1]
+    # Initialize the first item's probability distribution
+    if model_type[1] == "3PL"
+        a, b, c = item_params[1]  # Unpack 3PL parameters
         prob_correct = Probability(θ, b, a, c)
         res = [1 - prob_correct, prob_correct]  # Dichotomous case
     else
-        res = polytomous_probabilities(θ, item_params[:, 1], b_thresh[1], model_type[1])  # Polytomous case
+        if b_thresh !== nothing && !isempty(b_thresh[1])
+            res = polytomous_probabilities(θ, item_params[1], b_thresh[1], model_type[1])  # Polytomous case
+        else
+            error("Polytomous model with missing thresholds or empty thresholds.")
+        end
     end
 
-    # Iterate through remaining items
+    # Iterate through remaining items to update the score distribution
     for i in 2:num_items
-        if model_type[i] == "3PL" || model_type[i] == "dichotomous"
-            a, b, c = item_params[:, i]
+        if model_type[i] == "3PL"
+            a, b, c = item_params[i]  # Unpack 3PL parameters
             prob_correct = Probability(θ, b, a, c)
             prob_incorrect = 1 - prob_correct
 
-            # Create a new vector to store updated probabilities (for item `i`)
-            prov = zeros(Float64, i + 1)  # Size increases by 1 for each item
+            # Create a new result vector to store the updated probabilities
+            new_res = zeros(Float64, length(res) + 1)
 
-            # Handle the first and last elements separately to avoid out-of-bounds errors
-            prov[1] = prob_incorrect * res[1]  # First element
+            # Update the probabilities
+            new_res[1] = prob_incorrect * res[1]  # Probability of score 0
 
-            # Update probabilities for the middle part
-            for j in 2:i
-                prov[j] = prob_incorrect * res[j] + prob_correct * res[j - 1]  # Safely access res[j - 1] and res[j]
+            for j in 2:length(res)
+                new_res[j] = prob_incorrect * res[j] + prob_correct * res[j - 1]
             end
 
-            # Handle the last element
-            prov[i + 1] = prob_correct * res[i]  # Last element
-
-            res = prov  # Update the result vector with the new probabilities
-        else
-            # Polytomous item: Use a probability matrix for multiple categories
-            prob_matrix = polytomous_probabilities(θ, item_params[:, i], b_thresh[i], model_type[i])
-            num_cat = length(prob_matrix)  # Number of response categories
+            new_res[end] = prob_correct * res[end]  # Probability of the maximum score
+            res = new_res
+        elseif b_thresh !== nothing && i <= length(b_thresh) && !isempty(b_thresh[i])
+            # Polytomous item case
+            prob_matrix = polytomous_probabilities(θ, item_params[i], b_thresh[i], model_type[i])
+            num_cat = length(prob_matrix)
             new_res = zeros(Float64, length(res) + num_cat - 1)
 
-            # Update probabilities for polytomous items
+            # Update probabilities for each category of the polytomous item
             for j in 1:length(res)
                 for k in 1:num_cat
-                    new_res[j + k - 1] += res[j] * prob_matrix[k]  # Accumulate probabilities
+                    new_res[j + k - 1] += res[j] * prob_matrix[k]
                 end
             end
-            res = new_res  # Update the result vector for the next iteration
+            res = new_res
+        else
+            error("Polytomous model with missing thresholds or invalid index.")
         end
     end
 
@@ -479,29 +471,23 @@ function lw_dist(item_params::Matrix{Float64}, θ::Float64, model_type::Vector{S
 end
 
 
+
+
 """
-    observed_score_continuous(item_params::Matrix{Float64}, ability_dist::Normal; num_points::Int = 100, model_type::Vector{AbstractString}, b_thresh::Vector{Vector{Float64}}) -> Vector{Float64}
+    observed_score_continuous(item_params, ability_dist::Normal; num_points::Int = 100, model_type, b_thresh) -> Vector{Float64}
 
-Calculates the observed score distribution using numerical integration for both dichotomous and polytomous items.
-
-# Arguments
-
-  - `item_params`: Matrix of item parameters.
-  - `ability_dist`: Ability distribution (e.g., Normal(0, 1)).
-  - `num_points`: Number of points for numerical integration.
-  - `model_type`: Vector of item model types.
-  - `b_thresh`: Thresholds for polytomous items.
-
-# Returns
-
-  - The observed score distribution as a vector.
+Calculates the observed score distribution using numerical integration for both 3PL and polytomous items.
 """
-function observed_score_continuous(item_params::Matrix{Float64},
+function observed_score_continuous(item_params,
                                    ability_dist::Normal;
                                    num_points::Int=100,
-                                   model_type::Vector{String},
-                                   b_thresh::Union{Nothing, Vector{Vector{Float64}}})::Vector{Float64}
-    num_items = size(item_params, 2)
+                                   model_type,
+                                   b_thresh)::Vector{Float64}
+    # Convert model_type and b_thresh to Vector if they are PooledVector
+    model_type = Vector(model_type)  # In case it's a PooledVector
+    b_thresh = b_thresh === nothing ? nothing : Vector(b_thresh)
+
+    num_items = length(item_params)
 
     function integrand(θ, x)
         score_dist = lw_dist(item_params, θ, model_type, b_thresh)
@@ -511,18 +497,20 @@ function observed_score_continuous(item_params::Matrix{Float64},
         return score_dist[x + 1] * pdf(ability_dist, θ)
     end
 
-    # Calculate max possible score for mixed format
+    # Calculate max possible score for mixed format (dichotomous and polytomous)
     max_score = 0
-    for i in 1:length(model_type)
+    for i in 1:num_items
         if model_type[i] == "3PL"
             max_score += 1  # Dichotomous items contribute 1 score point
-        else
+        elseif b_thresh !== nothing && i <= length(b_thresh)
             max_score += length(b_thresh[i])  # Polytomous items contribute based on their thresholds
+        elseif model_type[i] != "3PL" && b_thresh === nothing
+            error("Missing thresholds for polytomous items.")
         end
     end
 
     # Initialize the observed distribution vector
-    observed_dist = zeros(Float64, max_score + 1)  # Ensure correct size
+    observed_dist = zeros(Float64, max_score + 1)
 
     # Iterate over possible observed scores (from 0 to max_score)
     for x in 0:max_score
@@ -531,7 +519,6 @@ function observed_score_continuous(item_params::Matrix{Float64},
 
     return observed_dist
 end
-
 
 
 """
@@ -555,6 +542,33 @@ function polytomous_probabilities(θ::Float64, params::Vector{Float64}, threshol
         return prob_pcm(params[1], thresholds, θ)
     elseif model_type == "GPCM"
         return prob_gpcm(params[1], thresholds, θ)
+    else
+        throw(ArgumentError("Unsupported polytomous model type: $model_type"))
+    end
+end
+
+
+"""
+    polytomous_information(θ::Float64, params::Vector{Float64}, thresholds::Vector{Float64}, model_type::AbstractString) -> Vector{Float64}
+
+Calculates the category information for polytomous items (GRM, PCM, GPCM) given θ.
+
+# Arguments
+  - `θ`: Ability parameter.
+  - `params`: Vector of item parameters (e.g., a, b for GRM).
+  - `thresholds`: Vector of thresholds for polytomous models.
+  - `model_type`: Polytomous model type (e.g., "GRM", "PCM", "GPCM").
+
+# Returns
+  - Vector of category information.
+"""
+function polytomous_information(θ::Float64, params::Vector{Float64}, thresholds::Vector{Float64}, model_type::AbstractString)::Vector{Float64}
+    if model_type == "GRM"
+        return info_grm(params[1], thresholds, θ)
+    elseif model_type == "PCM"
+        return info_pcm(params[1], thresholds, θ)
+    elseif model_type == "GPCM"
+        return info_gpcm(params[1], thresholds, θ)
     else
         throw(ArgumentError("Unsupported polytomous model type: $model_type"))
     end

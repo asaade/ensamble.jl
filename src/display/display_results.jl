@@ -1,6 +1,6 @@
 module DisplayResults
 
-export final_report, generate_report, show_results
+export final_report, generate_report, show_results, simulate_scores
 
 using JuMP, DataFrames, Dates, PrettyTables
 using ..Configuration, ..Utils

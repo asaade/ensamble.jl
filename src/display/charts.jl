@@ -1,6 +1,6 @@
 module Charts
 
-export plot_results, save_to_csv
+export plot_results, save_to_csv, simulate_scores
 
 using CSV, DataFrames, Plots, StatsPlots, Distributions, Measures
 using Base.Threads
@@ -9,7 +9,7 @@ using StatsBase
 using ..Configuration, ..Utils
 
 """
-    irt_params(bank, items) -> Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}}
+    irt_params(bank, items) -> Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Union{Nothing, Vector{Vector{Float64}}}, Vector{String}}
 
 Extracts IRT parameters (a, b, c) for selected items.
 """
@@ -18,16 +18,20 @@ function irt_params(bank::DataFrame, items::Vector)
     a = bank[idx, :A]
     b = bank[idx, :B]
     c = bank[idx, :C]
-    b_thresholds = bank[idx, :B_THRESHOLDS]
+
+    # Set b_thresholds to nothing for 3PL (dichotomous) items
+    b_thresholds = map(mt -> mt == "3PL" ? nothing : bank[idx, :B_THRESHOLDS][mt], bank[idx, :MODEL_TYPE])
+
     model_type = bank[idx, :MODEL_TYPE]
     return a, b, c, b_thresholds, model_type
 end
 
 
+
 """
     simulate_scores(parms, results, dist=Normal(0, 1)) -> DataFrame
 
-Simulates test scores based on ability distribution for both dichotomous and polytomous items.
+Simulates test scores based on ability distribution for both 3PL and polytomous items.
 """
 function simulate_scores(parms::Parameters, results::DataFrame, dist::Distribution=Normal(0, 1))
     bank = parms.bank
@@ -42,52 +46,22 @@ function simulate_scores(parms::Parameters, results::DataFrame, dist::Distributi
         selected = results[:, i]
         a, b, c, b_thresh, model_type = irt_params(bank, selected)
 
-        # Initialize observed score distribution
-        total_items = 0
-        for i in 1:length(model_type)
-            if model_type[i] == "3PL"
-                total_items += 1  # Dichotomous item contributes 1 score point
-            else
-                total_items += length(b_thresh[i])  # Polytomous item contributes length of b_thresh
-            end
-        end
+        # Prepare the item_params vector to match the expected format for `observed_score_continuous`
+        # Each item will have a parameter vector combining a, b, c (and b_thresh if polytomous)
+        item_params = [ [a[i], b[i], c[i]] for i in 1:length(a) ]
 
-        observed_dist = zeros(Float64, total_items + 1)  # Account for 0-based scores
+        # Convert PooledVector to regular Vector if necessary
+        model_type = Vector(model_type)  # Convert model_type from PooledVector if needed
+        b_thresh = b_thresh === nothing ? nothing : Vector(b_thresh)  # Convert b_thresh if it's a PooledVector
 
-        # Prepare the parameter matrices for dichotomous items
-        dich_items_idx = findall(model_type .== "3PL")
-        poly_items_idx = findall(model_type .!= "3PL")
+        # Call `observed_score_continuous` to handle both 3PL and polytomous items
+        total_scores = observed_score_continuous(item_params, dist, model_type=model_type, b_thresh=b_thresh)
 
-        if !isempty(dich_items_idx)
-            # Prepare dichotomous items and simulate using continuous Lord-Wingersky method
-            dich_params = hcat(a[dich_items_idx], b[dich_items_idx], c[dich_items_idx])
-            dich_params = Matrix(dich_params)  # Ensure regular matrix
-            dich_scores = observed_score_continuous(dich_params, dist; model_type=fill("3PL", length(dich_items_idx)), b_thresh=nothing)
-        else
-            dich_scores = zeros(Float64, length(observed_dist))  # No dichotomous items
-        end
-
-        if !isempty(poly_items_idx)
-            # Simulate scores for polytomous items using polytomous response model
-            poly_scores = observed_score_continuous_polytomous(
-                θ -> polytomous_probabilities(a[poly_items_idx], b_thresh[poly_items_idx], model_type[poly_items_idx], θ),
-                dist
-            )
-        else
-            poly_scores = zeros(Float64, length(observed_dist))  # No polytomous items
-        end
-
-        # Combine dichotomous and polytomous scores
-        total_scores = dich_scores .+ poly_scores
-
-        # Thread-local padded array for any missing values
-        padded = vcat(total_scores, fill(missing, n_items - length(total_scores)))
-        sim_matrix[:, i] = padded  # Thread-safe writing to matrix
+        # Pad the results and assign to the simulation matrix
+        sim_matrix[:, i] = vcat(total_scores, fill(missing, n_items - length(total_scores)))
     end
 
-    # Convert the matrix to a DataFrame after the threaded loop
-    sim_data = DataFrame(sim_matrix, Symbol.(names(results)))
-    return sim_data
+    return sim_matrix
 end
 
 
@@ -200,10 +174,10 @@ function plot_results(parms::Parameters, conf::Config, results::DataFrame,
     char_data, info_data = make_curves(parms, results, theta_range)
 
     # Generate simulation data
-    # sim_data = make_sims(parms, results)
+    sim_data = make_sims(parms, results)
 
     # Combine all plots
-    combined = combine_plots(parms, theta_range, char_data, info_data) # , sim_data)
+    combined = combine_plots(parms, theta_range, char_data, info_data, sim_data)
 
     # Save results and plots
     save_all(char_data, theta_range, conf, combined, plot_file)
@@ -229,7 +203,7 @@ end
 Generates a single simulation based on a Normal(0, 1) distribution.
 """
 function make_sims(parms::Parameters, results::DataFrame; distr = Normal(0, 1))
-    return simulate_scores(parms, results, distr)
+    return DataFrame(simulate_scores(parms, results, distr), :auto)
 end
 
 """
@@ -238,8 +212,7 @@ end
 Combines characteristic, information, and simulation plots.
 """
 function combine_plots(parms::Parameters, theta_range::Union{AbstractVector, AbstractRange},
-                       char_data::DataFrame, info_data::DataFrame)
-                       ## sim_data::DataFrame)
+                       char_data::DataFrame, info_data::DataFrame, sim_data::DataFrame)
 
     theme(:default)
     gr(size=(950, 850), legend=:topright)
@@ -263,13 +236,13 @@ function combine_plots(parms::Parameters, theta_range::Union{AbstractVector, Abs
     vline!([0], color=:gray, linestyle=:dash, label="")
 
     # # Plot simulated observed scores with score distribution (optional)
-    # p3 = @df sim_data plot(1:size(sim_data, 1), cols(),
-    #                        title="Simulated Observed Scores", xlabel="Items", ylabel="Percentage",
-    #                        linewidth=2, label="", grid=:both, color=:inferno)
+    p3 = @df sim_data plot(1:size(sim_data, 1), cols(),
+                           title="Simulated Observed Scores", xlabel="Items", ylabel="Percentage",
+                           linewidth=2, label="", grid=:both, color=:inferno)
 
     # # Combine plots into a single layout with consistent sizes
     # plot(p1, p2, p3; layout=(2, 2), size=(950, 850), margin=8mm)
-    plot(p1, p2; layout=(2, 1), size=(450, 850), margin=8mm)
+    plot(p1, p2, p3; layout=(2, 2), size=(850, 850), margin=8mm)
 end
 
 
