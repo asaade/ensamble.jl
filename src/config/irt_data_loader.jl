@@ -23,6 +23,7 @@ mutable struct IRTModelData
     D::Float64
 end
 
+
 """
     load_irt_data(config_data::Dict{Symbol, Any}, bank::DataFrame) -> IRTModelData
 
@@ -77,10 +78,13 @@ function load_irt_data(config_data::Dict{Symbol, Any}, bank::DataFrame)::IRTMode
     # Extract item parameters, taking into account both dichotomous and polytomous items
     a, b, c, b_thresholds, model_type = extract_item_params(bank)
 
+    # Ensure model_type is converted to Vector{String}
+    model_type = String.(model_type)
+
     # Validate model types
-    valid_models = ["3PL", "dichotomous", "GRM", "PCM", "GPCM"]
+    valid_models = ["3PL", "GRM", "PCM", "GPCM"]
     if any(mt -> !(mt in valid_models), model_type)
-        throw(ArgumentError("Invalid model type found in item bank. Supported types are: 3PL, dichotomous, GRM, PCM, GPCM."))
+        throw(ArgumentError("Invalid model type found in item bank. Supported types are: dichotomous, GRM, PCM, GPCM, not $model_type"))
     end
 
     # Calculate probability and information matrices
@@ -96,13 +100,13 @@ function load_irt_data(config_data::Dict{Symbol, Any}, bank::DataFrame)::IRTMode
 end
 
 
-
 """
     extract_item_params(bank::DataFrame) -> Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Vector{Float64}}, Vector{AbstractString}}
 
 Extracts the item parameters (A, B, C) and thresholds (for polytomous items) from the item bank.
 """
 function extract_item_params(bank::DataFrame)
+    # Ensure the bank has the required columns
     for param in [:A, :B]
         if !(param in upSymbol.(names(bank)))
             throw(ArgumentError("Missing required column '$param' in item bank."))
@@ -111,20 +115,35 @@ function extract_item_params(bank::DataFrame)
 
     a = bank.A
     b = bank.B
-    c = "C" in names(bank) ? bank.C : fill(0.0, size(bank, 1))  # Optional guessing param
+    c = "C" in names(bank) ? bank.C : fill(0.0, size(bank, 1))  # Optional guessing parameter C
 
-    # Ensure b_thresholds is a vector of vectors or missing values
-    b_thresholds = bank.B_THRESHOLDS
-    if !isa(b_thresholds, Vector{Vector{Union{Float64, Missing}}})
-        throw(ArgumentError("B_THRESHOLDS must be a vector of vectors or missing values."))
+    # Initialize b_thresholds as nothing for all items
+    b_thresholds = fill(nothing, size(bank, 1))  # Default for dichotomous items
+
+    # Iterate over the items and fill b_thresholds only for polytomous items
+    for i in 1:size(bank, 1)
+        if bank.MODEL_TYPE[i] != "3PL"
+            # Fill b_thresholds for polytomous items
+            num_categories = bank.NUM_CATEGORIES[i]  # Assuming NUM_CATEGORIES column exists
+            if num_categories > 2  # Polytomous item
+                b_thresh = Vector{Float64}()
+                for j in 1:(num_categories - 1)
+                    b_col = Symbol("B$j")
+                    if b_col in names(bank)
+                        push!(b_thresh, bank[i, b_col])
+                    else
+                        push!(b_thresh, missing)  # Handle missing thresholds gracefully
+                    end
+                end
+                b_thresholds[i] = b_thresh  # Assign thresholds only for polytomous items
+            end
+        end
     end
 
-    model_type = bank.MODEL_TYPE
+    model_type = String.(bank.MODEL_TYPE)
 
     return a, b, c, b_thresholds, model_type
 end
-
-
 
 
 """
@@ -133,7 +152,7 @@ end
                     a::Vector{Float64},
                     c::Vector{Float64},
                     b_thresholds,
-                    model_type::Vector{AbstractString},
+                    model_type::Vector{String},
                     D::Float64) -> Matrix{Float64}
 
 Calculates the probability matrix (p) for both dichotomous and polytomous items.
@@ -143,7 +162,7 @@ function calculate_probabilities(theta::Vector{Float64},
                                  a::Vector{Float64},
                                  c::Vector{Float64},
                                  b_thresholds,
-                                 model_type,
+                                 model_type::Vector{String},
                                  D::Float64)::Matrix{Float64}
     num_items = length(a)
     num_theta = length(theta)
@@ -152,23 +171,17 @@ function calculate_probabilities(theta::Vector{Float64},
     for i in 1:num_items
         if model_type[i] == "3PL"  # Dichotomous
             p_matrix[i, :] = Probability.(theta, b[i], a[i], c[i]; d=D)
-        elseif model_type[i] == "GRM"
-            if !ismissing(b_thresholds[i])
-                p_matrix[i, :] = prob_grm(a[i], b_thresholds[i], theta)
+        elseif model_type[i] in ["GRM", "PCM", "GPCM"]
+            if b_thresholds[i] !== nothing && b_thresholds[i] !== missing
+                if model_type[i] == "GRM"
+                    p_matrix[i, :] = prob_grm(a[i], b_thresholds[i], theta)
+                elseif model_type[i] == "PCM"
+                    p_matrix[i, :] = prob_pcm(a[i], b_thresholds[i], theta)
+                elseif model_type[i] == "GPCM"
+                    p_matrix[i, :] = prob_gpcm(a[i], b_thresholds[i], theta)
+                end
             else
-                throw(ArgumentError("Missing threshold values for item $(i) in GRM model."))
-            end
-        elseif model_type[i] == "PCM"
-            if !ismissing(b_thresholds[i])
-                p_matrix[i, :] = prob_pcm(a[i], b_thresholds[i], theta)
-            else
-                throw(ArgumentError("Missing threshold values for item $(i) in PCM model."))
-            end
-        elseif model_type[i] == "GPCM"
-            if !ismissing(b_thresholds[i])
-                p_matrix[i, :] = prob_gpcm(a[i], b_thresholds[i], theta)
-            else
-                throw(ArgumentError("Missing threshold values for item $(i) in GPCM model."))
+                throw(ArgumentError("Missing threshold values for item $(i) in $model_type[i] model."))
             end
         else
             throw(ArgumentError("Unsupported model type: $(model_type[i])"))
@@ -179,8 +192,9 @@ function calculate_probabilities(theta::Vector{Float64},
 end
 
 
+
 """
-    calculate_information(theta::Vector{Float64},
+     calculate_information(theta::Vector{Float64},
                            b::Vector{Float64},
                            a::Vector{Float64},
                            c::Vector{Float64},
@@ -250,6 +264,7 @@ function get_tau(irt_dict::Dict{Symbol, Any}, p_matrix::Matrix{Float64}, r::Int,
 
     return calc_tau(p_matrix, r, k, N)
 end
+
 
 """
     get_tau_info(irt_dict::Dict{Symbol, Any}, info_matrix::Matrix{Float64}, k::Int, N::Int) -> Vector{Float64}

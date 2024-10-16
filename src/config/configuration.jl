@@ -70,6 +70,14 @@ mutable struct Parameters
     verbose::Int                    # verbosity from BasicConfig
 end
 
+
+function clean_bank!(bank::DataFrame)
+    bank.B_THRESHOLDS = replace(bank.B_THRESHOLDS, nothing => missing)
+    return bank
+end
+
+
+
 """
     transform_config_to_flat(basic_config::BasicConfig)::Config
 
@@ -108,7 +116,7 @@ function transform_parameters_to_flat(forms_config::AssemblyConfig,
                       forms_config.max_item_use,          # max_item_use
                       forms_config.f,                     # f
                       forms_config.shadow_test,           # shadow_test
-                      bank,                               # bank
+                      clean_bank!(bank),                               # bank
                       forms_config.anchor_tests,          # anchor_tests
                       forms_config.anchor_size,           # anchor_size
                       irt_data.method,                    # method

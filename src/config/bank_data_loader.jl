@@ -58,15 +58,14 @@ function read_items_file(items_file::AbstractString)::DataFrame
             bank.C = coalesce.(bank.C, 0.0)  # Replace missing C with 0.0
         end
 
-        # Convert thresholds (B1, B2, ...) to a vector of B values for polytomous items
-        num_items = size(bank, 1)
+        # Initialize B_THRESHOLDS with nothing for all items
+        bank.B_THRESHOLDS = [nothing for _ in 1:size(bank, 1)]
 
-        # Create a matrix for B parameters (polytomous items with thresholds)
-        bank.B_THRESHOLDS = [Vector{Union{Float64, Missing}}() for _ in 1:num_items]
-        for i in 1:num_items
-            if bank.MODEL_TYPE[i] != "3PL"  # Assume 3PL is for dichotomous items, other values for polytomous models
+        # Populate B_THRESHOLDS only for polytomous items
+        for i in 1:size(bank, 1)
+            if bank.MODEL_TYPE[i] != "3PL"  # Assume "3PL" for dichotomous items, other values for polytomous models
                 num_cat = bank.NUM_CATEGORIES[i]
-                b_thresh = Vector{Union{Float64, Missing}}()  # Allow missing values
+                b_thresh = Vector{Float64}()
                 for cat in 1:(num_cat - 1)
                     b_column = Symbol("B$cat")  # B1, B2, B3...
                     if b_column in names(bank)
@@ -75,7 +74,7 @@ function read_items_file(items_file::AbstractString)::DataFrame
                         push!(b_thresh, missing)  # Handle missing threshold columns gracefully
                     end
                 end
-                bank.B_THRESHOLDS[i] = b_thresh
+                bank.B_THRESHOLDS[i] = b_thresh  # Assign thresholds for polytomous items only
             end
         end
 
@@ -84,8 +83,6 @@ function read_items_file(items_file::AbstractString)::DataFrame
         error("Error loading item bank: $e")
     end
 end
-
-
 
 
 """
