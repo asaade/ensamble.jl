@@ -161,19 +161,19 @@ end
 
 
 """
-    plot_results(parms, conf, results, theta_range=-3.0:0.1:3.0, plot_file="results/combined_plot.png") -> DataFrame
+    plot_results(parms, conf, results, theta_range=-3.0:0.1:3.0, plot_file="results/combined_plot.pdf") -> DataFrame
 
 Generates and plots characteristic curves, information curves, and simulated scores.
 """
 function plot_results(parms::Parameters, conf::Config, results::DataFrame,
                       theta_range::Union{AbstractVector, AbstractRange} = -4.0:0.1:4.0,
-                      plot_file::String = "results/combined_plot.png")::DataFrame
+                      plot_file::String = "results/combined_plot.pdf")::DataFrame
 
     # Generate characteristic and information curves
     char_data, info_data = make_curves(parms, results, theta_range)
 
     # Generate simulation data
-    sim_data = make_sims(parms, results)
+    sim_data = DataFrame(simulate_scores(parms, results), :auto)
 
     # Combine all plots
     combined = combine_plots(parms, theta_range, char_data, info_data, sim_data)
@@ -196,14 +196,6 @@ function make_curves(parms::Parameters, results::DataFrame, theta_range::Union{A
     return char_data, info_data
 end
 
-"""
-    make_sims(parms, results) -> DataFrame
-
-Generates a single simulation based on a Normal(0, 1) distribution.
-"""
-function make_sims(parms::Parameters, results::DataFrame; distr = Normal(0, 1))
-    return DataFrame(simulate_scores(parms, results, distr), :auto)
-end
 
 """
     combine_plots(parms, theta_range, char_data, info_data, sim_data) -> Plot
@@ -213,7 +205,7 @@ Combines characteristic, information, and simulation plots.
 function combine_plots(parms::Parameters, theta_range::Union{AbstractVector, AbstractRange},
                        char_data::DataFrame, info_data::DataFrame, sim_data::DataFrame)
 
-    theme(:default)
+    theme(:dao)
     gr(size=(950, 850), legend=:topright)
 
     # Plot characteristic curves with improved labels and styles
@@ -223,7 +215,7 @@ function combine_plots(parms::Parameters, theta_range::Union{AbstractVector, Abs
                             linewidth=2, label="", grid=:both, legend=:topright,
                             xticks=:auto, yticks=:auto, color=:viridis,
                             ylims = (0, parms.max_items))
-    parms.method == "TCC" && scatter!(parms.theta, parms.tau[1, :]; label="", markersize=3)
+    parms.method == "TCC" && scatter!(parms.theta, parms.tau[1, :]; label="", markersize=4)
 
     # Add information curves on the same graph using dual axes (right axis for info curves)
     p2 = @df info_data plot(theta_range, cols(),
@@ -241,7 +233,7 @@ function combine_plots(parms::Parameters, theta_range::Union{AbstractVector, Abs
 
     # # Combine plots into a single layout with consistent sizes
     # plot(p1, p2, p3; layout=(2, 2), size=(950, 850), margin=8mm)
-    plot(p1, p2, p3; layout=(2, 2), size=(850, 850), margin=8mm)
+    plot(p1, p2, p3; layout=(2, 2), size=(950, 850), margin=8mm)
 end
 
 
