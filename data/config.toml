@@ -1,6 +1,6 @@
 [FORMS]
 N = 60
-NumForms = 14
+NumForms = 8
 AnchorTests = 4
 ShadowTest = 1
 
@@ -25,5 +25,5 @@ PLOTFILE = "results/plot_output.png"
 REPORTCATEGORIES = ["FRIENDS", "ENEMIES", "AREA"]
 REPORTSUMS = ["WORDS", "IMAGES"]
 
-SOLVER = "highs"
+SOLVER = "cplex"
 VERBOSE = 1

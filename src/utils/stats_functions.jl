@@ -4,72 +4,10 @@ module StatsFunctions
 export Probability,
     Information, calc_tau, calc_info_tau,
     observed_score_continuous, lw_dist,
-    UnifiedProbability, UnifiedInformation,
-    polytomous_probabilities
+    polytomous_probabilities, calc_info_tau_polytomous,
+    calc_tau_polytomous
 
 using Random, Distributions, QuadGK
-
-
-"""
-    UnifiedProbability(item::Dict, θ::Float64) -> Vector{Float64}
-
-Calculates the probability of response for either 3PL or polytomous items,
-depending on the item type.
-
-# Arguments
-  - `item`: A dictionary containing item parameters and model type.
-  - `θ`: The ability parameter.
-
-# Returns
-  - A vector of probabilities for each response category (or for success/failure in 3PL).
-"""
-function UnifiedProbability(item::Dict, θ::Float64)::Vector{Float64}
-    model_type = item["POLY_MODEL_TYPE"]
-
-    if model_type == "3PL"
-        # Use 3PL probability function
-        return [Probability(θ, item["B"], item["A"], item["C"])]
-    elseif model_type == "GRM"
-        return prob_grm(item["A"], item["B"], θ)
-    elseif model_type == "PCM"
-        return prob_pcm(item["A"], item["B"], θ)
-    elseif model_type == "GPCM"
-        return prob_gpcm(item["A"], item["B"], θ)
-    else
-        error("Unsupported model type: $model_type")
-    end
-end
-
-
-
-"""
-    UnifiedInformation(item::Dict, θ::Float64) -> Float64
-
-Calculates the information for either 3PL or polytomous items, depending on the item type.
-
-# Arguments
-  - `item`: A dictionary containing item parameters and model type.
-  - `θ`: The ability parameter.
-
-# Returns
-  - The information value for the given item.
-"""
-function UnifiedInformation(item::Dict, θ::Float64)::Float64
-    model_type = item["POLY_MODEL_TYPE"]
-
-    if model_type == "3PL"
-        # Use 3PL information function
-        return Information(θ, item["B"], item["A"], item["C"])
-    elseif model_type == "GRM"
-        return info_grm(item["A"], item["B"], θ)
-    elseif model_type == "PCM"
-        return info_pcm(item["A"], item["B"], θ)
-    elseif model_type == "GPCM"
-        return info_gpcm(item["A"], item["B"], θ)
-    else
-        error("Unsupported model type: $model_type")
-    end
-end
 
 
 """
@@ -258,114 +196,46 @@ function info_gpcm(a::Vector{Float64}, b::Vector{Float64}, θ::Float64)
     return info
 end
 
+function kahan_sum(data::Vector{Float64})::Float64
+    sum = 0.0
+    c = 0.0  # A running compensation for lost low-order bits.
 
-"""
-    calc_tau(P::Matrix{Float64}, R::Int, K::Int, N::Int) -> Matrix{Float64}
-
-Calculates the tau matrix for given parameters and items based on probabilities.
-
-# Arguments
-
-  - `P`: Probability matrix.
-  - `R`: Number of powers.
-  - `K`: Number of points.
-  - `N`: Sample size.
-
-# Returns
-
-  - The tau matrix.
-"""
-function calc_tau(P::Matrix{Float64}, R::Int, K::Int, N::Int)::Matrix{Float64}
-    tau = zeros(Float64, R, K)
-    rows = size(P, 1)
-    for _ in 1:500
-        sampled_data = P[rand(1:rows, N), :]
-        for r in 1:R
-            tau[r, :] .+= [sum(sampled_data[:, i] .^ r) for i in 1:K]
-        end
+    for x in data
+        y = x - c        # So far, c is zero in the first iteration.
+        t = sum + y      # Add the compensated value.
+        c = (t - sum) - y  # (t - sum) recovers the high-order part of y; subtracting y recovers the low-order part.
+        sum = t          # New sum includes the low-order bits.
     end
-    return tau / 500.0
-end
 
-"""
-    calc_info_tau(info::Matrix{Float64}, K::Int, N::Int) -> Vector{Float64}
-
-Calculates the information tau vector for given parameters and items based on information functions.
-
-# Arguments
-
-  - `info`: Information matrix.
-  - `K`: Number of items.
-  - `N`: Sample size.
-
-# Returns
-
-  - Information tau vector.
-"""
-function calc_info_tau(info::Matrix{Float64}, K::Int, N::Int)::Vector{Float64}
-    tau = zeros(Float64, K)
-    rows = size(info, 1)
-    for _ in 1:500
-        sampled_data = info[rand(1:rows, N), :]
-        tau .+= [sum(sampled_data[:, i]) for i in 1:K]
-    end
-    return tau ./ 500.0
+    return sum
 end
 
 
-function calc_tau_polytomous(P::Array{Float64, 3}, R::Int, K::Int, N::Int)::Matrix{Float64}
+function calc_tau(p_matrix::Matrix{Float64}, r::Int, k::Int, N::Int)::Matrix{Float64}
     """
-    Calculates the tau matrix for polytomous models.
+    Calculate the tau matrix for given probabilities.
 
-    # Arguments
-    - `P`: 3D probability matrix of size (N_items, K_points, Categories). Contains probabilities for each category.
-    - `R`: Number of powers.
-    - `K`: Number of theta points.
-    - `N`: Sample size (number of items to sample).
+    # Arguments:
+    - `p_matrix`: Probability matrix (Items x K).
+    - `r`: Number of powers.
+    - `k`: Number of theta points.
+    - `N`: Sample size.
 
-    # Returns
-    - The tau matrix.
+    # Returns:
+    - Tau matrix (R x K).
     """
-    tau = zeros(Float64, R, K)
-    N_items, _, categories = size(P)
+    tau = zeros(Float64, r, k)
+    total_samples = 500 * N
+    sampled_data = p_matrix[rand(1:size(p_matrix, 1), total_samples), :]
 
-    for _ in 1:500
-        # Sample N items randomly from the probability matrix
-        sampled_data = P[rand(1:N_items, N), :, :]
+    # Sum the sampled probabilities raised to the r-th power in batches of N
+    for i in 1:500
+        start_idx = (i - 1) * N + 1
+        end_idx = i * N
+        buffer = sampled_data[start_idx:end_idx, :]
 
-        for r in 1:R
-            # Sum over categories for each theta point, then raise to power r
-            for k in 1:K
-                tau[r, k] += sum(sum(sampled_data[:, k, :] .^ r))
-            end
-        end
-    end
-    return tau / 500.0
-end
-
-
-function calc_info_tau_polytomous(info::Array{Float64, 3}, K::Int, N::Int)::Vector{Float64}
-    """
-    Calculates the information tau vector for polytomous models.
-
-    # Arguments
-    - `info`: 3D information matrix of size (N_items, K_points, Categories).
-    - `K`: Number of theta points.
-    - `N`: Sample size (number of items to sample).
-
-    # Returns
-    - The information tau vector.
-    """
-    tau = zeros(Float64, K)
-    N_items, _, categories = size(info)
-
-    for _ in 1:500
-        # Sample N items randomly from the information matrix
-        sampled_data = info[rand(1:N_items, N), :, :]
-
-        # Sum over categories for each theta point
-        for k in 1:K
-            tau[k] += sum(sum(sampled_data[:, k, :]))
+        for r_index in 1:r
+            tau[r_index, :] .+= vec(sum(buffer .^ r_index, dims=1))  # Use `vec` to flatten
         end
     end
 
@@ -373,137 +243,62 @@ function calc_info_tau_polytomous(info::Array{Float64, 3}, K::Int, N::Int)::Vect
 end
 
 
-"""
-    lw_dist(item_params::Matrix{Float64}, θ::Float64) -> Vector{Float64}
+function calc_info_tau(info_matrix::Matrix{Float64}, k::Int, N::Int)::Vector{Float64}
+    """
+    Calculate the tau vector for item information functions.
 
-Implementation of Lord and Wingersky Recursion Formula to calculate score distribution.
+    # Arguments:
+    - `info_matrix`: Information matrix (Items x K).
+    - `k`: Number of theta points.
+    - `N`: Sample size.
+
+    # Returns:
+    - Tau information vector (length k).
+    """
+    tau = zeros(Float64, k)
+    total_samples = 500 * N
+    sampled_data = info_matrix[rand(1:size(info_matrix, 1), total_samples), :]
+
+    # Sum the sampled information across items in batches of N
+    for i in 1:500
+        start_idx = (i - 1) * N + 1
+        end_idx = i * N
+        buffer = sampled_data[start_idx:end_idx, :]
+
+        tau .+= vec(sum(buffer, dims=1))  # Use `vec` to flatten
+    end
+
+    return tau / 500.0
+end
+
+
+"""
+    observed_score_continuous(item_params::Matrix{Float64}, ability_dist::Normal; num_points::Int=100) -> Vector{Float64}
+
+Calculates the observed score distribution using numerical integration for 3PL (dichotomous) items.
 
 # Arguments
-
-  - `item_params`: Matrix of item parameters (a, b, c).
-  - `θ`: Ability parameter.
+- `item_params`: Matrix of item parameters (a, b, c), size (num_items, 3).
+- `ability_dist`: Ability distribution (e.g., Normal).
+- `num_points`: Number of integration points (default 100).
 
 # Returns
-
-  - Score distribution as a vector.
+- Observed score distribution as a vector.
 """
-function lw_dist_dichotomous(item_params::Matrix{Float64}, θ::Float64)::Vector{Float64}
-    num_items = size(item_params, 2)
-    a, b, c = item_params[:, 1]
-    prob_correct = Probability(θ, b, a, c)
-    res = [1 - prob_correct, prob_correct]
+function observed_score_continuous(item_params::Matrix{Float64}, ability_dist::Normal; num_points::Int=120)::Vector{Float64}
+    num_items = size(item_params, 1)
 
-    for i in 2:num_items
-        a, b, c = item_params[:, i]
-        prob_correct = Probability(θ, b, a, c)
-        prob_incorrect = 1 - prob_correct
-
-        prov = zeros(Float64, i + 1)
-        prov[1] = prob_incorrect * res[1]
-
-        for j in 2:i
-            prov[j] = prob_incorrect * res[j] + prob_correct * res[j - 1]
-        end
-        prov[i + 1] = prob_correct * res[i]
-        res = prov
-    end
-
-    return res
-end
-
-
-"""
-    Computes the conditional distributions of number-correct (or observed) scores from the probabilities of category responses to items using Lord and Wingersky recursion formula.
-"""
-function lw_dist(item_params, θ::Float64, model_type, b_thresh)::Vector{Float64}
-    num_items = length(item_params)
-
-    # Initialize the first item's probability distribution
-    if model_type[1] == "3PL"
-        a, b, c = item_params[1]
-        prob_correct = Probability(θ, b, a, c)
-        res = [1 - prob_correct, prob_correct]  # Dichotomous case
-    elseif b_thresh !== nothing && !isempty(b_thresh[1])
-        res = polytomous_probabilities(θ, item_params[1], b_thresh[1], model_type[1])  # Polytomous case
-    else
-        error("Polytomous model with missing or invalid thresholds.")
-    end
-
-    # Iterate through remaining items to update the score distribution
-    for i in 2:num_items
-        if model_type[i] == "3PL"
-            a, b, c = item_params[i]
-            prob_correct = Probability(θ, b, a, c)
-            prob_incorrect = 1 - prob_correct
-
-            # Preallocate new result vector
-            new_res = zeros(Float64, length(res) + 1)
-
-            # Update probabilities for the dichotomous item
-            new_res[1] = prob_incorrect * res[1]
-            for j in 2:length(res)
-                new_res[j] = prob_incorrect * res[j] + prob_correct * res[j - 1]
-            end
-            new_res[end] = prob_correct * res[end]
-
-        elseif b_thresh !== nothing && !isempty(b_thresh[i]) && i <= length(b_thresh)
-            prob_matrix = polytomous_probabilities(θ, item_params[i], b_thresh[i], model_type[i])
-            num_cat = length(prob_matrix)
-            new_res = zeros(Float64, length(res) + num_cat - 1)
-
-            # Update probabilities for the polytomous item
-            for j in 1:length(res)
-                for k in 1:num_cat
-                    new_res[j + k - 1] += res[j] * prob_matrix[k]
-                end
-            end
-        else
-            error("Polytomous model with missing thresholds or invalid index.")
-        end
-
-        # Update result for next iteration
-        res = new_res
-    end
-
-    return res
-end
-
-
-"""
-    observed_score_continuous(item_params, ability_dist::Normal; num_points::Int = 100, model_type, b_thresh) -> Vector{Float64}
-
-Calculates the observed score distribution using numerical integration for both 3PL and polytomous items.
-"""
-function observed_score_continuous(item_params,
-                                   ability_dist::Normal;
-                                   num_points::Int=100,
-                                   model_type,
-                                   b_thresh)::Vector{Float64}
-    # Convert model_type and b_thresh to Vector if they are PooledVector
-    model_type = Vector(model_type)  # In case it's a PooledVector
-    b_thresh = b_thresh === nothing ? nothing : Vector(b_thresh)
-
-    num_items = length(item_params)
-
+    # Define the integrand function for numerical integration
     function integrand(θ, x)
-        score_dist = lw_dist(item_params, θ, model_type, b_thresh)
+        score_dist = lw_dist(item_params, θ)  # Score distribution for dichotomous items
         if x + 1 > length(score_dist)
             return 0.0  # Avoid bounds error
         end
         return score_dist[x + 1] * pdf(ability_dist, θ)
     end
 
-    # Calculate max possible score for mixed format (dichotomous and polytomous)
-    max_score = 0
-    for i in 1:num_items
-        if model_type[i] == "3PL"
-            max_score += 1  # Dichotomous items contribute 1 score point
-        elseif b_thresh !== nothing && i <= length(b_thresh)
-            max_score += length(b_thresh[i])  # Polytomous items contribute based on their thresholds
-        elseif model_type[i] != "3PL" && b_thresh === nothing
-            error("Missing thresholds for polytomous items.")
-        end
-    end
+    # Calculate max possible score for dichotomous items
+    max_score = num_items  # Each item contributes 1 score point
 
     # Initialize the observed distribution vector
     observed_dist = zeros(Float64, max_score + 1)
@@ -518,56 +313,49 @@ end
 
 
 """
-    polytomous_probabilities(θ::Float64, params::Vector{Float64}, thresholds::Vector{Float64}, model_type::AbstractString) -> Vector{Float64}
+    lw_dist(item_params::Matrix{Float64}, θ::Float64) -> Vector{Float64}
 
-Calculates the category probabilities for polytomous items (GRM, PCM, GPCM) given θ.
-
-# Arguments
-  - `θ`: Ability parameter.
-  - `params`: Vector of item parameters (e.g., a, b for GRM).
-  - `thresholds`: Vector of thresholds for polytomous models.
-  - `model_type`: Polytomous model type (e.g., "GRM", "PCM", "GPCM").
-
-# Returns
-  - Vector of category probabilities.
-"""
-function polytomous_probabilities(θ::Float64, params::Vector{Float64}, thresholds::Vector{Float64}, model_type::AbstractString)::Vector{Float64}
-    if model_type == "GRM"
-        return prob_grm(params[1], thresholds, θ)
-    elseif model_type == "PCM"
-        return prob_pcm(params[1], thresholds, θ)
-    elseif model_type == "GPCM"
-        return prob_gpcm(params[1], thresholds, θ)
-    else
-        throw(ArgumentError("Unsupported polytomous model type: $model_type"))
-    end
-end
-
-
-"""
-    polytomous_information(θ::Float64, params::Vector{Float64}, thresholds::Vector{Float64}, model_type::AbstractString) -> Vector{Float64}
-
-Calculates the category information for polytomous items (GRM, PCM, GPCM) given θ.
+Implementation of Lord and Wingersky Recursion Formula to calculate score distribution for dichotomous items.
 
 # Arguments
-  - `θ`: Ability parameter.
-  - `params`: Vector of item parameters (e.g., a, b for GRM).
-  - `thresholds`: Vector of thresholds for polytomous models.
-  - `model_type`: Polytomous model type (e.g., "GRM", "PCM", "GPCM").
+- `item_params`: Matrix of item parameters (a, b, c).
+- `θ`: Ability parameter.
 
 # Returns
-  - Vector of category information.
+- Score distribution as a vector.
 """
-function polytomous_information(θ::Float64, params::Vector{Float64}, thresholds::Vector{Float64}, model_type::AbstractString)::Vector{Float64}
-    if model_type == "GRM"
-        return info_grm(params[1], thresholds, θ)
-    elseif model_type == "PCM"
-        return info_pcm(params[1], thresholds, θ)
-    elseif model_type == "GPCM"
-        return info_gpcm(params[1], thresholds, θ)
-    else
-        throw(ArgumentError("Unsupported polytomous model type: $model_type"))
+function lw_dist(item_params::Matrix{Float64}, θ::Float64)::Vector{Float64}
+    num_items = size(item_params, 1)
+
+    # Pre-allocate the result array for probabilities
+    res = ones(Float64, num_items + 1)  # Initialize with 1 (for zero correct answers)
+
+    # Loop over items and apply the recursion formula
+    for i in 1:num_items
+        a, b, c = item_params[i, :]  # Corrected: extract parameters from row `i`
+
+        prob_correct = Probability(θ, b, a, c)
+        prob_incorrect = 1.0 - prob_correct
+
+        # Create a new array for intermediate results
+        prov = zeros(Float64, i + 1)
+
+        # Update the first element
+        prov[1] = prob_incorrect * res[1]
+
+        # Apply the recursion formula for each subsequent element
+        for j in 2:i
+            prov[j] = prob_incorrect * res[j] + prob_correct * res[j - 1]
+        end
+
+        # Update the last element
+        prov[i + 1] = prob_correct * res[i]
+
+        # Update the result array with the new values
+        res[1:i+1] .= prov  # Broadcasting for efficient assignment
     end
+
+    return res
 end
 
 

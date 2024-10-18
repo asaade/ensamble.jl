@@ -8,8 +8,9 @@ using StatsBase
 
 using ..Configuration, ..Utils
 
+
 """
-    irt_params(bank, items) -> Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Union{Nothing, Vector{Vector{Float64}}}, Vector{String}}
+    irt_params(bank, items) -> Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}}
 
 Extracts IRT parameters (a, b, c) for selected items.
 """
@@ -19,45 +20,37 @@ function irt_params(bank::DataFrame, items::Vector)
     b = bank[idx, :B]
     c = bank[idx, :C]
 
-    # Set b_thresholds to nothing for 3PL (dichotomous) items
-    b_thresholds = map(mt -> mt == "3PL" ? nothing : bank[idx, :B_THRESHOLDS][mt], bank[idx, :MODEL_TYPE])
-
-    model_type = bank[idx, :MODEL_TYPE]
-    return a, b, c, b_thresholds, model_type
+    return a, b, c
 end
 
 
 """
     simulate_scores(parms, results, dist=Normal(0, 1)) -> DataFrame
 
-Simulates test scores based on ability distribution for both 3PL and polytomous items.
+Simulates test scores based on ability distribution for 3PL items.
 """
 function simulate_scores(parms::Parameters, results::DataFrame, dist::Distribution=Normal(0, 1))
     bank = parms.bank
     n_items, n_forms = size(results)
-    n_items += 1  # Account for padded 0 score
-    n_forms = size(results, 2)
+    n_items += 1  # Add one extra row to account for the padded zero score
 
-    # Preallocate a matrix to store results (thread-safe)
+    # Preallocate a matrix to store the results for all forms
     sim_matrix = Matrix{Union{Missing, Float64}}(missing, n_items, n_forms)
 
-    @threads for i in 1:n_forms
-        selected = results[:, i]
-        a, b, c, b_thresh, model_type = irt_params(bank, selected)
+    @threads for form in 1:n_forms
+        selected_items = results[:, form]
 
-        # Prepare the item_params vector to match the expected format for `observed_score_continuous`
-        # Each item will have a parameter vector combining a, b, c (and b_thresh if polytomous)
-        item_params = [ [a[i], b[i], c[i]] for i in 1:length(a) ]
+        # Extract IRT parameters (a, b, c) for the selected items (dichotomous 3PL model)
+        a, b, c = irt_params(bank, selected_items)
 
-        # Convert PooledVector to regular Vector if necessary
-        model_type = Vector(model_type)  # Convert model_type from PooledVector if needed
-        b_thresh = b_thresh === nothing ? nothing : Vector(b_thresh)  # Convert b_thresh if it's a PooledVector
+        # Prepare the item_params matrix for lw_dist (parameters: a, b, c for each item)
+        params = Matrix(hcat(a, b, c))  # Corrected: no transpose needed
 
-        # Call `observed_score_continuous` to handle both 3PL and polytomous items
-        total_scores = observed_score_continuous(item_params, dist, model_type=model_type, b_thresh=b_thresh)
+        # Apply Lord-Wingersky recursion to calculate the score distribution
+        total_scores = observed_score_continuous(params, dist)
 
-        # Pad the results and assign to the simulation matrix
-        sim_matrix[:, i] = vcat(total_scores, fill(missing, n_items - length(total_scores)))
+        # Pad the results if needed and store in the simulation matrix
+        sim_matrix[:, form] = vcat(total_scores, fill(missing, n_items - length(total_scores)))
     end
 
     return sim_matrix
@@ -65,10 +58,11 @@ end
 
 
 
+
 """
     char_curves(parms, results, theta_range, r=1) -> DataFrame
 
-Generates characteristic curve data for all forms.
+Generates characteristic curve data for all forms using dichotomous items.
 """
 function char_curves(parms::Parameters, results::DataFrame, theta_range::Union{AbstractVector, AbstractRange}, r::Int=1)
     bank = parms.bank
@@ -77,26 +71,17 @@ function char_curves(parms::Parameters, results::DataFrame, theta_range::Union{A
 
     curves_matrix = Matrix{Float64}(undef, n_thetas, n_forms)
 
-    # @threads
+    # Loop over each form
     for i in 1:n_forms
         selected = results[:, i]
-        a, b, c, b_thresh, model_type = irt_params(bank, selected)
+        a, b, c = irt_params(bank, selected)
         scores = zeros(Float64, n_thetas)
 
+        # Recalculate probabilities dynamically for each theta value
         for (j, theta) in enumerate(theta_range)
-            for k in 1:length(selected)
-                if model_type[k] == "3PL"
-                    prob = Probability(theta, b[k], a[k], c[k])
-                elseif model_type[k] == "GRM"
-                    prob = prob_grm(a[k], b_thresh[k], theta)
-                elseif model_type[k] == "PCM"
-                    prob = prob_pcm(a[k], b_thresh[k], theta)
-                elseif model_type[k] == "GPCM"
-                    prob = prob_gpcm(a[k], b_thresh[k], theta)
-                else
-                    continue
-                end
-                scores[j] += sum(prob .^ r)  # Summing the probabilities for each category
+            for k in eachindex(selected)
+                prob = Probability(theta, b[k], a[k], c[k])
+                scores[j] += prob^r  # Summing the probability for correct response
             end
         end
 
@@ -111,34 +96,25 @@ end
 """
     info_curves(parms, results, theta_range) -> DataFrame
 
-Generates information curve data for all forms.
+Generates information curve data for all forms using dichotomous items.
 """
 function info_curves(parms::Parameters, results::DataFrame, theta_range::Union{AbstractVector, AbstractRange})
     bank = parms.bank
-    n_thetas = length(theta_range)
     n_forms = size(results, 2)
+    n_thetas = length(theta_range)
 
     info_matrix = Matrix{Float64}(undef, n_thetas, n_forms)
 
-    #  @threads
+    # Loop over each form
     for i in 1:n_forms
         selected = results[:, i]
-        a, b, c, b_thresh, model_type = irt_params(bank, selected)
+        a, b, c = irt_params(bank, selected)
         info = zeros(Float64, n_thetas)
 
+        # Recalculate information dynamically for each theta value
         for (j, theta) in enumerate(theta_range)
-            for k in 1:length(selected)
-                if model_type[k] == "3PL"
-                    info[j] += Information(theta, b[k], a[k], c[k])
-                elseif model_type[k] == "GRM"
-                    info[j] += info_grm(a[k], b_thresh[k], theta)
-                elseif model_type[k] == "PCM"
-                    info[j] += info_pcm(a[k], b_thresh[k], theta)
-                elseif model_type[k] == "GPCM"
-                    info[j] += info_gpcm(a[k], b_thresh[k], theta)
-                else
-                    continue
-                end
+            for k in eachindex(selected)
+                info[j] += Information(theta, b[k], a[k], c[k])
             end
         end
 
@@ -228,7 +204,7 @@ function combine_plots(parms::Parameters, theta_range::Union{AbstractVector, Abs
 
     # # Plot simulated observed scores with score distribution (optional)
     p3 = @df sim_data plot(1:size(sim_data, 1), cols(),
-                           title="Simulated Observed Scores", xlabel="Items", ylabel="Percentage",
+                           title="Simulated Observed Scores", xlabel="Score", ylabel="Frequency",
                            linewidth=2, label="", grid=:both, color=:inferno)
 
     # # Combine plots into a single layout with consistent sizes

@@ -195,7 +195,7 @@ Returns a table of tolerances for each form.
 """
 function tolerances_table(tols::Vector{Float64})::String
     header = ["Form", "Tolerance"]
-    form_ids = [i for i in 1:length(tols)]
+    form_ids = [i for i in eachindex(tols)]
     table_data = Dict(k => rpad(v, 6, "0") for (k, v) in zip(form_ids, tols))
 
     return pretty_table(String, table_data; header=header, sortkeys=true, alignment=:c)
@@ -229,11 +229,6 @@ function gather_tables(parms::Parameters, config::Config, results::DataFrame, to
     tables
 end
 
-function clean_bank!(bank::DataFrame)
-    bank.B_THRESHOLDS = replace(bank.B_THRESHOLDS, nothing => missing)
-    return bank
-end
-
 """
     save_forms(parms, results, config)
 
@@ -247,7 +242,7 @@ function save_forms(parms::Parameters, results::DataFrame, config::Config)
                                  bank.ID .∈ Ref(skipmissing(results[:, v])))
     end
 
-    save_to_csv(clean_bank!(bank), config.forms_file)
+    save_to_csv(bank, config.forms_file)
     save_to_csv(results, config.results_file)
 
     println("\nSaved Forms and Results")

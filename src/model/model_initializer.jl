@@ -222,7 +222,7 @@ function apply_individual_constraint!(model::Model, parms::Parameters, constrain
         constraint_friends_in_form(model, parms, condition)
     elseif constraint.type == "INCLUDE"
         condition = constraint.condition(bank)
-        constraint_include_items(model, condition)
+        constraint_fix_items(model, condition)
     elseif constraint.type == "EXCLUDE"
         condition = constraint.condition(bank)
         constraint_exclude_items(model, parms, condition)

@@ -1,7 +1,7 @@
 module Configuration
 
 # Export main configuration-related functions and types
-export configure, Config, Parameters, Constraint
+export configure, Config, Parameters, Constraint, load_irt_data
 
 using DataFrames
 
@@ -58,10 +58,10 @@ mutable struct Parameters
     anchor_size::Int                # anchor_size from AssemblyConfig
     method::AbstractString          # method from IRTModelData
     theta::Union{Vector{Float64}, Nothing}  # theta from IRTModelData
-    p::Union{Matrix{Float64}, Nothing}      # p matrix from IRTModelData
-    info::Union{Matrix{Float64}, Nothing}   # info matrix from IRTModelData
-    tau::Union{Matrix{Float64}, Nothing}    # tau matrix from IRTModelData
-    tau_info::Union{Vector{Float64}, Nothing}  # tau_info from IRTModelData
+    p_matrix::Matrix{Float64}     # 3D array: (items, theta, categories) for probability
+    info_matrix::Matrix{Float64}  # 3D array: (items, theta, categories) for information
+    tau::Matrix{Float64}            # Tau matrix (aggregated probabilities or information)
+    tau_info::Vector{Float64}       # Tau info (aggregated information at theta points)
     r::Int
     k::Int
     D::Float64
@@ -114,8 +114,8 @@ function transform_parameters_to_flat(forms_config::AssemblyConfig,
                       forms_config.anchor_size,           # anchor_size
                       irt_data.method,                    # method
                       irt_data.theta,                     # theta (Vector{Float64})
-                      irt_data.p,                         # p (Matrix{Float64})
-                      irt_data.info,                      # info (Matrix{Float64})
+                      irt_data.p_matrix,                  # p (Matrix{Float64})
+                      irt_data.info_matrix,               # info (Matrix{Float64})
                       irt_data.tau,                       # tau (Matrix{Float64})
                       irt_data.tau_info,                  # tau_info (Vector{Float64})
                       irt_data.r,

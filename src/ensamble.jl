@@ -1,7 +1,7 @@
 module Ensamble
 __precompile__()
 
-export assemble_tests
+export assemble_tests, load_irt_data
 
 # Import necessary packages
 using JuMP
@@ -59,9 +59,9 @@ function remove_used_items!(parms::Parameters, items_used::Vector{Int})::Paramet
     parms.bank = parms.bank[remaining, :]
 
     if parms.method == "TCC"
-        parms.p = parms.p[remaining, :]
+        parms.p_matrix = parms.p_matrix[remaining, :]
     elseif parms.method in ["TIC", "TIC2", "TIC3"]
-        parms.info = parms.info[remaining, :]
+        parms.info_matrix = parms.info_matrix[remaining, :]
     else
         error("Unknown $(parms.method) optimization method used.")
     end
@@ -153,13 +153,13 @@ function handle_anchor_items(parms::Parameters, orig_parms::Parameters)::Paramet
         # Update parameters based on the method
         if parms.method == "TCC"
             if "INDEX" in names(parms.bank)
-                parms.p = orig_parms.p[parms.bank.INDEX, :]
+                parms.p_matrix = orig_parms.p_matrix[parms.bank.INDEX, :]
             else
                 error("INDEX column missing in the bank for TCC method.")
             end
         elseif parms.method in ["TIC", "TIC2", "TIC3"]
             if "INDEX" in names(parms.bank)
-                parms.info = orig_parms.info[parms.bank.INDEX, :]
+                parms.info_matrix = orig_parms.info_matrix[parms.bank.INDEX, :]
             else
                 error("INDEX column missing in the bank for TIC method.")
             end
