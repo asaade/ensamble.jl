@@ -383,7 +383,6 @@ end
 
 end  # module CriteriaParser
 
-
 # # Example usage
 # df = DataFrame(CLAVE = [1, 2, 3, 4], AREA = ["A", "B", "C", "D"], A = [0.6, 0.4, 0.9, 0.2])
 
@@ -402,7 +401,6 @@ end  # module CriteriaParser
 # expr4 = parse_criteria("AREA")
 # result4 = eval(expr4)(df)
 # println(result5)
-
 
 # expr5 = parse_criteria("AREA in ['A', 'B']")
 # result5 = eval(expr5)(df)

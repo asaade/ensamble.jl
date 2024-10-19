@@ -72,16 +72,17 @@ function load_irt_data(config_data::Dict{Symbol, Any}, bank::DataFrame)::IRTMode
 
     # Return IRTModelData struct with all required data
     return IRTModelData(method, theta, p_matrix, info_matrix, tau, tau_info,
-        relative_target_weights, relative_target_points, length(theta), r, D)
+                        relative_target_weights, relative_target_points, length(theta), r,
+                        D)
 end
-
 
 """
     create_irt_item_data(theta::Vector{Float64}, a::Vector{Float64}, b::Vector{Float64}, c::Vector{Float64}, D::Float64)
 
 Creates the probability and information matrices for dichotomous items only.
 """
-function create_irt_item_data(theta::Vector{Float64}, a::Vector{Float64}, b::Vector{Float64}, c::Vector{Float64}, D::Float64)
+function create_irt_item_data(theta::Vector{Float64}, a::Vector{Float64},
+                              b::Vector{Float64}, c::Vector{Float64}, D::Float64)
     num_items = length(a)
 
     # Initialize 2D arrays for probabilities and information
@@ -98,13 +99,13 @@ function create_irt_item_data(theta::Vector{Float64}, a::Vector{Float64}, b::Vec
     return (p_matrix, info_matrix)
 end
 
-
 """
     get_tau(irt_dict::Dict{Symbol, Any}, p_matrix::Matrix{Float64}, r::Int, k::Int, N::Int)::Matrix{Float64}
 
 Calculates or retrieves the tau values based on the probability matrix.
 """
-function get_tau(irt_dict::Dict{Symbol, Any}, p_matrix::Matrix{Float64}, r::Int, k::Int, N::Int)::Matrix{Float64}
+function get_tau(irt_dict::Dict{Symbol, Any}, p_matrix::Matrix{Float64}, r::Int, k::Int,
+                 N::Int)::Matrix{Float64}
     tau = get(irt_dict, :TAU, nothing)
 
     if tau !== nothing && !isempty(tau)
@@ -119,7 +120,8 @@ end
 
 Calculates or retrieves the tau_info values based on the information matrix.
 """
-function get_tau_info(irt_dict::Dict{Symbol, Any}, info_matrix::Matrix{Float64}, k::Int, N::Int)::Vector{Float64}
+function get_tau_info(irt_dict::Dict{Symbol, Any}, info_matrix::Matrix{Float64}, k::Int,
+                      N::Int)::Vector{Float64}
     tau_info = get(irt_dict, :TAU_INFO, nothing)
 
     if tau_info !== nothing && !isempty(tau_info)

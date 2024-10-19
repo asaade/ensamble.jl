@@ -30,6 +30,7 @@ end
 
 """
     read_items_file(items_file::AbstractString)::DataFrame
+
 Reads the item file and returns a DataFrame.
 """
 function read_items_file(items_file::AbstractString)::DataFrame
@@ -43,8 +44,6 @@ function read_items_file(items_file::AbstractString)::DataFrame
 
         # Set missing C values to 0.0 for all models
         bank.C = coalesce.(bank.C, 0.0)
-
-
 
         return bank
     catch e
@@ -113,10 +112,12 @@ function select_valid_items!(bank::DataFrame)::DataFrame
     bank.C = coalesce.(bank.C, 0.0)
 
     # Filter items based on A, B, C limits for dichotomous items
-    filter!(row -> (0.4 <= row.A <= 2.0 && -3.5 <= row.B <= 3.5 && 0.0 <= row.C <= 0.5), bank)
+    filter!(row -> (0.4 <= row.A <= 2.0 && -3.5 <= row.B <= 3.5 && 0.0 <= row.C <= 0.5),
+            bank)
 
     invalid_items = original_size - size(bank, 1)
-    invalid_items > 0 && @warn string(invalid_items, " invalid items were filtered out of the bank.")
+    invalid_items > 0 &&
+        @warn string(invalid_items, " invalid items were filtered out of the bank.")
 
     # Recompute the INDEX column after filtering
     bank.INDEX = rownumber.(eachrow(bank))

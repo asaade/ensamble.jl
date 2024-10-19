@@ -8,7 +8,6 @@ using StatsBase
 
 using ..Configuration, ..Utils
 
-
 """
     irt_params(bank, items) -> Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}}
 
@@ -23,13 +22,13 @@ function irt_params(bank::DataFrame, items::Vector)
     return a, b, c
 end
 
-
 """
     simulate_scores(parms, results, dist=Normal(0, 1)) -> DataFrame
 
 Simulates test scores based on ability distribution for 3PL items.
 """
-function simulate_scores(parms::Parameters, results::DataFrame, dist::Distribution=Normal(0, 1))
+function simulate_scores(parms::Parameters, results::DataFrame,
+                         dist::Distribution=Normal(0, 1))
     bank = parms.bank
     n_items, n_forms = size(results)
     n_items += 1  # Add one extra row to account for the padded zero score
@@ -50,21 +49,20 @@ function simulate_scores(parms::Parameters, results::DataFrame, dist::Distributi
         total_scores = observed_score_continuous(params, dist)
 
         # Pad the results if needed and store in the simulation matrix
-        sim_matrix[:, form] = vcat(total_scores, fill(missing, n_items - length(total_scores)))
+        sim_matrix[:, form] = vcat(total_scores,
+                                   fill(missing, n_items - length(total_scores)))
     end
 
     return sim_matrix
 end
-
-
-
 
 """
     char_curves(parms, results, theta_range, r=1) -> DataFrame
 
 Generates characteristic curve data for all forms using dichotomous items.
 """
-function char_curves(parms::Parameters, results::DataFrame, theta_range::Union{AbstractVector, AbstractRange}, r::Int=1)
+function char_curves(parms::Parameters, results::DataFrame,
+                     theta_range::Union{AbstractVector, AbstractRange}, r::Int=1)
     bank = parms.bank
     n_forms = size(results, 2)
     n_thetas = length(theta_range)
@@ -92,13 +90,13 @@ function char_curves(parms::Parameters, results::DataFrame, theta_range::Union{A
     return round.(curves, digits=2)
 end
 
-
 """
     info_curves(parms, results, theta_range) -> DataFrame
 
 Generates information curve data for all forms using dichotomous items.
 """
-function info_curves(parms::Parameters, results::DataFrame, theta_range::Union{AbstractVector, AbstractRange})
+function info_curves(parms::Parameters, results::DataFrame,
+                     theta_range::Union{AbstractVector, AbstractRange})
     bank = parms.bank
     n_forms = size(results, 2)
     n_thetas = length(theta_range)
@@ -125,16 +123,14 @@ function info_curves(parms::Parameters, results::DataFrame, theta_range::Union{A
     return round.(info_data, digits=2)
 end
 
-
 """
     save_to_csv(data, file)
 
 Saves a DataFrame to a CSV file.
 """
 function save_to_csv(data::DataFrame, file::String)
-    CSV.write(file, data)
+    return CSV.write(file, data)
 end
-
 
 """
     plot_results(parms, conf, results, theta_range=-3.0:0.1:3.0, plot_file="results/combined_plot.pdf") -> DataFrame
@@ -142,8 +138,8 @@ end
 Generates and plots characteristic curves, information curves, and simulated scores.
 """
 function plot_results(parms::Parameters, conf::Config, results::DataFrame,
-                      theta_range::Union{AbstractVector, AbstractRange} = -4.0:0.1:4.0,
-                      plot_file::String = "results/combined_plot.pdf")::DataFrame
+                      theta_range::Union{AbstractVector, AbstractRange}=-4.0:0.1:4.0,
+                      plot_file::String="results/combined_plot.pdf")::DataFrame
 
     # Generate characteristic and information curves
     char_data, info_data = make_curves(parms, results, theta_range)
@@ -160,18 +156,17 @@ function plot_results(parms::Parameters, conf::Config, results::DataFrame,
     return char_data
 end
 
-
 """
     make_curves(parms, results, theta_range) -> Tuple{DataFrame, DataFrame}
 
 Generates both characteristic and information curves.
 """
-function make_curves(parms::Parameters, results::DataFrame, theta_range::Union{AbstractVector, AbstractRange})
+function make_curves(parms::Parameters, results::DataFrame,
+                     theta_range::Union{AbstractVector, AbstractRange})
     char_data = char_curves(parms, results, theta_range)
     info_data = info_curves(parms, results, theta_range)
     return char_data, info_data
 end
-
 
 """
     combine_plots(parms, theta_range, char_data, info_data, sim_data) -> Plot
@@ -180,9 +175,8 @@ Combines characteristic, information, and simulation plots.
 """
 function combine_plots(parms::Parameters, theta_range::Union{AbstractVector, AbstractRange},
                        char_data::DataFrame, info_data::DataFrame, sim_data::DataFrame)
-
     theme(:dao)
-    gr(size=(950, 850), legend=:topright)
+    gr(; size=(950, 850), legend=:topright)
 
     # Plot characteristic curves with improved labels and styles
     p1 = @df char_data plot(theta_range, cols(),
@@ -190,7 +184,7 @@ function combine_plots(parms::Parameters, theta_range::Union{AbstractVector, Abs
                             xlabel="Ability (θ)", ylabel="Expected Score",
                             linewidth=2, label="", grid=:both, legend=:topright,
                             xticks=:auto, yticks=:auto, color=:viridis,
-                            ylims = (0, parms.max_items))
+                            ylims=(0, parms.max_items))
     parms.method == "TCC" && scatter!(parms.theta, parms.tau[1, :]; label="", markersize=4)
 
     # Add information curves on the same graph using dual axes (right axis for info curves)
@@ -200,32 +194,33 @@ function combine_plots(parms::Parameters, theta_range::Union{AbstractVector, Abs
                             linewidth=2, label="", grid=:both, color=:plasma)
 
     # Overlay a reference line at θ = 0
-    vline!([0], color=:gray, linestyle=:dash, label="")
+    vline!([0]; color=:gray, linestyle=:dash, label="")
 
     # # Plot simulated observed scores with score distribution (optional)
     p3 = @df sim_data plot(1:size(sim_data, 1), cols(),
-                           title="Simulated Observed Scores", xlabel="Score", ylabel="Frequency",
+                           title="Simulated Observed Scores", xlabel="Score",
+                           ylabel="Frequency",
                            linewidth=2, label="", grid=:both, color=:inferno)
 
     # # Combine plots into a single layout with consistent sizes
     # plot(p1, p2, p3; layout=(2, 2), size=(950, 850), margin=8mm)
-    plot(p1, p2, p3; layout=(2, 2), size=(950, 850), margin=8mm)
+    return plot(p1, p2, p3; layout=(2, 2), size=(950, 850), margin=8mm)
 end
-
 
 """
     save_all(curves, theta_range, conf, plot, plot_file)
 
 Saves the curves to a CSV and the plot to a file.
 """
-function save_all(curves::DataFrame, theta_range::Union{AbstractVector, AbstractRange}, conf::Config, plot::AbstractPlot, plot_file::String)
+function save_all(curves::DataFrame, theta_range::Union{AbstractVector, AbstractRange},
+                  conf::Config, plot::AbstractPlot, plot_file::String)
     insertcols!(curves, 1, :THETA => collect(theta_range))
     save_to_csv(curves, conf.tcc_file)
 
     savefig(plot, plot_file)
 
     println("TCC data saved to: ", conf.tcc_file)
-    println("Charts saved to: ", plot_file)
+    return println("Charts saved to: ", plot_file)
 end
 
 end

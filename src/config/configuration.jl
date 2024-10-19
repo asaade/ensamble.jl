@@ -70,7 +70,6 @@ mutable struct Parameters
     verbose::Int                    # verbosity from BasicConfig
 end
 
-
 """
     transform_config_to_flat(basic_config::BasicConfig)::Config
 

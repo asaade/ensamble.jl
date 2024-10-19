@@ -62,8 +62,6 @@ function constraint_items_per_form(model::Model, parms::Parameters, minItems::In
                                  maxItems)
 end
 
-
-
 """
     constraint_item_count(model::Model, parms::Parameters, selected::BitVector, minItems::Int, maxItems::Int=minItems)
 
@@ -78,8 +76,10 @@ function constraint_item_count(model::Model, parms::Parameters, selected::BitVec
     forms = operational_forms(x, parms.shadow_test)
 
     # Adjust constraints for item count
-    @constraint(model, [f = 1:forms], sum(x[items[i], f] for i in eachindex(items)) >= minItems)
-    @constraint(model, [f = 1:forms], sum(x[items[i], f] for i in eachindex(items)) <= maxItems)
+    @constraint(model, [f = 1:forms],
+                sum(x[items[i], f] for i in eachindex(items)) >= minItems)
+    @constraint(model, [f = 1:forms],
+                sum(x[items[i], f] for i in eachindex(items)) <= maxItems)
 
     # Handle shadow test constraints if applicable
     if parms.shadow_test > 0
@@ -97,10 +97,12 @@ function constraint_item_count(model::Model, parms::Parameters, selected::BitVec
 
         # Adjust constraints for shadow test
         @constraint(model,
-                    sum(x[non_anchor_items[i], shadow_test_col] for i in eachindex(non_anchor_items)) >=
+                    sum(x[non_anchor_items[i], shadow_test_col]
+                        for i in eachindex(non_anchor_items)) >=
                     minItems * parms.shadow_test)
         @constraint(model,
-                    sum(x[non_anchor_items[i], shadow_test_col] for i in eachindex(non_anchor_items)) <=
+                    sum(x[non_anchor_items[i], shadow_test_col]
+                        for i in eachindex(non_anchor_items)) <=
                     maxItems * parms.shadow_test)
     end
 
@@ -128,7 +130,7 @@ function constraint_item_sum(model::Model, parms::Parameters, vals, minVal, maxV
     cond = ndims(vals) == 1 ? trues(length(vals)) : vals[:, 1]
 
     # Identify anchor and non-anchor items
-    anchor_items = findall(parms.bank.ANCHOR .!== missing)
+    anchor_items = filter(i -> !ismissing(parms.bank.ANCHOR[i]), 1:items)
     non_anchor_items = filter(i -> ismissing(parms.bank.ANCHOR[i]), 1:items)
 
     # Calculate the sum for anchor items in operational forms
@@ -150,15 +152,14 @@ function constraint_item_sum(model::Model, parms::Parameters, vals, minVal, maxV
 
         @constraint(model,
                     sum(x[i, zcol] * val[i] for i in non_anchor_items if cond[i]) >=
-                        effective_minVal * parms.shadow_test)
+                    effective_minVal * parms.shadow_test)
         @constraint(model,
                     sum(x[i, zcol] * val[i] for i in non_anchor_items if cond[i]) <=
-                        effective_maxVal * parms.shadow_test)
+                    effective_maxVal * parms.shadow_test)
     end
 
     return model
 end
-
 
 # ---------------------------------------------------------------------------
 # Constraint Functions for item groups (friends, enemies, anchors)
@@ -171,7 +172,7 @@ Adds constraints to ensure that friend items (items that must always be together
 """
 function constraint_friends_in_form(model::Model, parms::Parameters, selected)
     x = model[:x]
-    forms  = operational_forms(x, parms.shadow_test)
+    forms = operational_forms(x, parms.shadow_test)
     groups = group_by_selected(selected)
 
     for group in groups
@@ -181,11 +182,11 @@ function constraint_friends_in_form(model::Model, parms::Parameters, selected)
 
         # Only add constraints if the group has more than one item
         if cnt > 1
-            @constraint(model, [f in 1:forms], sum(x[i, f] for i in items) == (cnt * x[pivot, f]))
+            @constraint(model, [f in 1:forms],
+                        sum(x[i, f] for i in items) == (cnt * x[pivot, f]))
         end
     end
 end
-
 
 """
     constraint_enemies_in_form(model::Model, parms::Parameters, selected)
@@ -194,7 +195,7 @@ Adds constraints to prevent enemy items (items that should not appear together) 
 """
 function constraint_enemies_in_form(model::Model, parms::Parameters, selected)
     x = model[:x]
-    forms  = operational_forms(x, parms.shadow_test)
+    forms = operational_forms(x, parms.shadow_test)
 
     if isa(selected, BitVector)
         items = 1:size(x, 1)
@@ -230,7 +231,6 @@ function constraint_exclude_items(model::Model, exclude::BitVector)
     return model
 end
 
-
 """
     constraint_fix_items(model::Model, fixed::BitVector)
 
@@ -258,7 +258,7 @@ function constraint_add_anchor!(model::Model, parms::Parameters)
     if parms.anchor_tests > 0
         x = model[:x]
         forms = operational_forms(x, parms.shadow_test)
-        anchor_items = findall(parms.bank.ANCHOR .!== missing)
+        anchor_items = filter(i -> !ismissing(parms.bank.ANCHOR[i]), 1:size(x, 1))
 
         for i in anchor_items
             for f in 1:forms
@@ -285,8 +285,7 @@ function constraint_max_use(model::Model, parms::Parameters, selected::BitVector
 
     if max_use < forms
         selected_items = collect(1:size(x, 1))[selected]
-        non_anchor_items =
-            filter(i -> ismissing(parms.bank.ANCHOR[i]), selected_items)
+        non_anchor_items = filter(i -> ismissing(parms.bank.ANCHOR[i]), selected_items)
 
         @constraint(model, max_use[i in non_anchor_items],
                     sum(x[i, f] for f in 1:forms) + parms.bank.ITEM_USE[i] <= max_use)
@@ -345,7 +344,7 @@ function objective_match_characteristic_curve!(model::Model, parms::Parameters)
     forms -= parms.shadow_test > 0 ? 1 : 0
 
     # Identify anchor and non-anchor items
-    anchor_items = findall(parms.bank.ANCHOR .!== missing)
+    anchor_items = filter(i -> !ismissing(parms.bank.ANCHOR[i]), 1:items)
     non_anchor_items = filter(i -> ismissing(parms.bank.ANCHOR[i]), 1:items)
 
     # Initialize a matrix to store anchor contributions
@@ -358,27 +357,26 @@ function objective_match_characteristic_curve!(model::Model, parms::Parameters)
 
     # Constraints for operational forms (include both anchor and non-anchor items)
     @constraint(model, [f = 1:forms, k = K, r = R],
-        sum(P[i, k]^r * x[i, f] for i in 1:items) <= tau[r, k] + y)
+                sum(P[i, k]^r * x[i, f] for i in 1:items) <= tau[r, k] + y)
 
     @constraint(model, [f = 1:forms, k = K, r = R],
-        sum(P[i, k]^r * x[i, f] for i in 1:items) >= tau[r, k] - y)
+                sum(P[i, k]^r * x[i, f] for i in 1:items) >= tau[r, k] - y)
 
     # Constraints for shadow test (only non-anchor items)
     if parms.shadow_test > 0
         shadow_test = parms.shadow_test
 
         @constraint(model, [k = K, r = R],
-            sum(P[i, k]^r * x[i, zcol] for i in non_anchor_items) <=
-            ((tau[r, k] - anchor_contribution[r, k] + y) * shadow_test))
+                    sum(P[i, k]^r * x[i, zcol] for i in non_anchor_items) <=
+                    ((tau[r, k] - anchor_contribution[r, k] + y) * shadow_test))
 
         @constraint(model, [k = K, r = R],
-            sum(P[i, k]^r * x[i, zcol] for i in non_anchor_items) >=
-            ((tau[r, k] - anchor_contribution[r, k] - y) * shadow_test))
+                    sum(P[i, k]^r * x[i, zcol] for i in non_anchor_items) >=
+                    ((tau[r, k] - anchor_contribution[r, k] - y) * shadow_test))
     end
 
     return model
 end
-
 
 """
     objective_match_information_curve!(model::Model, parms::Parameters)
@@ -393,7 +391,7 @@ function objective_match_information_curve!(model::Model, parms::Parameters)
     forms -= parms.shadow_test > 0 ? 1 : 0
 
     # Identify anchor and non-anchor items
-    anchor_items = findall(parms.bank.ANCHOR .!== missing)
+    anchor_items = filter(i -> !ismissing(parms.bank.ANCHOR[i]), 1:items)
     non_anchor_items = filter(i -> ismissing(parms.bank.ANCHOR[i]), 1:items)
 
     # Contribution of anchor items to the information curve
@@ -423,7 +421,6 @@ function objective_match_information_curve!(model::Model, parms::Parameters)
     return model
 end
 
-
 """
     objective_max_info(model::Model, parms::Parameters)
 
@@ -440,7 +437,7 @@ function objective_max_info(model::Model, parms::Parameters)
     forms -= shadow > 0 ? 1 : 0
 
     # Identify anchor and non-anchor items
-    anchor_items = findall(parms.bank.ANCHOR .!== missing)
+    anchor_items = filter(i -> !ismissing(parms.bank.ANCHOR[i]), 1:items)
     non_anchor_items = filter(i -> ismissing(parms.bank.ANCHOR[i]), 1:items)
 
     # Calculate the contribution of anchor items for each theta point k
@@ -462,7 +459,6 @@ function objective_max_info(model::Model, parms::Parameters)
 
     return model
 end
-
 
 """
     objective_info_relative2(model::Model, parms::Parameters)
@@ -486,6 +482,5 @@ function objective_info_relative2(model::Model, parms::Parameters)
 
     return model
 end
-
 
 end  # module ATAConstraints

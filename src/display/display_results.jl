@@ -21,7 +21,7 @@ Prints a title with a separator.
 """
 function title_with_separator(title::String)
     println("\n" * title)
-    println(repeat("=", length(title)))
+    return println(repeat("=", length(title)))
 end
 
 """
@@ -32,7 +32,7 @@ Displays the optimization results, including objective value.
 function show_opt_results(model::Model, parms::Parameters)
     parms.verbose > 1 && println(solution_summary(model))
     println("Objective: ", round(objective_value(model); digits=4))
-    println("=====================================")
+    return println("=====================================")
 end
 
 """
@@ -41,7 +41,7 @@ end
 Throws an error if the DataFrame is empty.
 """
 function check_empty!(df::DataFrame)
-    isempty(df) && throw(ArgumentError("Results are empty."))
+    return isempty(df) && throw(ArgumentError("Results are empty."))
 end
 
 """
@@ -50,7 +50,8 @@ end
 Checks if a column exists in the DataFrame.
 """
 function check_column!(col_name::String, df::DataFrame)
-    col_name in names(df) || throw(ArgumentError("Column '$col_name' does not exist."))
+    return col_name in names(df) ||
+        throw(ArgumentError("Column '$col_name' does not exist."))
 end
 
 """
@@ -60,7 +61,7 @@ Displays optimization results, including tolerance and objective value.
 """
 function show_results(model::Model, parms::Parameters)
     title_with_separator("Optimization Results")
-    show_opt_results(model, parms)
+    return show_opt_results(model, parms)
 end
 
 """
@@ -85,7 +86,7 @@ function anchor_summary(results::DataFrame, bank::DataFrame)::String
     end
 
     table_matrix = hcat(table_data...)'
-    pretty_table(String, table_matrix; header=header, alignment=:r)
+    return pretty_table(String, table_matrix; header=header, alignment=:r)
 end
 
 """
@@ -113,7 +114,7 @@ function col_sums(results::DataFrame, bank::DataFrame, cols)::String
         push!(table_data, col_sum)
     end
 
-    pretty_table(String, hcat(table_data...); header=["Form"; cols...], alignment=:r)
+    return pretty_table(String, hcat(table_data...); header=["Form"; cols...], alignment=:r)
 end
 
 """
@@ -121,7 +122,8 @@ end
 
 Returns a table showing the counts of items grouped by category in the specified column for each form.
 """
-function cat_counts(results::DataFrame, bank::DataFrame, col::Union{String, Symbol}; max_cats::Int=10)::String
+function cat_counts(results::DataFrame, bank::DataFrame, col::Union{String, Symbol};
+                    max_cats::Int=10)::String
     check_empty!(results)
     check_column!(String(col), bank)
 
@@ -132,7 +134,8 @@ function cat_counts(results::DataFrame, bank::DataFrame, col::Union{String, Symb
     table_data = []
     for i in 1:num_forms
         selected_items = skipmissing(results[:, i])
-        form_counts = [sum(non_missing_bank[in(selected_items).(non_missing_bank.ID), Symbol(col)] .== category)
+        form_counts = [sum(non_missing_bank[in(selected_items).(non_missing_bank.ID),
+                                            Symbol(col)] .== category)
                        for category in categories]
         push!(table_data, [i; form_counts...])
     end
@@ -166,7 +169,8 @@ function common_items(results::DataFrame)::String
     end
 
     header = [""; collect(1:num_forms)...]
-    pretty_table(String, hcat(collect(1:num_forms), common_matrix); header=header, alignment=:r)
+    return pretty_table(String, hcat(collect(1:num_forms), common_matrix); header=header,
+                        alignment=:r)
 end
 
 """
@@ -183,9 +187,12 @@ function final_summary(parms::Parameters, results::DataFrame)::String
     used_non_anchors = setdiff(used_items, used_anchors)
 
     labels = [LABEL_FORMS, LABEL_ITEMS, LABEL_NON_ANCHOR, LABEL_ANCHOR, LABEL_UNUSED]
-    values = [size(results, 2), length(used_items), length(used_non_anchors), length(used_anchors), length(items) - length(anchor_items) - length(used_items)]
+    values = [size(results, 2), length(used_items), length(used_non_anchors),
+              length(used_anchors),
+              length(items) - length(anchor_items) - length(used_items)]
 
-    pretty_table(String, hcat(labels, string.(values)); header=["Concept", "Count"], alignment=[:l, :r])
+    return pretty_table(String, hcat(labels, string.(values)); header=["Concept", "Count"],
+                        alignment=[:l, :r])
 end
 
 """
@@ -201,13 +208,13 @@ function tolerances_table(tols::Vector{Float64})::String
     return pretty_table(String, table_data; header=header, sortkeys=true, alignment=:c)
 end
 
-
 """
     gather_tables(parms, config, results, tols) -> Dict{String, String}
 
 Gathers summary tables into a dictionary for the final report.
 """
-function gather_tables(parms::Parameters, config::Config, results::DataFrame, tols::Vector{Float64})::Dict{String, String}
+function gather_tables(parms::Parameters, config::Config, results::DataFrame,
+                       tols::Vector{Float64})::Dict{String, String}
     tables = Dict{String, String}()
 
     tables["Summary"] = final_summary(parms, results)
@@ -226,7 +233,7 @@ function gather_tables(parms::Parameters, config::Config, results::DataFrame, to
     tables["Common items"] = common_items(results)
     tables["Tolerances"] = tolerances_table(tols)
 
-    tables
+    return tables
 end
 
 """
@@ -248,7 +255,7 @@ function save_forms(parms::Parameters, results::DataFrame, config::Config)
     println("\nSaved Forms and Results")
     println("=======================")
     println("Modified bank saved to: ", config.forms_file)
-    println("Results saved to: ", config.results_file)
+    return println("Results saved to: ", config.results_file)
 end
 
 """
@@ -256,11 +263,12 @@ end
 
 Generates the final report and returns it as a dictionary.
 """
-function final_report(parms::Parameters, results::DataFrame, config::Config, tols::Vector{Float64})::Dict{String, String}
+function final_report(parms::Parameters, results::DataFrame, config::Config,
+                      tols::Vector{Float64})::Dict{String, String}
     report_data = gather_tables(parms, config, results, tols)
     save_forms(parms, results, config)
     plot_results(parms, config, results)
-    report_data
+    return report_data
 end
 
 """
@@ -296,7 +304,7 @@ function generate_report(report_data::Dict{String, String})::String
         report *= report_data["Column sums"] * "\n\n"
     end
 
-    report
+    return report
 end
 
 end
