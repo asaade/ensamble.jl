@@ -11,7 +11,7 @@ using ..Utils
 Data structure for holding the IRT model data.
 """
 mutable struct IRTModelData
-    method::AbstractString          # Method (e.g., TCC, TIC, etc.)
+    method::String          # Method (e.g., TCC, TIC, etc.)
     theta::Vector{Float64}          # Theta points (ability levels)
     p_matrix::Matrix{Float64}     # 3D array: (items, theta, categories) for probability
     info_matrix::Matrix{Float64}  # 3D array: (items, theta, categories) for information
@@ -39,7 +39,7 @@ based on the input configuration and item bank.
 
   - An `IRTModelData` struct containing IRT parameters and matrices for the assembly process.
 """
-function load_irt_data(config_data::Dict{Symbol, Any}, bank::DataFrame)::IRTModelData
+function load_irt_data(config_data::Dict{Symbol, Any}, forms_config, bank::DataFrame)::IRTModelData
     # Ensure IRT configuration exists
     if !haskey(config_data, :IRT)
         throw(ArgumentError("Configuration must contain the 'IRT' key."))
@@ -50,7 +50,7 @@ function load_irt_data(config_data::Dict{Symbol, Any}, bank::DataFrame)::IRTMode
     theta = get(irt_dict, :THETA, missing)
     D = get(irt_dict, :D, 1.0)
     r = get(irt_dict, :R, 2)
-    N = get(config_data[:FORMS], :N, 1)
+    N = forms_config.form_size # get(config_data[:FORMS], :N, 1)
 
     relative_target_weights = get(irt_dict, :RELATIVETARGETWEIGHTS, [1.0, 1.0])
     relative_target_points = get(irt_dict, :RELATIVETARGETPOINTS, [-1.0, 1.0])
@@ -59,9 +59,9 @@ function load_irt_data(config_data::Dict{Symbol, Any}, bank::DataFrame)::IRTMode
     end
 
     # Extract item parameters directly from the bank DataFrame
-    a = bank.A
-    b = bank.B
-    c = bank.C
+    a::Vector{Float64} = bank.A
+    b::Vector{Float64} = bank.B
+    c::Vector{Float64} = bank.C
 
     # Calculate 3D probability and information matrices for dichotomous items
     (p_matrix, info_matrix) = create_irt_item_data(theta, a, b, c, D)
@@ -92,8 +92,8 @@ function create_irt_item_data(theta::Vector{Float64}, a::Vector{Float64},
     # Use direct element iteration
     for (t_idx, θ) in enumerate(theta)
         # Vectorized computation for probabilities and information for all items at this theta
-        p_matrix[:, t_idx] = Probability(θ, b, a, c; d=D)
-        info_matrix[:, t_idx] = Information(θ, b, a, c; d=D)
+        p_matrix[:, t_idx] = prob_3pl.(a, b, c, θ; D=D)
+        info_matrix[:, t_idx] = info_3pl.(a, b, c, θ; D=D)
     end
 
     return (p_matrix, info_matrix)
@@ -112,7 +112,7 @@ function get_tau(irt_dict::Dict{Symbol, Any}, p_matrix::Matrix{Float64}, r::Int,
         return hcat(tau...)  # Directly concatenate tau columns if provided
     end
 
-    return calc_tau(p_matrix, r, k, N)
+    return calc_tau(p_matrix, r, N)
 end
 
 """
@@ -128,7 +128,8 @@ function get_tau_info(irt_dict::Dict{Symbol, Any}, info_matrix::Matrix{Float64},
         return Vector{Float64}(tau_info)
     end
 
-    return calc_info_tau(info_matrix, k, N)
+    return calc_info_tau(info_matrix, N)
 end
+
 
 end # module IRTDataLoader
