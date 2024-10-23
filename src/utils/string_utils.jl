@@ -10,7 +10,7 @@ using DataFrames: DataFrames
 using Logging
 
 """
-    upSymbol(y::Any) -> Symbol
+    upSymbol(y)::Symbol
 
 Converts any input into a Symbol with all uppercase characters. If the input
 is not convertible to a string, returns the input untouched.
@@ -32,7 +32,7 @@ function upSymbol(y)::Symbol
 end
 
 """
-    upcaseKeys(d::Dict{<:Union{String, Symbol}, Any}) -> Dict{Symbol, Any}
+    upcaseKeys(d::Dict{<:Union{String, Symbol}, Any})::Dict{Symbol, Any}
 
 Recursively converts all keys in a dictionary to uppercase symbols, and ensures
 the output dictionary is of type `Dict{Symbol, Any}`.
@@ -51,7 +51,7 @@ function upcaseKeys(d::Dict{<:Union{String, Symbol}, Any})::Dict{Symbol, Any}
 end
 
 """
-    cleanValues(d::Dict{<:Union{String, Symbol}, Any}) -> Dict{Symbol, Any}
+    cleanValues(d::Dict{<:Union{String, Symbol}, Any})::Dict{Symbol, Any}
 
 Recursively strips all string values in a dictionary, and ensures the output dictionary is of type `Dict{Symbol, Any}`.
 
@@ -69,13 +69,13 @@ function cleanValues(d::Dict{<:Union{String, Symbol}, Any})::Dict{Symbol, Any}
 end
 
 """
-    uppercase_dataframe!(df::DataFrames.DataFrame)
+    uppercase_dataframe!(df::DataFrames.DataFrame)::DataFrames.DataFrame
 
 Convert all strings in the DataFrame to uppercase, in place.
 This operates on each column that is of type `String` or `AbstractString`,
 and skips over missing values.
 """
-function uppercase_dataframe!(df::DataFrames.DataFrame)
+function uppercase_dataframe!(df::DataFrames.DataFrame)::DataFrames.DataFrame
     for col in eachcol(df)
         if eltype(col) <: AbstractString  # Only process string columns
             for i in eachindex(col)
@@ -89,7 +89,7 @@ function uppercase_dataframe!(df::DataFrames.DataFrame)
 end
 
 """
-    upcase(x::Any) -> Any
+    upcase(x::Any)::Any
 
 Converts a string to uppercase and strips whitespace. If the input is not a string,
 returns the input untouched.
@@ -125,8 +125,8 @@ Safely reads a CSV file and returns a DataFrame. Logs an error if the file canno
 """
 function safe_read_csv(file_path::String)::DataFrames.DataFrame
     try
-        return DataFrames.DataFrame(CSV.File(file_path; stripwhitespace=true,
-                                             stringtype=String))
+        return DataFrames.DataFrame(CSV.File(file_path;
+            stripwhitespace=true, pool=false, stringtype=String))
     catch e
         @error "Error reading CSV file: $file_path. Error: $e"
         return DataFrames.DataFrame()
@@ -147,6 +147,11 @@ Safely reads a YAML file and returns a dictionary with upcased symbol keys.
   - A dictionary where keys are upcased symbols. Returns an empty dictionary if an error occurs.
 """
 function safe_read_yaml(file_path::String)::Dict{Symbol, Any}
+    if !isfile(file_path)
+        @error "File $file_path does not exist"
+        return Dict{Symbol, Any}()
+    end
+
     try
         yaml_dict = YAML.load_file(file_path; dicttype=Dict{Union{String, Symbol}, Any})
         return yaml_dict
