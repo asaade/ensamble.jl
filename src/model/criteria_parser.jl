@@ -63,7 +63,7 @@ include alphanumeric characters, comparison operators, logical operators, and ba
   - `true` if the string contains only valid characters; `false` otherwise.
 """
 function isvalidinput(input_str::AbstractString)::Bool
-    return match(r"^[a-zA-Z0-9\[\]\,\s\<\>\=\!\|\&\-\.]+$", input_str) !== nothing
+    return match(r"^[a-zA-Z0-9\[\]\,\s\<\>\=\'\!\|\&\-\.]+$", input_str) !== nothing
 end
 
 # Operator map that defines how operators behave in condition expressions
@@ -184,7 +184,7 @@ it returns a vector. Otherwise, it attempts to convert the value into a float or
 function process_rhs(rhs::AbstractString) #::Union{Float64, AbstractString}
     if match(r"^\[.*\]$", rhs) !== nothing
         elements = map(String, split(strip(rhs, ['[', ']']), ","))
-        return [is_numeric(el) ? parse(Float64, el) : strip(el, '"') for el in elements]
+        return [is_numeric(el) ? parse(Float64, el) : strip(el, ''') for el in elements]
     elseif is_numeric(rhs)
         return parse(Float64, rhs)
     else
@@ -400,7 +400,7 @@ end  # module CriteriaParser
 
 # expr4 = parse_criteria("AREA")
 # result4 = eval(expr4)(df)
-# println(result5)
+# println(result4)
 
 # expr5 = parse_criteria("AREA in ['A', 'B']")
 # result5 = eval(expr5)(df)
