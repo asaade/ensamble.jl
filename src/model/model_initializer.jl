@@ -7,6 +7,7 @@ using DataFrames
 using JuMP
 using StatsBase
 using StringDistances
+using Logging
 
 using ..Configuration
 using ..Utils
@@ -24,14 +25,22 @@ const APPLYING_CONSTRAINT_MESSAGE = "Applying constraint: "
 const INITIALIZING_MODEL_MESSAGE = "Initializing optimization model..."
 const MODEL_FILE = "./results/model.lp"
 
+const VALID_TYPES = ["TEST", "NUMBER", "SUM", "ENEMIES",
+                     "ALLORNONE", "MAXUSE", "OVERLAP",
+                     "INCLUDE", "EXCLUDE"]
+const CONFLICTING_CONSTRAINTS = ["ALLORNONE", "ENEMIES", "INCLUDE", "EXCLUDE"]
+
+
+level = Logging.Info
+
 """
-    find_closest(input, valid_labels)
+    find_closest(input::String, valid_labels::Vector{String})::String
+                      valid_labels::Vector{String})::String
 
 Find the closest valid label from the `valid_labels` list based on string similarity
 (using Levenshtein distance).
 """
-function find_closest(input::AbstractString,
-                      valid_labels::Vector{AbstractString})::AbstractString
+function find_closest(input::String, valid_labels::Vector{String})::String
     distances = [evaluate(Levenshtein(), lowercase(input), lowercase(label))
                  for label in valid_labels]
     closest_label_index = argmin(distances)
@@ -39,11 +48,11 @@ function find_closest(input::AbstractString,
 end
 
 """
-    validate_cond_id!(cond_id, cond_ids_seen)
+    validate_cond_id!(cond_id::String, cond_ids_seen::Set{String})
 
 Check if the `cond_id` is unique. If not, raise an error indicating the duplication.
 """
-function validate_cond_id!(cond_id::AbstractString, cond_ids_seen::Set{AbstractString})
+function validate_cond_id!(cond_id::String, cond_ids_seen::Set{String})
     if cond_id in cond_ids_seen
         error("Duplicate CONSTRAINT_ID: '$cond_id' found. Please ensure all constraint IDs are unique.")
     end
@@ -52,7 +61,7 @@ function validate_cond_id!(cond_id::AbstractString, cond_ids_seen::Set{AbstractS
 end
 
 """
-    validate_type!(type, valid_types, cond_id)
+    validate_type!(type::String, valid_types::Vector{String}, cond_id::String)
 
 Check if `type` is valid. If not, raise an error and suggest the closest valid label.
 """
@@ -66,11 +75,11 @@ function validate_type!(type::String, valid_types::Vector{String}, cond_id::Stri
 end
 
 """
-    validate_bounds!(lb, ub, cond_id)
+    validate_bounds!(lb::Number, ub::Number, cond_id::String)
 
 Ensure LB and UB are valid numbers and LB ≤ UB.
 """
-function validate_bounds!(lb::Number, ub::Number, cond_id::AbstractString)
+function validate_bounds!(lb::Number, ub::Number, cond_id::String)
     if !(isa(lb, Number) && isa(ub, Number))
         error("LB and UB must be valid numbers in '$cond_id'.")
     end
@@ -80,28 +89,26 @@ function validate_bounds!(lb::Number, ub::Number, cond_id::AbstractString)
 end
 
 """
-    read_constraints(file_path, parms) -> Dict{String, Constraint}
+    read_constraints(file_path::String, parms::Parameters)
 
 Read constraints from a CSV file, returning a dictionary of Constraint objects.
 This function checks for consistency and potential errors in the user-provided constraint file.
 """
-function read_constraints(file_path::AbstractString, parms::Parameters)
-    df = CSV.read(file_path, DataFrame; missingstring=nothing)
+function read_constraints(file_path::String, parms::Parameters)
+    df = CSV.read(file_path, DataFrame; stripwhitespace=true, pool=false, stringtype=String, missingstring=nothing)
     uppercase_dataframe!(df)
 
-    constraints = Dict{AbstractString, Constraint}()
-    cond_ids_seen = Set{AbstractString}()
-    valid_types = ["TEST", "NUMBER", "SUM", "ENEMIES", "ALLORNONE", "MAXUSE", "OVERLAP",
-                   "INCLUDE", "EXCLUDE"]
+    constraints = Dict{String, Constraint}()
+    cond_ids_seen = Set{String}()
 
     # Track counts for specific types
     type_counts = Dict("test" => 0, "overlap" => 0, "maxuse" => 0)
 
     for row in eachrow(df)
+        row = map(upcase, row)
         if row[:ONOFF] == "ON"
-            row = map(upcase, row)
             cond_id = validate_cond_id!(String(row[:CONSTRAINT_ID]), cond_ids_seen)
-            type = validate_type!(String(row[:TYPE]), valid_types, cond_id)
+            type = validate_type!(String(row[:TYPE]), VALID_TYPES, cond_id)
 
             # Track and enforce rules for TEST, OVERLAP, and MAXUSE
             if lowercase(type) in keys(type_counts)
@@ -115,10 +122,6 @@ function read_constraints(file_path::AbstractString, parms::Parameters)
                 validate_bounds!(lb, ub, cond_id)
             end
 
-            if type == "TEST"
-                parms.max_items = ub
-            end
-
             # Parse the condition or default to a true condition
             condition = strip(condition_expr) == "" ? df -> trues(size(df, 1)) :
                         CriteriaParser.parse_criteria(condition_expr)
@@ -128,7 +131,7 @@ function read_constraints(file_path::AbstractString, parms::Parameters)
 
     # Ensure specific constraints appear exactly once
     for (type, count) in type_counts
-        if type == "test" && count != 1
+        if type == "TEST" && count != 1
             error("Constraint 'TEST' must be included exactly once, but $count found.")
         elseif count > 1 && type in ["overlap", "maxuse"]
             error("Constraint '$type' can only appear once, but $count found.")
@@ -136,9 +139,9 @@ function read_constraints(file_path::AbstractString, parms::Parameters)
     end
 
     # Apply conflict-related constraints
-    conflict_constraints = Dict{AbstractString, Constraint}()
+    conflict_constraints = Dict{String, Constraint}()
     for (constraint_id, constraint) in constraints
-        if constraint.type in ["ALLORNONE", "ENEMIES", "INCLUDE"]
+        if constraint.type in CONFLICTING_CONSTRAINTS
             conflict_constraints[constraint_id] = constraint
         end
     end
@@ -148,13 +151,14 @@ function read_constraints(file_path::AbstractString, parms::Parameters)
 end
 
 """
-    initialize_model!(model, parms, constraints)
+    initialize_model!(model::Model, parms::Parameters,
+                           constraints::Dict{String, Constraint})
 
 Initialize the optimization model, adding variables, the objective function,
 and constraints based on the provided parameters.
 """
 function initialize_model!(model::Model, parms::Parameters,
-                           constraints::Dict{AbstractString, Constraint})
+                           constraints::Dict{String, Constraint})
     @info INITIALIZING_MODEL_MESSAGE
     num_items = size(parms.bank, 1)
     num_forms = parms.num_forms + (parms.shadow_test > 0 ? 1 : 0)
@@ -188,6 +192,9 @@ function set_objective!(model::Model, parms::Parameters)
     # Delegate to the appropriate objective function
     if parms.method == "TCC"
         objective_match_characteristic_curve!(model, parms)
+    elseif parms.method == "MIXED"
+        objective_match_characteristic_curve!(model, parms)
+        objective_match_information_curve!(model, parms)
     elseif parms.method == "TIC"
         objective_match_information_curve!(model, parms)
     elseif parms.method == "TIC2"
@@ -202,7 +209,8 @@ function set_objective!(model::Model, parms::Parameters)
 end
 
 """
-    apply_individual_constraint!(model, parms, constraint)
+    apply_individual_constraint!(model::Model, parms::Parameters,
+                                      constraint::Constraint)
 
 Apply an individual constraint to the model based on the constraint type.
 """
@@ -231,7 +239,7 @@ function apply_individual_constraint!(model::Model, parms::Parameters,
         constraint_fix_items(model, condition)
     elseif constraint.type == "EXCLUDE"
         condition = constraint.condition(bank)
-        constraint_exclude_items(model, parms, condition)
+        constraint_exclude_items(model, condition)
     elseif constraint.type == "MAXUSE"
         parms.max_item_use = ub
         condition = constraint.condition(bank)
@@ -246,12 +254,13 @@ function apply_individual_constraint!(model::Model, parms::Parameters,
 end
 
 """
-    apply_constraints!(model, parms, constraints)
+    apply_constraints!(model::Model, parms::Parameters,
+                            constraints::Dict{String, Constraint})
 
 Apply all constraints to the optimization model.
 """
 function apply_constraints!(model::Model, parms::Parameters,
-                            constraints::Dict{AbstractString, Constraint})
+                            constraints::Dict{String, Constraint})
     for (constraint_id, constraint) in constraints
         @debug "$APPLYING_CONSTRAINT_MESSAGE $constraint_id"
         apply_individual_constraint!(model, parms, constraint)
@@ -259,41 +268,63 @@ function apply_constraints!(model::Model, parms::Parameters,
     return model
 end
 
+
 """
-    normalize_condition_values(values)
+    normalize_condition_values(values::Union{Vector, BitVector})::Vector{Any}
 
 Converts Boolean vectors to group values (`true` becomes a group identifier) and normalizes other vector types.
 """
 function normalize_condition_values(values::Union{Vector, BitVector})::Vector{Any}
-    # if ndims(values) == 2
-    #     values = valuesues[1, :]
-    # end
-    return isa(values, BitVector) ? [x ? 1 : missing for x in values] : values
+    try
+        # Handle BitVector: convert true to 1, false to missing
+        if isa(values, BitVector)
+            return [x ? 1 : missing for x in values]
+        else
+            # Handle other Vector types and explicitly keep `missing` intact
+            return [ismissing(x) ? missing : x for x in values]
+        end
+    catch e
+        @error "Failed to normalize condition values: $e"
+        return []  # Return empty in case of failure
+    end
 end
 
+
 """
-    run_conflict_checks!(parms, conflict_constraints)
+    run_conflict_checks!(parms::Parameters, conflict_constraints::Dict{String, Constraint})
 
 Run conflict checks for friends, enemies, and anchors.
+All INCLUDED items are equivalent to friends.  While the test for EXLUDED as enemies does not match
+their exact characteristics, it may be a useful approximation without adding more rules.
 """
-function run_conflict_checks!(parms::Parameters,
-                              conflict_constraints::Dict{AbstractString, Constraint})
+function run_conflict_checks!(parms::Parameters, conflict_constraints::Dict{String, Constraint})
+    # Find friends, enemies, and include constraints
+    bank = parms.bank
     friends_constraints = find_all_constraints_by_type(conflict_constraints, "ALLORNONE")
     enemies_constraints = find_all_constraints_by_type(conflict_constraints, "ENEMIES")
     include_constraints = find_all_constraints_by_type(conflict_constraints, "INCLUDE")
+    exclude_constraints = find_all_constraints_by_type(conflict_constraints, "EXCLUDE")
     friends_constraints = vcat(friends_constraints, include_constraints)
+    enemies_constraints = vcat(enemies_constraints, exclude_constraints)
 
     # Check conflicts between friends and enemies
     try
         if !isempty(friends_constraints) && !isempty(enemies_constraints)
             for friends_constraint in friends_constraints
-                friends_values = normalize_condition_values(friends_constraint.condition(parms.bank))
+                @debug "Checking Friends Constraint: $(friends_constraint.id)"
+                friends_values = normalize_condition_values(friends_constraint.condition(bank))
                 for enemies_constraint in enemies_constraints
-                    enemies_values = normalize_condition_values(enemies_constraint.condition(parms.bank))
-                    conflict_df = apply_conflict_rule(friends_values, enemies_values,
-                                                      one_to_many_conflict_rule)
+                    @debug "Checking Enemies Constraint: $(enemies_constraint.id)"
+                    enemies_values = normalize_condition_values(enemies_constraint.condition(bank))
+
+                    # Apply one-to-many conflict rule between friends and enemies
+                    conflict_df = apply_conflict_rule(friends_values, enemies_values, one_to_many_conflict_rule)
+
+                    # Log the conflict if any were found
                     if !isempty(conflict_df)
                         log_conflicts("Friends-Enemies", conflict_df)
+                    else
+                        @debug "No conflicts found between Friends and Enemies."
                     end
                 end
             end
@@ -305,21 +336,36 @@ function run_conflict_checks!(parms::Parameters,
     # Check conflicts between anchors and friends/enemies
     try
         if parms.anchor_tests > 0
-            anchor_values = normalize_condition_values(parms.bank.ANCHOR)
+            @debug "Running anchor tests conflict check."
+            anchor_values = normalize_condition_values(bank.ANCHOR)
+
+            # Check anchors against enemies
             for enemies_constraint in enemies_constraints
-                enemies_values = normalize_condition_values(enemies_constraint.condition(parms.bank))
-                conflict_df = apply_conflict_rule(anchor_values, enemies_values,
-                                                  one_to_many_conflict_rule)
+                @debug "Checking Anchor-Enemies Constraint: $(enemies_constraint.id)"
+                enemies_values = normalize_condition_values(enemies_constraint.condition(bank))
+
+                # Apply conflict rule between anchors and enemies
+                conflict_df = apply_conflict_rule(anchor_values, enemies_values, one_to_many_conflict_rule)
+
                 if !isempty(conflict_df)
                     log_conflicts("Anchor-Enemies", conflict_df)
+                else
+                    @debug "No conflicts found between Anchor and Enemies."
                 end
             end
+
+            # Check anchors against friends
             for friends_constraint in friends_constraints
-                friends_values = normalize_condition_values(friends_constraint.condition(parms.bank))
-                conflict_df = apply_conflict_rule(friends_values, anchor_values,
-                                                  all_or_none_conflict_rule)
+                @debug "Checking Anchor-Friends Constraint: $(friends_constraint.id)"
+                friends_values = normalize_condition_values(friends_constraint.condition(bank))
+
+                # Apply conflict rule between anchors and friends
+                conflict_df = apply_conflict_rule(friends_values, anchor_values, all_or_none_conflict_rule)
+
                 if !isempty(conflict_df)
                     log_conflicts("Anchor-Friends", conflict_df)
+                else
+                    @debug "No conflicts found between Anchor and Friends."
                 end
             end
         end
@@ -328,13 +374,15 @@ function run_conflict_checks!(parms::Parameters,
     end
 end
 
+
+
 """
     find_all_constraints_by_type(constraints, type)
 
 Helper function to retrieve all constraints by their type.
 """
-function find_all_constraints_by_type(constraints::Dict{AbstractString, Constraint},
-                                      type::AbstractString)::Vector{Constraint}
+function find_all_constraints_by_type(constraints::Dict{String, Constraint},
+                                      type::String)::Vector{Constraint}
     return [constraint for constraint in values(constraints) if constraint.type == type]
 end
 
@@ -343,7 +391,7 @@ end
 
 Logs conflicts found in data.
 """
-function log_conflicts(conflict_type::AbstractString, conflicting_rows::DataFrame,
+function log_conflicts(conflict_type::String, conflicting_rows::DataFrame,
                        max_rows_to_log::Int=5)
     num_conflicts = size(conflicting_rows, 1)
     if num_conflicts > 0
@@ -366,16 +414,20 @@ function one_to_many_conflict_rule(values1::Vector, values2::Vector)::Vector{Tup
             counts[pair] = get(counts, pair, 0) + 1
         end
     end
-    return [key for key in keys(counts) if counts[key] > 1]
+    conflicts = [key for key in keys(counts) if counts[key] > 1]
+    if !isempty(conflicts)
+        @info "One-to-Many conflict found: $conflicts"
+    end
+    return conflicts
 end
+
 
 """
     all_or_none_conflict_rule(friends_values, anchor_values)
 
 Checks for all-or-none conflicts between two sets of values.
 """
-function all_or_none_conflict_rule(friends_values::Vector,
-                                   anchor_values::Vector)::Vector{Tuple}
+function all_or_none_conflict_rule(friends_values::Vector, anchor_values::Vector)::Vector{Tuple}
     group_dict = Dict{Any, Set{Any}}()
     for (friend, anchor) in zip(friends_values, anchor_values)
         if !ismissing(friend) && !ismissing(anchor)
@@ -385,8 +437,13 @@ function all_or_none_conflict_rule(friends_values::Vector,
             push!(group_dict[friend], anchor)
         end
     end
-    return [(friend, anchors) for (friend, anchors) in group_dict if length(anchors) > 1]
+    conflicts = [(friend, anchors) for (friend, anchors) in group_dict if length(anchors) > 1]
+    if !isempty(conflicts)
+        @info "All-or-None conflict found: $conflicts"
+    end
+    return conflicts
 end
+
 
 """
     apply_conflict_rule(values1, values2, rule)
@@ -394,11 +451,15 @@ end
 Applies a conflict rule between two sets of values and returns a DataFrame with conflicting pairs if any exist.
 """
 function apply_conflict_rule(values1::Vector, values2::Vector, rule::Function)::DataFrame
+    @debug "Applying conflict rule: $(rule)"
     conflicting_pairs = rule(values1, values2)
+
     if !isempty(conflicting_pairs)
+        @info "Conflicting pairs found: $conflicting_pairs"
         return DataFrame(:col1 => map(x -> x[1], conflicting_pairs),
                          :col2 => map(x -> x[2], conflicting_pairs))
     else
+        @debug "No conflicts found using rule $(rule)"
         return DataFrame()  # Return empty DataFrame if no conflicts are found
     end
 end
