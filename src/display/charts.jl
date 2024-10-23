@@ -46,7 +46,7 @@ function simulate_scores(parms::Parameters, results::DataFrame,
         params = Matrix(hcat(a, b, c))  # Corrected: no transpose needed
 
         # Apply Lord-Wingersky recursion to calculate the score distribution
-        total_scores = observed_score_continuous(params, dist)
+        total_scores = observed_score_continuous(params, dist; parms.D)
 
         # Pad the results if needed and store in the simulation matrix
         sim_matrix[:, form] = vcat(total_scores,
@@ -78,7 +78,7 @@ function char_curves(parms::Parameters, results::DataFrame,
         # Recalculate probabilities dynamically for each theta value
         for (j, theta) in enumerate(theta_range)
             for k in eachindex(selected)
-                prob = Probability(theta, b[k], a[k], c[k])
+                prob = prob_3pl(a[k], b[k], c[k], theta; D=parms.D)
                 scores[j] += prob^r  # Summing the probability for correct response
             end
         end
@@ -112,7 +112,7 @@ function info_curves(parms::Parameters, results::DataFrame,
         # Recalculate information dynamically for each theta value
         for (j, theta) in enumerate(theta_range)
             for k in eachindex(selected)
-                info[j] += Information(theta, b[k], a[k], c[k])
+                info[j] += info_3pl(a[k], b[k], c[k], theta; D=parms.D)
             end
         end
 
@@ -185,7 +185,7 @@ function combine_plots(parms::Parameters, theta_range::Union{AbstractVector, Abs
                             linewidth=2, label="", grid=:both, legend=:topright,
                             xticks=:auto, yticks=:auto, color=:viridis,
                             ylims=(0, parms.max_items))
-    parms.method == "TCC" && scatter!(parms.theta, parms.tau[1, :]; label="", markersize=4)
+    (parms.method == "TCC" || parms.method == "MIXED") && scatter!(parms.theta, parms.tau[1, :]; label="", markersize=4)
 
     # Add information curves on the same graph using dual axes (right axis for info curves)
     p2 = @df info_data plot(theta_range, cols(),
