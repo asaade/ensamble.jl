@@ -6,11 +6,11 @@ using DataFrames
 using ..Utils
 
 """
-    read_bank_file(items_file::AbstractString)::DataFrame
+    read_bank_file(items_file::String)::DataFrame
 
 Reads the item bank file and returns a DataFrame.
 """
-function read_bank_file(itemsfile::AbstractString, anchorsfile::AbstractString)::DataFrame
+function read_bank_file(itemsfile::String, anchorsfile::String)::DataFrame
     bank = read_items_file(itemsfile)
     bank_size = size(bank, 1)
     @info "Loaded $bank_size items from $itemsfile"
@@ -29,11 +29,11 @@ function read_bank_file(itemsfile::AbstractString, anchorsfile::AbstractString):
 end
 
 """
-    read_items_file(items_file::AbstractString)::DataFrame
+    read_items_file(items_file::String)::DataFrame
 
 Reads the item file and returns a DataFrame.
 """
-function read_items_file(items_file::AbstractString)::DataFrame
+function read_items_file(items_file::String)::DataFrame
     try
         bank = safe_read_csv(items_file)
         rename!(bank, uppercase.(names(bank)))
@@ -52,11 +52,11 @@ function read_items_file(items_file::AbstractString)::DataFrame
 end
 
 """
-    read_anchor_file(anchor_file::AbstractString)::DataFrame
+    read_anchor_file(anchor_file::String)::DataFrame
 
 Reads the anchor items file and returns a DataFrame.
 """
-function read_anchor_file(anchor_file::AbstractString)::DataFrame
+function read_anchor_file(anchor_file::String)::DataFrame
     if !isempty(anchor_file)
         try
             anchor_data = safe_read_csv(anchor_file)

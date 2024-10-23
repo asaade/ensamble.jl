@@ -2,7 +2,10 @@ module AssemblyConfigLoader
 
 export AssemblyConfig, load_assembly_config
 
-using Logging
+using CSV, DataFrames
+
+using ..Utils
+
 
 # Define the AssemblyConfig struct
 mutable struct AssemblyConfig
@@ -16,6 +19,7 @@ mutable struct AssemblyConfig
     max_item_use::Int        # Maximum number of times an item can be used across forms
     shadow_test::Int         # Size of the shadow test (for iterative algorithms)
 end
+
 
 """
     load_assembly_config(config_data::Dict{Symbol, Any})::AssemblyConfig
@@ -40,8 +44,23 @@ function load_assembly_config(config_data::Dict{Symbol, Any})::AssemblyConfig
 
     assembly_dict = config_data[:FORMS]
 
+    constraints_file = get(config_data, :CONSTRAINTSFILE, "data/constraints.csv")
+    form_size = get(assembly_dict, :N, 60)
+
+    df = safe_read_csv(constraints_file)
+    uppercase_dataframe!(df)
+
+    row_index = findfirst(r -> upcase(r[:ONOFF]) == "ON" && upcase(r[:TYPE]) == "TEST", eachrow(df))
+
+    if row_index !== nothing
+        row = df[row_index, :]
+        lb = get(row, :LB, form_size)
+        ub = get(row, :UB, form_size)
+        form_size = round((lb + ub) ÷ 2)
+        max_items = ub
+    end
+
     # Extract necessary values from the FORMS section and apply defaults where needed
-    form_size = get(assembly_dict, :N, 0)
     num_forms = get(assembly_dict, :NUMFORMS, 1)
     f = num_forms  # Assuming the fixed number of forms is the same as num_forms
     max_item_use = get(assembly_dict, :MAXITEMUSE, num_forms)  # Default to forms if not provided
@@ -49,7 +68,6 @@ function load_assembly_config(config_data::Dict{Symbol, Any})::AssemblyConfig
     anchor_tests = get(assembly_dict, :ANCHORTESTS, 0) # Default to 0 if not provided
 
     # Initialize other fields with default values
-    max_items = 0
     operational_items = 0
     anchor_size = 0
 
