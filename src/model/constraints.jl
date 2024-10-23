@@ -6,7 +6,7 @@ export constraint_items_per_form, constraint_item_count,
        constraint_enemies_in_form, constraint_exclude_items, constraint_include_items,
        constraint_add_anchor!, constraint_max_use, constraint_forms_overlap,
        objective_match_characteristic_curve!, objective_match_information_curve!,
-       objective_max_info, objective_info_relative2
+       objective_max_info, objective_info_relative2, constraint_fix_items
 
 #
 
@@ -343,6 +343,8 @@ function objective_match_characteristic_curve!(model::Model, parms::Parameters)
     zcol = forms
     forms -= parms.shadow_test > 0 ? 1 : 0
 
+    w = [1.1 - (0.1 * r)  for r in R]
+
     # Identify anchor and non-anchor items
     anchor_items = filter(i -> !ismissing(parms.bank.ANCHOR[i]), 1:items)
     non_anchor_items = filter(i -> ismissing(parms.bank.ANCHOR[i]), 1:items)
@@ -357,10 +359,10 @@ function objective_match_characteristic_curve!(model::Model, parms::Parameters)
 
     # Constraints for operational forms (include both anchor and non-anchor items)
     @constraint(model, [f = 1:forms, k = K, r = R],
-                sum(P[i, k]^r * x[i, f] for i in 1:items) <= tau[r, k] + y)
+                sum(P[i, k]^r * x[i, f] for i in 1:items) <= tau[r, k] + w[r] * y)
 
     @constraint(model, [f = 1:forms, k = K, r = R],
-                sum(P[i, k]^r * x[i, f] for i in 1:items) >= tau[r, k] - y)
+                sum(P[i, k]^r * x[i, f] for i in 1:items) >= tau[r, k] - w[r] * y)
 
     # Constraints for shadow test (only non-anchor items)
     if parms.shadow_test > 0
@@ -368,11 +370,11 @@ function objective_match_characteristic_curve!(model::Model, parms::Parameters)
 
         @constraint(model, [k = K, r = R],
                     sum(P[i, k]^r * x[i, zcol] for i in non_anchor_items) <=
-                    ((tau[r, k] - anchor_contribution[r, k] + y) * shadow_test))
+                    ((tau[r, k] - anchor_contribution[r, k] + w[r] * y) * shadow_test))
 
         @constraint(model, [k = K, r = R],
                     sum(P[i, k]^r * x[i, zcol] for i in non_anchor_items) >=
-                    ((tau[r, k] - anchor_contribution[r, k] - y) * shadow_test))
+                    ((tau[r, k] - anchor_contribution[r, k] - w[r] * y) * shadow_test))
     end
 
     return model
@@ -390,7 +392,7 @@ function objective_match_information_curve!(model::Model, parms::Parameters)
     zcol = forms
     forms -= parms.shadow_test > 0 ? 1 : 0
 
-    # Identify anchor and non-anchor items
+   # Identify anchor and non-anchor items
     anchor_items = filter(i -> !ismissing(parms.bank.ANCHOR[i]), 1:items)
     non_anchor_items = filter(i -> ismissing(parms.bank.ANCHOR[i]), 1:items)
 
