@@ -1,28 +1,34 @@
 module Ensamble
-__precompile__()
 
 export assemble_tests, load_irt_data
 
+using Revise
 # Import necessary packages
 using JuMP
 using DataFrames
-using Logging #, LoggingExtras
+using Logging
 using PrettyTables
 
 include("constants.jl")
 
-# Include external modules
+# Include local modules (this loads the code from each file)
 include("utils/utils.jl")
 include("config/configuration.jl")
 include("display/display_results.jl")
 include("model/model_initializer.jl")
+
+# Track local files with Revise
+# Revise.track("src/utils/utils.jl")
+# Revise.track("src/config/configuration.jl")
+# Revise.track("src/display/display_results.jl")
+# Revise.track("src/model/model_initializer.jl")
+
+# Use the included modules
 using .Utils
 using .Configuration
 using .DisplayResults
 using .ModelInitializer
-
-using Logging: Logging
-# Set global log level (e.g., show info, warnings and errors)
+# Set global log level
 Logging.global_logger(Logging.ConsoleLogger(stderr, Logging.Info))
 
 """
@@ -62,6 +68,9 @@ function remove_used_items!(parms::Parameters, items_used::Vector{Int})::Paramet
         parms.p_matrix = parms.p_matrix[remaining, :]
     elseif parms.method in ["TIC", "TIC2", "TIC3"]
         parms.info_matrix = parms.info_matrix[remaining, :]
+    elseif parms.method == "MIXED"
+        parms.p_matrix = parms.p_matrix[remaining, :]
+        parms.info_matrix = parms.info_matrix[remaining, :]
     else
         error("Unknown $(parms.method) optimization method used.")
     end
@@ -88,7 +97,7 @@ end
     process_and_store_results!(model::Model, parms::Parameters, results_df::DataFrame)
 
 Process the optimization results at each iteration and store them in a DataFrame.
-Used items ARE DELETED from the working copy of the bank to avoid its use in subsequent forms.
+Removes used items from the working copy of the bank to avoid its use in subsequent forms.
 """
 function process_and_store_results!(model::Model, parms::Parameters,
                                     results_df::DataFrame)::DataFrame
@@ -129,7 +138,8 @@ end
 """
     handle_anchor_items(parms::Parameters, orig_parms::Parameters)::Parameters
 
-Cycles through anchor tests, updates the bank by removing the old anchor items and adding the new anchor items,
+Cycles through anchor tests, updates the item bank used ath this iteration
+by removing the old anchor items and adding the new anchor items,
 and updates the relevant parameters (`p` or `info`) depending on the method in use.
 """
 function handle_anchor_items(parms::Parameters, orig_parms::Parameters)::Parameters
@@ -153,17 +163,12 @@ function handle_anchor_items(parms::Parameters, orig_parms::Parameters)::Paramet
 
         # Update parameters based on the method
         if parms.method == "TCC"
-            if "INDEX" in names(parms.bank)
-                parms.p_matrix = orig_parms.p_matrix[parms.bank.INDEX, :]
-            else
-                error("INDEX column missing in the bank for TCC method.")
-            end
+            parms.p_matrix = orig_parms.p_matrix[parms.bank.INDEX, :]
         elseif parms.method in ["TIC", "TIC2", "TIC3"]
-            if "INDEX" in names(parms.bank)
-                parms.info_matrix = orig_parms.info_matrix[parms.bank.INDEX, :]
-            else
-                error("INDEX column missing in the bank for TIC method.")
-            end
+            parms.info_matrix = orig_parms.info_matrix[parms.bank.INDEX, :]
+        elseif parms.method == "MIXED"
+            parms.p_matrix = orig_parms.p_matrix[parms.bank.INDEX, :]
+            parms.info_matrix = orig_parms.info_matrix[parms.bank.INDEX, :]
         else
             error("Unsupported method: $(parms.method)")
         end
@@ -211,7 +216,7 @@ function assemble_tests(config_file::String="data/config.toml")::DataFrame
             assembled_forms += parms.num_forms
             parms.f -= parms.num_forms
             println("Forms assembled: $assembled_forms")
-            println("Forms remaining: $(parms.f)")
+            println("Forms remaining: $(parms.f)\n\n")
 
         else
             println(OPTIMIZATION_FAILED_MESSAGE)

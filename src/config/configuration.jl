@@ -21,53 +21,53 @@ using .IRTDataLoader
 
 # Define a struct for holding constraint information
 struct Constraint
-    id::AbstractString
-    type::AbstractString
+    id::String
+    type::String
     condition::Function
     lb::Number
     ub::Number
 end
 
-# Define a struct for the configuration
+# Struct for the configuration
 struct Config
     forms::Dict{Symbol, Any}
-    items_file::AbstractString
+    items_file::String
     anchor_items_file::Union{String, Missing}
-    forms_file::AbstractString
-    constraints_file::AbstractString
-    results_file::AbstractString
-    tcc_file::AbstractString
-    plot_file::AbstractString
-    solver::AbstractString
+    forms_file::String
+    constraints_file::String
+    results_file::String
+    tcc_file::String
+    plot_file::String
+    solver::String
     verbose::Int
     report_categories::Vector{String}
     report_sums::Vector{String}
 end
 
-# Final struct for the parameters (types updated for consistency)
+# Final struct for the parameters
 mutable struct Parameters
-    n::Int                          # form_size from AssemblyConfig
-    num_forms::Int                  # num_forms from AssemblyConfig
-    max_items::Int                  # max_items from AssemblyConfig
-    operational_items::Int          # operational_items from AssemblyConfig
-    max_item_use::Int               # max_item_use from AssemblyConfig
-    f::Int                          # f from AssemblyConfig
-    shadow_test::Int                # shadow_test from AssemblyConfig
-    bank::DataFrame                 # item bank DataFrame from BankDataLoader
-    anchor_tests::Int               # anchor_tests from AssemblyConfig
-    anchor_size::Int                # anchor_size from AssemblyConfig
-    method::AbstractString          # method from IRTModelData
-    theta::Union{Vector{Float64}, Nothing}  # theta from IRTModelData
-    p_matrix::Matrix{Float64}     # 3D array: (items, theta, categories) for probability
-    info_matrix::Matrix{Float64}  # 3D array: (items, theta, categories) for information
-    tau::Matrix{Float64}            # Tau matrix (aggregated probabilities or information)
-    tau_info::Vector{Float64}       # Tau info (aggregated information at theta points)
+    n::Int
+    num_forms::Int
+    max_items::Int
+    operational_items::Int
+    max_item_use::Int
+    f::Int
+    shadow_test::Int
+    bank::DataFrame
+    anchor_tests::Int
+    anchor_size::Int
+    method::String
+    theta::Union{Vector{Float64}, Nothing}
+    p_matrix::Matrix{Float64}
+    info_matrix::Matrix{Float64}
+    tau::Matrix{Float64}
+    tau_info::Vector{Float64}
     r::Int
     k::Int
     D::Float64
-    relative_target_weights::Union{Vector{Float64}, Nothing}  # relative_target_weights from IRTModelData
-    relative_target_points::Union{Vector{Float64}, Nothing}   # relative_target_points from IRTModelData
-    verbose::Int                    # verbosity from BasicConfig
+    relative_target_weights::Union{Vector{Float64}, Nothing}
+    relative_target_points::Union{Vector{Float64}, Nothing}
+    verbose::Int
 end
 
 """
@@ -132,22 +132,46 @@ Entry point function that loads and prepares the system configuration.
 Reads from a TOML configuration file, loads data, and returns the system parameters.
 """
 function configure(inFile::String="data/config.toml")::Tuple{Config, Parameters}
-    # Read TOML configuration
-    config_data = upcaseKeys(safe_read_toml(inFile))
+    # Read TOML configuration and validate in safe_read_toml
+    config_data = try
+        upcaseKeys(safe_read_toml(inFile))
+    catch e
+        error("Failed to load configuration from file: $inFile. Error: $e")
+    end
 
-    # Load configuration, forms, item bank, and IRT data
-    basic_config::BasicConfig = load_config(config_data)
-    forms_config::AssemblyConfig = load_assembly_config(config_data)
-    bank::DataFrame = read_bank_file(basic_config.items_file,
-                                     basic_config.anchor_items_file)
-    irt_data::IRTModelData = load_irt_data(config_data, bank)
+    # Load and validate configuration and forms in load_config and load_assembly_config
+    basic_config = try
+        load_config(config_data)
+    catch e
+        error("Error loading basic configuration. Details: $e")
+    end
 
-    # Transform the nested configuration to the flat Config struct
+    forms_config = try
+        load_assembly_config(config_data)
+    catch e
+        error("Error loading forms configuration. Details: $e")
+    end
+
+    # Load and validate the item bank in read_bank_file
+    bank = try
+        read_bank_file(basic_config.items_file, basic_config.anchor_items_file)
+    catch e
+        error("Error reading item bank files. Details: $e")
+    end
+
+    # Load and validate the IRT data in load_irt_data
+    irt_data = try
+        load_irt_data(config_data, forms_config, bank)
+    catch e
+        error("Error loading IRT data. Details: $e")
+    end
+
+    # Transform the configuration into flat structures
     flat_config = transform_config_to_flat(basic_config)
-
-    # Transform and return the flat Parameters struct
     return (flat_config,
             transform_parameters_to_flat(forms_config, irt_data, bank, flat_config))
 end
+
+
 
 end # module Configuration
