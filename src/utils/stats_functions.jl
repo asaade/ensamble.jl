@@ -1,196 +1,369 @@
 module StatsFunctions
 
 # Export the key functions to be used by other modules
-export Probability,
-       Information, calc_tau, calc_info_tau,
-       observed_score_continuous, lw_dist,
-       polytomous_probabilities, calc_info_tau_polytomous,
-       calc_tau_polytomous
 
-using Random, Distributions, QuadGK
+export calc_tau, calc_info_tau, prob_3pl, info_3pl,
+    observed_score_continuous, lw_dist,
+    expected_score_item, expected_score_matrix
+
+using Base.Threads
+using DataFrames
+using Distributions
+using FastGaussQuadrature
+using QuadGK
+using Random
+using Statistics
+using StatsFuns
+using ThreadsX
+
+
+# Probability function for the 3PL model
+"""
+    prob_3pl(a::Float64, b::Float64, c::Float64, θ::Float64; D::Float64 = 1.0)::Float64
+
+TBW
+"""
+function prob_3pl(a::Float64, b::Float64, c::Float64, θ::Float64; D::Float64 = 1.0)::Float64
+    exponent = D * a * (θ - b)
+    p = c + (1.0 - c) / (1.0 + exp(-exponent))
+    return p
+end
 
 """
-    Probability(θ::Float64, b::Float64, a::Float64, c::Float64; d::Float64 = 1.0) -> Float64
+    prob_pcm(a::Float64, b::Vector{Float64}, θ::Float64; D::Float64 = 1.0)::Vector{Float64}
 
-Calculates the probability of success given the IRT parameters and ability level θ.
+Computes the probability of response in each category for the Partial Credit Model (PCM).
 
 # Arguments
 
-  - `θ`: The ability parameter.
-  - `b`: The difficulty parameter.
-  - `a`: The discrimination parameter.
-  - `c`: The guessing parameter.
-  - `d`: Scaling constant (default is 1.0).
+- `a`: Discrimination parameter (scalar).
+- `b`: Step difficulty parameters (vector of length `K`).
+- `θ`: Ability parameter (scalar).
+- `D`: Scaling constant (default is 1.0).
 
 # Returns
 
-  - Probability of success as `Float64`.
+- `prob_category`: Vector of probabilities for each response category (length `K + 1`).
 """
-function Probability(θ::Float64, b::Float64, a::Float64, c::Float64;
-                     d::Float64=1.0)::Float64
-    return c + (1 - c) / (1 + exp(-d * a * (θ - b)))
-end
+function prob_pcm(a::Float64, b::Vector{Float64}, θ::Float64; D::Float64 = 1.0)::Vector{Float64}
+    # Compute increments for cumulative sum
+    delta = D * a .* (θ .- b)  # Vector of length K
 
-"""
-    Probability(θ::Float64, b::Vector{Float64}, a::Vector{Float64}, c::Vector{Float64}; d::Float64 = 1.0) -> Vector{Float64}
+    # Compute cumulative sums with initial zero for category 0
+    sum_terms = cumsum([0.0; delta])  # Vector of length K + 1
 
-Calculates the probability of success for a vector of items at a given ability level.
-
-# Arguments
-
-  - `θ`: The ability parameter.
-  - `a`: Vector of discrimination parameters.
-  - `b`: Vector of difficulty parameters.
-  - `c`: Vector of guessing parameters.
-  - `d`: Scaling constant (default is 1.0).
-
-# Returns
-
-  - A vector of probabilities of success for each item.
-"""
-function Probability(θ::Float64, b::Vector{Float64}, a::Vector{Float64}, c::Vector{Float64};
-                     d::Float64=1.0)::Vector{Float64}
-    return c .+ (1 .- c) ./ (1 .+ exp.(-d .* a .* (θ .- b)))
-end
-
-"""
-    Information(θ::Float64, b::Vector{Float64}, a::Vector{Float64}, c::Vector{Float64}; d::Float64 = 1.0) -> Vector{Float64}
-
-Calculates the item information function for a vector of items.
-
-# Arguments
-
-  - `θ`: The ability parameter.
-  - `b`: Vector of difficulty parameters.
-  - `a`: Vector of discrimination parameters.
-  - `c`: Vector of guessing parameters.
-  - `d`: Scaling constant (default is 1.0).
-
-# Returns
-
-  - A vector of item information values.
-"""
-function Information(θ::Float64, b::Vector{Float64}, a::Vector{Float64}, c::Vector{Float64};
-                     d::Float64=1.0)::Vector{Float64}
-    p = Probability.(θ, b, a, c; d=d)
-    q = 1 .- p
-    return (d .* a) .^ 2 .* (p .- c) .^ 2 .* q ./ ((1 .- c) .^ 2 .* p)
-end
-
-# Scalar version of Information function
-function Information(θ::Float64, b::Float64, a::Float64, c::Float64;
-                     d::Float64=1.0)::Float64
-    p = Probability(θ, b, a, c; d=d)
-    q = 1 - p
-    return (d * a)^2 * (p - c)^2 * q / ((1 - c)^2 * p)
-end
-
-function prob_grm(a::Float64, b::Vector{Float64}, θ::Float64)
-    K = length(b) + 1  # Number of categories
-    prob = zeros(Float64, K)
-
-    # Compute probabilities for response categories
-    for k in 1:(K - 1)
-        prob[k] = 1.0 / (1.0 + exp(-a * (θ - b[k])))
-    end
-
-    # For the last category, probability is 1
-    prob[K] = 1.0
-
-    # Convert to probability of response in category
-    prob_category = zeros(Float64, K)
-    prob_category[1] = 1 - prob[1]
-    for k in 2:(K - 1)
-        prob_category[k] = prob[k - 1] - prob[k]
-    end
-    prob_category[K] = prob[K - 1]
-
-    return prob_category
-end
-
-function info_grm(a::Float64, b::Vector{Float64}, θ::Float64)
-    K = length(b) + 1  # Number of categories
-    prob = prob_grm(a, b, θ)
-    info = 0.0
-
-    # Calculate item information
-    for k in 1:(K - 1)
-        p = prob[k]
-        info += a^2 * p * (1 - p)
-    end
-
-    return info
-end
-
-function prob_pcm(a::Float64, b::Vector{Float64}, θ::Float64)
-    K = length(b)  # Number of categories
-    numerators = zeros(Float64, K + 1)
-
-    # Compute numerator for each category
-    for k in 0:K
-        sum_term = sum(a * (θ - b[j]) for j in 1:k)
-        numerators[k + 1] = exp(sum_term)
-    end
+    # Compute numerators for each category
+    numerators = exp.(sum_terms)
 
     # Compute denominator (sum of numerators)
     denominator = sum(numerators)
 
     # Compute probabilities for each category
     prob_category = numerators / denominator
+
     return prob_category
 end
 
-function info_pcm(a::Float64, b::Vector{Float64}, θ::Float64)
-    K = length(b)  # Number of categories
-    prob = prob_pcm(a, b, θ)
-    info = 0.0
 
-    # Calculate item information
-    for k in 1:(K + 1)
-        p = prob[k]
-        log_derivative = a * (k - sum(prob .* (0:K)))  # Gradient of log-probability
-        info += p * log_derivative^2
-    end
+"""
+    expected_score_pcm(a::Float64, b::Vector{Float64}, θ::Float64; D::Float64 = 1.0)::Float64
 
-    return info
+Computes the expected score for the Partial Credit Model (PCM).
+
+# Arguments
+
+- `a`: Discrimination parameter (scalar).
+- `b`: Step difficulty parameters (vector of length `K`).
+- `θ`: Ability parameter (scalar).
+- `D`: Scaling constant (default is 1.0).
+
+# Returns
+
+- `expected_score`: Expected score for the item.
+"""
+function expected_score_pcm(a::Float64, b::Vector{Float64}, θ::Float64; D::Float64 = 1.0)::Float64
+    # Compute category probabilities
+    prob_category = prob_pcm(a, b, θ; D=D)
+    # Scores are typically 0 to K
+    scores = 0:length(b)
+    # Compute expected score
+    expected_score = sum(prob_category .* scores)
+    return expected_score
 end
 
-function prob_gpcm(a::Vector{Float64}, b::Vector{Float64}, θ::Float64)
-    K = length(b)  # Number of categories
-    numerators = zeros(Float64, K + 1)
 
-    # Compute numerator for each category
-    for k in 0:K
-        sum_term = sum(a[j] * (θ - b[j]) for j in 1:k)
-        numerators[k + 1] = exp(sum_term)
-    end
+"""
+    prob_grm(a::Float64, b::Vector{Float64}, θ::Float64; D::Float64 = 1.0)::Vector{Float64}
 
-    # Compute denominator (sum of numerators)
+Computes the probability of response in each category for the Graded Response Model (GRM).
+
+# Arguments
+
+- `a`: Discrimination parameter (scalar).
+- `b`: Threshold parameters (vector of length `K - 1`).
+- `θ`: Ability parameter (scalar).
+- `D`: Scaling constant (default is 1.0).
+
+# Returns
+
+- `prob_category`: Vector of probabilities for each response category (length `K`).
+"""
+function prob_grm(a::Float64, b::Vector{Float64}, θ::Float64; D::Float64 = 1.0)::Vector{Float64}
+    # Compute cumulative probabilities (P*)
+    z = D * a .* (θ .- b)
+    P_star = 1.0 ./ (1.0 .+ exp.(-z))
+    P_star = vcat(0.0, P_star, 1.0)  # Add P*_0 = 0 and P*_K = 1
+
+    # Compute category probabilities
+    prob_category = diff(P_star)
+
+    return prob_category
+end
+
+"""
+    expected_score_grm(a::Float64, b::Vector{Float64}, θ::Float64; D::Float64 = 1.0)::Float64
+
+Computes the expected score for the Graded Response Model (GRM).
+
+# Arguments
+
+- `a`: Discrimination parameter (scalar).
+- `b`: Threshold parameters (vector of length `K - 1`).
+- `θ`: Ability parameter (scalar).
+- `D`: Scaling constant (default is 1.0).
+
+# Returns
+
+- `expected_score`: Expected score for the item.
+"""
+function expected_score_grm(a::Float64, b::Vector{Float64}, θ::Float64; D::Float64 = 1.0)::Float64
+    # Compute category probabilities
+    prob_category = prob_grm(a, b, θ; D=D)
+    # Scores are typically 0 to K - 1
+    scores = 0:length(b)
+    # Compute expected score
+    expected_score = sum(prob_category .* scores)
+    return expected_score
+end
+
+# Probability function for the 3PL model
+function prob_3pl(a::Float64, b::Float64, c::Float64, θ::Float64; D::Float64 = 1.0)::Float64
+    exponent = D * a * (θ - b)
+    p = c + (1.0 - c) / (1.0 + exp(-exponent))
+    return p
+end
+
+
+"""
+    prob_gpcm(a::Vector{Float64}, b::Vector{Float64}, θ::Float64; D::Float64 = 1.0)::Vector{Float64}
+
+Computes the probability of response in each category for the Generalized Partial Credit Model (GPCM).
+
+# Arguments
+
+- `a`: Vector of discrimination parameters for each category transition (length `K`).
+- `b`: Vector of threshold parameters for each category transition (length `K`).
+- `θ`: Ability parameter (scalar).
+- `D`: Scaling constant (default is 1.0).
+
+# Returns
+
+- `prob_category`: Vector of probabilities for each response category (length `K + 1`).
+"""
+function prob_gpcm(a::Vector{Float64}, b::Vector{Float64}, θ::Float64; D::Float64 = 1.0)::Vector{Float64}
+    delta_theta = θ .- b
+    sum_terms = cumsum(D .* a .* delta_theta)
+    sum_terms = vcat(0.0, sum_terms)
+    numerators = exp.(sum_terms)
     denominator = sum(numerators)
-
-    # Compute probabilities for each category
     prob_category = numerators / denominator
     return prob_category
 end
 
 """
-The information for GPCM is computed similarly to PCM, but each category
-k has its own discrimination parameter, so the information calculation takes this into account:
-"""
-function info_gpcm(a::Vector{Float64}, b::Vector{Float64}, θ::Float64)
-    K = length(b)  # Number of categories
-    prob = prob_gpcm(a, b, θ)
-    info = 0.0
+    expected_score_gpcm(a::Vector{Float64}, b::Vector{Float64}, θ::Float64; D::Float64 = 1.0)::Float64
 
-    # Calculate item information
-    for k in 1:(K + 1)
-        p = prob[k]
-        log_derivative = a[k] * (k - sum(prob .* (0:K)))  # Gradient of log-probability
-        info += p * log_derivative^2
+Computes the expected score for the Generalized Partial Credit Model (GPCM).
+
+# Arguments
+
+- `a`: Vector of discrimination parameters for each category transition (length `K`).
+- `b`: Vector of threshold parameters for each category transition (length `K`).
+- `θ`: Ability parameter (scalar).
+- `D`: Scaling constant (default is 1.0).
+
+# Returns
+
+- `expected_score`: Expected score for the item.
+"""
+function expected_score_gpcm(a::Vector{Float64}, b::Vector{Float64}, θ::Float64; D::Float64 = 1.0)::Float64
+    # Compute category probabilities
+    prob_category = prob_gpcm(a, b, θ; D=D)
+    # Scores are typically 0 to K
+    scores = 0:length(b)
+    # Compute expected score
+    expected_score = sum(prob_category .* scores)
+    return expected_score
+end
+
+
+
+function expected_score_item(model::String, a, bs::Vector{Float64}, c::Union{Nothing, Float64}, θ::Float64; D::Float64 = 1.0)::Float64
+    # Determine the number of categories
+    K = length(bs) + 1
+    scores = 0:(K - 1)
+
+    # Compute category probabilities based on the model
+    if model in ("ThreePL", "THREEPL")
+        p = prob_3pl(a, bs[1], c, θ; D=D)
+        prob_category = [1 - p, p]
+        scores = [0, 1]
+    elseif model == "PCM"
+        prob_category = prob_pcm(a, bs, θ; D=D)
+    elseif model == "GPCM"
+        prob_category = prob_gpcm(a, bs, θ; D=D)
+    elseif model in ("TwoPL", "TWOPL")
+        p = prob_3pl(a, bs[1], 0.0, θ; D=D)
+        prob_category = [1 - p, p]
+        scores = [0, 1]
+    elseif model == "GRM"
+        prob_category = prob_grm(a, bs, θ; D=D)
+    else
+        error("Unsupported model: $model")
     end
+
+    # Compute expected score
+    expected_score = sum(prob_category .* scores)
+    return expected_score
+end
+
+
+function info_2pl(a::Float64, b::Float64, θ::Float64; D::Float64 = 1.0)::Float64
+    exponent = D * a * (θ - b)
+    p = 1.0 / (1.0 + exp(-exponent))
+    q = 1.0 - p
+    info = (D * a) ^ 2 * p * q
+    return info
+end
+
+# Information function for the 3PL model
+function info_3pl(θ::Float64, b::Vector{Float64}, a::Vector{Float64}, c::Vector{Float64}; D::Float64 = 1.0)::Vector{Float64}
+    p = prob_3pl.(a, b, c, θ; D=D)
+    q = 1.0 .- p
+    numerator = (D .* a) .^ 2 .* (p .- c) .^ 2 .* q
+    denominator = ((1.0 .- c) .^ 2) .* p
+    info = numerator ./ denominator
+    return info
+end
+
+
+function info_3pl(a::Float64, b::Float64, c::Float64, θ::Float64; D::Float64 = 1.0)::Float64
+    p = prob_3pl(a, b, c, θ; D=D)
+    q = 1.0 - p
+    numerator = (D * a * (p - c)) ^ 2 * q
+    denominator = ((1.0 - c) ^ 2) * p
+    info = numerator / denominator
+    return info
+end
+
+
+function info_grm(a::Float64, b::Vector{Float64}, θ::Float64; D::Float64 = 1.0)::Float64
+    # Compute cumulative probabilities (P*)
+    z = D * a .* (θ .- b)
+    P_star = 1.0 ./ (1.0 .+ exp.(-z))
+    P_star = vcat(0.0, P_star, 1.0)  # P*_0 = 0, P*_K = 1
+
+    # Compute derivatives of cumulative probabilities
+    P_star_derivative = D * a .* P_star[2:end-1] .* (1.0 .- P_star[2:end-1])
+
+    # Compute category probabilities (P_k)
+    P_k = diff(P_star)
+
+    # Compute item information components
+    numerator = P_star_derivative .^ 2
+    denominator = P_k[1:end-1] .* P_k[2:end]
+    info_components = numerator ./ denominator
+
+    # Sum over all categories
+    info = sum(info_components)
 
     return info
 end
+
+
+function info_pcm(a::Float64, b::Vector{Float64}, θ::Float64; D::Float64 = 1.0)::Float64
+    # Compute probabilities for each category
+    prob = prob_pcm(a, b, θ; D=D)  # Vector of length K + 1
+
+    # Categories from 0 to K
+    categories = 0:length(b)  # Vector of length K + 1
+
+    # Expected score E(X)
+    expected_score = sum(prob .* categories)
+
+    # Compute score differences
+    score_diff = categories .- expected_score
+
+    # Compute item information
+    info = (D * a) ^ 2 * sum(prob .* (score_diff .^ 2))
+
+    return info
+end
+
+
+"""
+    info_gpcm(a::Vector{Float64}, b::Vector{Float64}, θ::Float64; D::Float64 = 1.0) -> Float64
+
+Calculates the item information for the Generalized Partial Credit Model (GPCM).
+
+# Arguments
+
+- `a`: Vector of discrimination parameters for each category transition (length `K`).
+- `b`: Vector of threshold parameters for each category transition (length `K`).
+- `θ`: Ability parameter (scalar).
+- `D`: Scaling constant (default is 1.0).
+
+# Returns
+
+- `info`: The item information at ability level `θ`.
+"""
+function info_gpcm(a::Vector{Float64}, b::Vector{Float64}, θ::Float64; D::Float64 = 1.0)::Float64
+    # Compute probabilities for each category
+    prob = prob_gpcm(a, b, θ; D=D)  # Vector of length K + 1
+
+    # Compute cumulative discrimination parameters (η_k)
+    eta_k = D * cumsum([0.0; a])  # Vector of length K + 1
+
+    # Compute expected value of η (η̄)
+    eta_bar = sum(prob .* eta_k)
+
+    # Compute differences (η_k - η̄)
+    eta_diff = eta_k .- eta_bar
+
+    # Compute item information
+    info = sum(prob .* (eta_diff .^ 2))
+
+    return info
+end
+
+
+
+function info_item(model::String, a, bs::Vector{Float64}, c::Union{Nothing, Float64}, θ::Float64; D::Float64 = 1.0)::Float64
+    if model in ("ThreePL", "THREEPL")
+        return info_3pl(a, bs[1], c, θ; D=D)
+    elseif model == "PCM"
+        return info_pcm(a, bs, θ; D=D)
+    elseif model == "GPCM"
+        return info_gpcm(a, bs, θ; D=D)
+    elseif model in ("TwoPL", "TWOPL")
+        return info_3pl(a, bs[1], 1.0, θ; D=D)
+    elseif model == "GRM"
+        return info_grm(a, bs, θ; D=D)
+    else
+        error("Unsupported model: $model")
+    end
+end
+
 
 function kahan_sum(data::Vector{Float64})::Float64
     sum = 0.0
@@ -206,67 +379,109 @@ function kahan_sum(data::Vector{Float64})::Float64
     return sum
 end
 
-function calc_tau(p_matrix::Matrix{Float64}, r::Int, k::Int, N::Int)::Matrix{Float64}
+
+
+function expected_score_matrix(bank::DataFrame, θ_values::Vector{Float64}; D::Float64 = 1.0)::Matrix{Float64}
+    num_items = nrow(bank)
+    num_thetas = length(θ_values)
+
+    # Initialize the matrix to hold expected scores (num_items x num_theta_values)
+    score_matrix = zeros(Float64, num_items, num_thetas)
+
+    # Pre-extract column names for B parameters (thresholds/difficulties)
+    b_columns = filter(col -> occursin(r"^B\d*$|^B$", string(col)), names(bank))
+
+    # Parallelize the loop over items
+    @threads for idx in 1:num_items
+        @inbounds begin  # Use @inbounds to avoid bounds checking inside the loop
+
+            # Extract necessary information from the DataFrame once per item
+            model = bank[idx, :MODEL_TYPE]
+            a = bank[idx, :A]
+            c = if model in ("ThreePL", "THREEPL")
+                    bank[idx, :C]
+                else
+                    nothing
+                end
+
+            # Extract B parameters (thresholds or difficulties)
+            bs = [bank[idx, col] for col in b_columns if !ismissing(bank[idx, col])]
+
+            # Calculate expected scores for all θ values
+            expected_scores = map(θ -> expected_score_item(model, a, bs, c, θ; D=D), θ_values)
+
+            # Store the expected scores in the matrix
+            score_matrix[idx, :] .= expected_scores
+        end
+    end
+
+    return score_matrix
+end
+
+
+function calc_tau(p_matrix::Matrix{Float64}, r::Int, N::Int)::Matrix{Float64}
     """
     Calculate the tau matrix for given probabilities.
 
     # Arguments:
     - `p_matrix`: Probability matrix (Items x K).
     - `r`: Number of powers.
-    - `k`: Number of theta points.
     - `N`: Sample size.
 
     # Returns:
     - Tau matrix (R x K).
     """
-    tau = zeros(Float64, r, k)
-    total_samples = 500 * N
-    sampled_data = p_matrix[rand(1:size(p_matrix, 1), total_samples), :]
+    k = size(p_matrix, 2)  # Number of theta points is the number of columns of p_matrix
+    tau = zeros(Float64, r, k)  # Initialize tau matrix (R x K)
+    num_items = size(p_matrix, 1)  # Number of items
 
-    # Sum the sampled probabilities raised to the r-th power in batches of N
-    for i in 1:500
-        start_idx = (i - 1) * N + 1
-        end_idx = i * N
-        buffer = sampled_data[start_idx:end_idx, :]
+    # Sample and accumulate tau for 250 batches
+    for _ in 1:250
+        sampled_rows = rand(1:num_items, N)  # Sample N rows
+        buffer = p_matrix[sampled_rows, :]  # N x K matrix
 
         for r_index in 1:r
-            tau[r_index, :] .+= vec(sum(buffer .^ r_index; dims=1))  # Use `vec` to flatten
+            # Sum buffer raised to r_index-th power along the first dimension (rows)
+            # Ensure sum returns a row vector for broadcasting
+            tau[r_index, :] .+= sum(buffer .^ r_index; dims=1)[:]  # Use `[:]` to ensure proper shape
         end
     end
 
-    return tau / 500.0
+    return tau / 250.0  # Average the results
 end
 
-function calc_info_tau(info_matrix::Matrix{Float64}, k::Int, N::Int)::Vector{Float64}
+
+function calc_info_tau(info_matrix::Matrix{Float64}, N::Int)::Vector{Float64}
     """
     Calculate the tau vector for item information functions.
 
     # Arguments:
     - `info_matrix`: Information matrix (Items x K).
-    - `k`: Number of theta points.
     - `N`: Sample size.
 
     # Returns:
-    - Tau information vector (length k).
+    - Tau information vector (length K).
     """
-    tau = zeros(Float64, k)
-    total_samples = 500 * N
-    sampled_data = info_matrix[rand(1:size(info_matrix, 1), total_samples), :]
+    k = size(info_matrix, 2)  # Number of theta points
+    tau = zeros(Float64, k)  # Initialize tau vector
+    num_items = size(info_matrix, 1)  # Number of items
 
-    # Sum the sampled information across items in batches of N
-    for i in 1:500
-        start_idx = (i - 1) * N + 1
-        end_idx = i * N
-        buffer = sampled_data[start_idx:end_idx, :]
+    # Sample and accumulate tau for 250 batches
+    for _ in 1:250
+        sampled_rows = rand(1:num_items, N)  # Sample N rows
+        buffer = info_matrix[sampled_rows, :]
 
-        tau .+= vec(sum(buffer; dims=1))  # Use `vec` to flatten
+        tau .+= sum(buffer; dims=1)[:]  # Use `[:]` to flatten the sum result to a 1D vector
     end
 
-    return tau / 500.0
+    return tau / 250.0  # Average the results
 end
 
+
+
 """
-    observed_score_continuous(item_params::Matrix{Float64}, ability_dist::Normal; num_points::Int=100) -> Vector{Float64}
+    observed_score_continuous(item_params::Matrix{Float64}, ability_dist::Normal;
+                                   D::Float64=1.0, num_points::Int=120)::Vector{Float64}
 
 Calculates the observed score distribution using numerical integration for 3PL (dichotomous) items.
 
@@ -281,12 +496,12 @@ Calculates the observed score distribution using numerical integration for 3PL (
   - Observed score distribution as a vector.
 """
 function observed_score_continuous(item_params::Matrix{Float64}, ability_dist::Normal;
-                                   num_points::Int=120)::Vector{Float64}
+                                   D::Float64=1.0, num_points::Int=120)::Vector{Float64}
     num_items = size(item_params, 1)
 
     # Define the integrand function for numerical integration
     function integrand(θ, x)
-        score_dist = lw_dist(item_params, θ)  # Score distribution for dichotomous items
+        score_dist = lw_dist(item_params, θ; D)  # Score distribution for dichotomous items
         if x + 1 > length(score_dist)
             return 0.0  # Avoid bounds error
         end
@@ -308,7 +523,7 @@ function observed_score_continuous(item_params::Matrix{Float64}, ability_dist::N
 end
 
 """
-    lw_dist(item_params::Matrix{Float64}, θ::Float64) -> Vector{Float64}
+    lw_dist(item_params::Matrix{Float64}, θ::Float64; D::Float64=1.0)::Vector{Float64}
 
 Implementation of Lord and Wingersky Recursion Formula to calculate score distribution for dichotomous items.
 
@@ -321,7 +536,7 @@ Implementation of Lord and Wingersky Recursion Formula to calculate score distri
 
   - Score distribution as a vector.
 """
-function lw_dist(item_params::Matrix{Float64}, θ::Float64)::Vector{Float64}
+function lw_dist(item_params::Matrix{Float64}, θ::Float64; D::Float64=1.0)::Vector{Float64}
     num_items = size(item_params, 1)
 
     # Pre-allocate the result array for probabilities
@@ -331,7 +546,7 @@ function lw_dist(item_params::Matrix{Float64}, θ::Float64)::Vector{Float64}
     for i in 1:num_items
         a, b, c = item_params[i, :]  # Corrected: extract parameters from row `i`
 
-        prob_correct = Probability(θ, b, a, c)
+        prob_correct = prob_3pl(a, b, c, θ; D)
         prob_incorrect = 1.0 - prob_correct
 
         # Create a new array for intermediate results
