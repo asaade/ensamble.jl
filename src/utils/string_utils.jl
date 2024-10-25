@@ -126,7 +126,8 @@ Safely reads a CSV file and returns a DataFrame. Logs an error if the file canno
 function safe_read_csv(file_path::String)::DataFrames.DataFrame
     try
         return DataFrames.DataFrame(CSV.File(file_path;
-            stripwhitespace=true, pool=false, stringtype=String))
+                                             stripwhitespace=true, pool=false,
+                                             stringtype=String))
     catch e
         @error "Error reading CSV file: $file_path. Error: $e"
         return DataFrames.DataFrame()

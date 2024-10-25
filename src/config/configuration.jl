@@ -52,7 +52,7 @@ mutable struct Parameters
     operational_items::Int
     max_item_use::Int
     f::Int
-    shadow_test::Int
+    shadow_test_size::Int
     bank::DataFrame
     anchor_tests::Int
     anchor_size::Int
@@ -107,7 +107,7 @@ function transform_parameters_to_flat(forms_config::AssemblyConfig,
                       forms_config.operational_items,     # operational_items
                       forms_config.max_item_use,          # max_item_use
                       forms_config.f,                     # f
-                      forms_config.shadow_test,           # shadow_test
+                      forms_config.shadow_test_size,           # shadow_test_size
                       bank,                               # bank
                       forms_config.anchor_tests,          # anchor_tests
                       forms_config.anchor_size,           # anchor_size
@@ -171,7 +171,5 @@ function configure(inFile::String="data/config.toml")::Tuple{Config, Parameters}
     return (flat_config,
             transform_parameters_to_flat(forms_config, irt_data, bank, flat_config))
 end
-
-
 
 end # module Configuration

@@ -51,7 +51,7 @@ Checks if a column exists in the DataFrame.
 """
 function check_column!(col_name::String, df::DataFrame)
     return col_name in names(df) ||
-        throw(ArgumentError("Column '$col_name' does not exist."))
+           throw(ArgumentError("Column '$col_name' does not exist."))
 end
 
 """
@@ -189,7 +189,7 @@ function final_summary(parms::Parameters, results::DataFrame)::String
     labels = [LABEL_FORMS, LABEL_ITEMS, LABEL_NON_ANCHOR, LABEL_ANCHOR, LABEL_UNUSED]
     values = [size(results, 2), length(used_items), length(used_non_anchors),
               length(used_anchors),
-              length(items) - length(anchor_items) - length(used_items)]
+              length(items) - length(used_items)]
 
     return pretty_table(String, hcat(labels, string.(values)); header=["Concept", "Count"],
                         alignment=[:l, :r])

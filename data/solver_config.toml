@@ -40,6 +40,7 @@ time_limit = 120.0                 # Not recognized by solver. Possible bug. Doe
 mip_rel_gap = 0.05
 mip_abs_gap = 0.05
 parallel = "on"
+threads = 8
 
 [gurobi]
 MIPGap = 0.05                      # Relative MIP gap tolerance

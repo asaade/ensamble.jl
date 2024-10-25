@@ -1,14 +1,14 @@
 ID,CONSTRAINT_ID,TYPE,CONDITION,LB,UB,ONOFF
-1,C1,Test,,80,80,ON
-2,C2,Number,AREA == 1,20,20,ON
-3,C3,Number,AREA == 2,20,20,ON
-4,C4,Number,AREA == 3,20,20,ON
-5,C5,Number,AREA == 4,20,20,ON
-6,C6,Sum,Words,2800,3400,ON
+1,C1,Test,,40,40,ON
+2,C2,Number,AREA == 1,10,10,ON
+3,C3,Number,AREA == 2,10,10,ON
+4,C4,Number,AREA == 3,10,10,ON
+5,C5,Number,AREA == 4,10,10,ON
+6,C6,Sum,Words,1400,1700,OFF
 7,C7,Enemies,Enemies,0,0,ON
 8,C8,AllOrNone,Friends,0,0,ON
 9,C9,MaxUse,,0,1,ON
-10,C10,overlap,,5,5,OFF
+10,C10,overlap,,10,10,OFF
 11,C11,Exclude,CORR <= 0.12,0,0,OFF
 12,C12,AllOrNone,"ID in [ITEM0001,ITEM0002]",0,0,ON
 13,C13,Enemies,"ID in [ITEM0036,ITEM00039]",0,0,ON

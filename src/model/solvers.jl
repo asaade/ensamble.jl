@@ -88,6 +88,12 @@ function configure_solver!(model::Model, parms::Parameters, solver_name::String=
     set_time_limit_sec(model, 120.0)
     parms.verbose <= 1 && set_silent(model)
 
+    # if name == :HIGHS
+    #     model = Model(HiGHS.Optimizer)
+    #     Highs_resetGlobalScheduler(1)
+    #     set_attribute(model, MOI.NumberOfThreads(), 8)
+    # end
+
     return model
 end
 

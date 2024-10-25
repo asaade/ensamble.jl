@@ -30,7 +30,6 @@ const VALID_TYPES = ["TEST", "NUMBER", "SUM", "ENEMIES",
                      "INCLUDE", "EXCLUDE"]
 const CONFLICTING_CONSTRAINTS = ["ALLORNONE", "ENEMIES", "INCLUDE", "EXCLUDE"]
 
-
 level = Logging.Info
 
 """
@@ -95,7 +94,8 @@ Read constraints from a CSV file, returning a dictionary of Constraint objects.
 This function checks for consistency and potential errors in the user-provided constraint file.
 """
 function read_constraints(file_path::String, parms::Parameters)
-    df = CSV.read(file_path, DataFrame; stripwhitespace=true, pool=false, stringtype=String, missingstring=nothing)
+    df = CSV.read(file_path, DataFrame; stripwhitespace=true, pool=false, stringtype=String,
+                  missingstring=nothing)
     uppercase_dataframe!(df)
 
     constraints = Dict{String, Constraint}()
@@ -161,7 +161,7 @@ function initialize_model!(model::Model, parms::Parameters,
                            constraints::Dict{String, Constraint})
     @info INITIALIZING_MODEL_MESSAGE
     num_items = size(parms.bank, 1)
-    num_forms = parms.num_forms + (parms.shadow_test > 0 ? 1 : 0)
+    num_forms = parms.num_forms + (parms.shadow_test_size > 0 ? 1 : 0)
 
     # Declare model variables
     @variable(model, y >= 0.0)
@@ -268,7 +268,6 @@ function apply_constraints!(model::Model, parms::Parameters,
     return model
 end
 
-
 """
     normalize_condition_values(values::Union{Vector, BitVector})::Vector{Any}
 
@@ -289,7 +288,6 @@ function normalize_condition_values(values::Union{Vector, BitVector})::Vector{An
     end
 end
 
-
 """
     run_conflict_checks!(parms::Parameters, conflict_constraints::Dict{String, Constraint})
 
@@ -297,7 +295,8 @@ Run conflict checks for friends, enemies, and anchors.
 All INCLUDED items are equivalent to friends.  While the test for EXLUDED as enemies does not match
 their exact characteristics, it may be a useful approximation without adding more rules.
 """
-function run_conflict_checks!(parms::Parameters, conflict_constraints::Dict{String, Constraint})
+function run_conflict_checks!(parms::Parameters,
+                              conflict_constraints::Dict{String, Constraint})
     # Find friends, enemies, and include constraints
     bank = parms.bank
     friends_constraints = find_all_constraints_by_type(conflict_constraints, "ALLORNONE")
@@ -318,7 +317,8 @@ function run_conflict_checks!(parms::Parameters, conflict_constraints::Dict{Stri
                     enemies_values = normalize_condition_values(enemies_constraint.condition(bank))
 
                     # Apply one-to-many conflict rule between friends and enemies
-                    conflict_df = apply_conflict_rule(friends_values, enemies_values, one_to_many_conflict_rule)
+                    conflict_df = apply_conflict_rule(friends_values, enemies_values,
+                                                      one_to_many_conflict_rule)
 
                     # Log the conflict if any were found
                     if !isempty(conflict_df)
@@ -345,7 +345,8 @@ function run_conflict_checks!(parms::Parameters, conflict_constraints::Dict{Stri
                 enemies_values = normalize_condition_values(enemies_constraint.condition(bank))
 
                 # Apply conflict rule between anchors and enemies
-                conflict_df = apply_conflict_rule(anchor_values, enemies_values, one_to_many_conflict_rule)
+                conflict_df = apply_conflict_rule(anchor_values, enemies_values,
+                                                  one_to_many_conflict_rule)
 
                 if !isempty(conflict_df)
                     log_conflicts("Anchor-Enemies", conflict_df)
@@ -360,7 +361,8 @@ function run_conflict_checks!(parms::Parameters, conflict_constraints::Dict{Stri
                 friends_values = normalize_condition_values(friends_constraint.condition(bank))
 
                 # Apply conflict rule between anchors and friends
-                conflict_df = apply_conflict_rule(friends_values, anchor_values, all_or_none_conflict_rule)
+                conflict_df = apply_conflict_rule(friends_values, anchor_values,
+                                                  all_or_none_conflict_rule)
 
                 if !isempty(conflict_df)
                     log_conflicts("Anchor-Friends", conflict_df)
@@ -373,8 +375,6 @@ function run_conflict_checks!(parms::Parameters, conflict_constraints::Dict{Stri
         @warn "Conflict checks for Anchors-Friends/Enemies failed: $e"
     end
 end
-
-
 
 """
     find_all_constraints_by_type(constraints, type)
@@ -421,13 +421,13 @@ function one_to_many_conflict_rule(values1::Vector, values2::Vector)::Vector{Tup
     return conflicts
 end
 
-
 """
     all_or_none_conflict_rule(friends_values, anchor_values)
 
 Checks for all-or-none conflicts between two sets of values.
 """
-function all_or_none_conflict_rule(friends_values::Vector, anchor_values::Vector)::Vector{Tuple}
+function all_or_none_conflict_rule(friends_values::Vector,
+                                   anchor_values::Vector)::Vector{Tuple}
     group_dict = Dict{Any, Set{Any}}()
     for (friend, anchor) in zip(friends_values, anchor_values)
         if !ismissing(friend) && !ismissing(anchor)
@@ -437,13 +437,13 @@ function all_or_none_conflict_rule(friends_values::Vector, anchor_values::Vector
             push!(group_dict[friend], anchor)
         end
     end
-    conflicts = [(friend, anchors) for (friend, anchors) in group_dict if length(anchors) > 1]
+    conflicts = [(friend, anchors)
+                 for (friend, anchors) in group_dict if length(anchors) > 1]
     if !isempty(conflicts)
         @info "All-or-None conflict found: $conflicts"
     end
     return conflicts
 end
-
 
 """
     apply_conflict_rule(values1, values2, rule)

@@ -32,18 +32,17 @@ using .ModelInitializer
 Logging.global_logger(Logging.ConsoleLogger(stderr, Logging.Info))
 
 """
-load_configuration(config_file::String)::Tuple{Dict, Parameters}
+    configure_system(config_file::String)::Tuple{Dict, Parameters}
 
-Load the configuration from a TOML file and return the configuration and parameters.
+Load system configuration from a TOML file and return the configuration and parameters.
 """
 function configure_system(config_file::String)
     println(LOADING_CONFIGURATION_MESSAGE)
     return Configuration.configure(config_file)
 end
 
-# Run the optimization solver
 """
-    run_optimization(model::Model)
+    run_optimization(model::Model)::Bool
 
 Run the optimization solver and check if the model is solved and feasible.
 """
@@ -53,11 +52,10 @@ function run_optimization(model::Model)::Bool
     return is_solved_and_feasible(model)
 end
 
-# Remove used items from the bank
 """
-    remove_used_items!(parms::Parameters, items_used::Vector{Int})
+    remove_used_items!(parms::Parameters, items_used::Vector{Int})::Parameters
 
-Remove items used in forms from the bank and update probabilities or
+Remove the items used in forms from the bank and update probabilities or
 information for the remaining items based on the method used.
 """
 function remove_used_items!(parms::Parameters, items_used::Vector{Int})::Parameters
@@ -78,9 +76,8 @@ function remove_used_items!(parms::Parameters, items_used::Vector{Int})::Paramet
     return parms
 end
 
-# Generate a unique column name for DataFrame
 """
-    generate_unique_column_name(results_df::DataFrame)
+    generate_unique_column_name(results_df::DataFrame)::String
 
 Generate a unique column name to avoid naming conflicts in the results DataFrame.
 """
@@ -92,7 +89,6 @@ function generate_unique_column_name(results_df::DataFrame)::String
     return "Form_$i"
 end
 
-# Process optimization results and store them
 """
     process_and_store_results!(model::Model, parms::Parameters, results_df::DataFrame)
 
@@ -138,9 +134,9 @@ end
 """
     handle_anchor_items(parms::Parameters, orig_parms::Parameters)::Parameters
 
-Cycles through anchor tests, updates the item bank used ath this iteration
-by removing the old anchor items and adding the new anchor items,
-and updates the relevant parameters (`p` or `info`) depending on the method in use.
+Update the item bank used for the next iteration
+by removing the old anchor items and adding the new anchor items iterating on anchor forms.
+Also retrives the original p_matrix or info_matrix for these items, depending on the objective in use.
 """
 function handle_anchor_items(parms::Parameters, orig_parms::Parameters)::Parameters
     # Ensure anchor tests are available and cycle through them
@@ -176,7 +172,6 @@ function handle_anchor_items(parms::Parameters, orig_parms::Parameters)::Paramet
     return parms
 end
 
-# Main function to run the optimization process
 """
     assemble_tests(config_file::String="path_to_config_file.toml")
 
@@ -192,7 +187,7 @@ function assemble_tests(config_file::String="data/config.toml")::DataFrame
     parms = deepcopy(orig_parms)
     results_df = DataFrame()
 
-    if parms.shadow_test > 0
+    if parms.shadow_test_size > 0
         parms.num_forms = 1
     end
 
@@ -201,7 +196,7 @@ function assemble_tests(config_file::String="data/config.toml")::DataFrame
 
     while parms.f > 0
         parms.num_forms = min(parms.num_forms, parms.f)
-        parms.shadow_test = max(0, parms.f - parms.num_forms)
+        parms.shadow_test_size = max(0, parms.f - parms.num_forms)
 
         handle_anchor_items(parms, orig_parms)
 

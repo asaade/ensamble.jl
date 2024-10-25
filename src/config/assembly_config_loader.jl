@@ -6,7 +6,6 @@ using CSV, DataFrames
 
 using ..Utils
 
-
 # Define the AssemblyConfig struct
 mutable struct AssemblyConfig
     form_size::Int           # Size of each form (number of items)
@@ -17,9 +16,8 @@ mutable struct AssemblyConfig
     anchor_tests::Int        # Number of anchor tests to include
     anchor_size::Int         # Size of anchor test section in each form
     max_item_use::Int        # Maximum number of times an item can be used across forms
-    shadow_test::Int         # Size of the shadow test (for iterative algorithms)
+    shadow_test_size::Int         # Size of the shadow test (for iterative algorithms)
 end
-
 
 """
     load_assembly_config(config_data::Dict{Symbol, Any})::AssemblyConfig
@@ -50,7 +48,8 @@ function load_assembly_config(config_data::Dict{Symbol, Any})::AssemblyConfig
     df = safe_read_csv(constraints_file)
     uppercase_dataframe!(df)
 
-    row_index = findfirst(r -> upcase(r[:ONOFF]) == "ON" && upcase(r[:TYPE]) == "TEST", eachrow(df))
+    row_index = findfirst(r -> upcase(r[:ONOFF]) == "ON" && upcase(r[:TYPE]) == "TEST",
+                          eachrow(df))
 
     if row_index !== nothing
         row = df[row_index, :]
@@ -64,7 +63,7 @@ function load_assembly_config(config_data::Dict{Symbol, Any})::AssemblyConfig
     num_forms = get(assembly_dict, :NUMFORMS, 1)
     f = num_forms  # Assuming the fixed number of forms is the same as num_forms
     max_item_use = get(assembly_dict, :MAXITEMUSE, num_forms)  # Default to forms if not provided
-    shadow_test = get(assembly_dict, :SHADOWTEST, 1)   # Default to 1 if not provided
+    shadow_test_size = get(assembly_dict, :SHADOWTEST, 1)   # Default to 1 if not provided
     anchor_tests = get(assembly_dict, :ANCHORTESTS, 0) # Default to 0 if not provided
 
     # Initialize other fields with default values
@@ -83,7 +82,7 @@ function load_assembly_config(config_data::Dict{Symbol, Any})::AssemblyConfig
                           anchor_tests,
                           anchor_size,
                           max_item_use,
-                          shadow_test)
+                          shadow_test_size)
 end
 
 end # module AssemblyConfigLoader
