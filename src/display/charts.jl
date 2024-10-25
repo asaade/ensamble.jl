@@ -5,6 +5,7 @@ export plot_results, save_to_csv, simulate_scores
 using CSV, DataFrames, Plots, StatsPlots, Distributions, Measures
 using Base.Threads
 using StatsBase
+using Base.Threads
 
 using ..Configuration, ..Utils
 
@@ -91,6 +92,39 @@ function char_curves(parms::Parameters, results::DataFrame,
 end
 
 """
+    score_curves(parms::Parameters, results::DataFrame,
+                     theta_range::Union{AbstractVector, AbstractRange})::DataFrame
+
+Generates expected scrore curve data for all forms using dichotomous items.
+"""
+function expected_score_curves(parms::Parameters, results::DataFrame,
+                               theta_range::Union{AbstractVector, AbstractRange})::DataFrame
+    bank = parms.bank
+    theta::Vector{Float64} = collect(theta_range)
+    n_forms = size(results, 2)  # Number of forms (columns in results)
+    n_thetas = length(theta)  # Number of theta points
+
+    # Pre-allocate the curves matrix (theta points x forms)
+    curves_matrix = Matrix{Float64}(undef, n_thetas, n_forms)
+
+    # Loop over each form in parallel
+    @threads for i in 1:n_forms
+        selected = results[:, i]  # Select the i-th column
+        idx = bank.ID .∈ Ref(skipmissing(selected))  # Filter selected items from bank
+
+        # Compute the expected score matrix for the selected items
+        scores = expected_score_matrix(bank[idx, :], theta; parms.D)
+
+        # Store the sum of the scores for this form in the curves matrix
+        curves_matrix[:, i] = sum(scores; dims=1)  # Sum along items (rows)
+    end
+
+    # Convert the curves matrix into a DataFrame and round the results
+    curves = DataFrame(curves_matrix, Symbol.(names(results)))
+    return round.(curves, digits=2)
+end
+
+"""
     info_curves(parms, results, theta_range) -> DataFrame
 
 Generates information curve data for all forms using dichotomous items.
@@ -121,6 +155,33 @@ function info_curves(parms::Parameters, results::DataFrame,
 
     info_data = DataFrame(info_matrix, Symbol.(names(results)))
     return round.(info_data, digits=2)
+end
+
+function expected_info_curves(parms::Parameters, results::DataFrame,
+                              theta_range::Union{AbstractVector, AbstractRange})
+    bank = parms.bank
+    theta::Vector{Float64} = collect(theta_range)
+    n_forms = size(results, 2)  # Number of forms (columns in results)
+    n_thetas = length(theta)  # Number of theta points
+
+    # Pre-allocate the curves matrix (theta points x forms)
+    curves_matrix = Matrix{Float64}(undef, n_thetas, n_forms)
+
+    # Loop over each form in parallel
+    @threads for i in 1:n_forms
+        selected = results[:, i]  # Select the i-th column
+        idx = bank.ID .∈ Ref(skipmissing(selected))  # Filter selected items from bank
+
+        # Compute the expected information matrix for the selected items
+        info = expected_info_matrix(bank[idx, :], theta; parms.D)
+
+        # Store the sum of the information for this form in the curves matrix
+        curves_matrix[:, i] = sum(info; dims=1)  # Sum along items (rows)
+    end
+
+    # Convert the curves matrix into a DataFrame and round the results
+    curves = DataFrame(curves_matrix, Symbol.(names(results)))
+    return round.(curves, digits=2)
 end
 
 """
@@ -163,8 +224,8 @@ Generates both characteristic and information curves.
 """
 function make_curves(parms::Parameters, results::DataFrame,
                      theta_range::Union{AbstractVector, AbstractRange})
-    char_data = char_curves(parms, results, theta_range)
-    info_data = info_curves(parms, results, theta_range)
+    char_data = expected_score_curves(parms, results, theta_range)
+    info_data = expected_info_curves(parms, results, theta_range)
     return char_data, info_data
 end
 
@@ -185,7 +246,8 @@ function combine_plots(parms::Parameters, theta_range::Union{AbstractVector, Abs
                             linewidth=2, label="", grid=:both, legend=:topright,
                             xticks=:auto, yticks=:auto, color=:viridis,
                             ylims=(0, parms.max_items))
-    (parms.method == "TCC" || parms.method == "MIXED") && scatter!(parms.theta, parms.tau[1, :]; label="", markersize=4)
+    (parms.method == "TCC" || parms.method == "MIXED") &&
+        scatter!(parms.theta, parms.tau[1, :]; label="", markersize=4)
 
     # Add information curves on the same graph using dual axes (right axis for info curves)
     p2 = @df info_data plot(theta_range, cols(),

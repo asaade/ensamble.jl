@@ -39,7 +39,8 @@ based on the input configuration and item bank.
 
   - An `IRTModelData` struct containing IRT parameters and matrices for the assembly process.
 """
-function load_irt_data(config_data::Dict{Symbol, Any}, forms_config, bank::DataFrame)::IRTModelData
+function load_irt_data(config_data::Dict{Symbol, Any}, forms_config,
+                       bank::DataFrame)::IRTModelData
     # Ensure IRT configuration exists
     if !haskey(config_data, :IRT)
         throw(ArgumentError("Configuration must contain the 'IRT' key."))
@@ -47,9 +48,12 @@ function load_irt_data(config_data::Dict{Symbol, Any}, forms_config, bank::DataF
 
     irt_dict = config_data[:IRT]
     method = get(irt_dict, :METHOD, missing)
-    theta = get(irt_dict, :THETA, missing)
+    theta = get(irt_dict, :THETA, [-1.8, -0.5, 0.0, 0.5, 1.8])
     D = get(irt_dict, :D, 1.0)
     r = get(irt_dict, :R, 2)
+    if any(x->x ∉ ["1PL", "2PL", "3PL"], bank[:, "MODEL_TYPE"])
+        r = 1
+    end
     N = forms_config.form_size # get(config_data[:FORMS], :N, 1)
 
     relative_target_weights = get(irt_dict, :RELATIVETARGETWEIGHTS, [1.0, 1.0])
@@ -58,17 +62,13 @@ function load_irt_data(config_data::Dict{Symbol, Any}, forms_config, bank::DataF
         throw(ArgumentError("The length of 'RELATIVETARGETWEIGHTS' and 'RELATIVETARGETPOINTS' must match."))
     end
 
-    # Extract item parameters directly from the bank DataFrame
-    a::Vector{Float64} = bank.A
-    b::Vector{Float64} = bank.B
-    c::Vector{Float64} = bank.C
-
     # Calculate 3D probability and information matrices for dichotomous items
-    (p_matrix, info_matrix) = create_irt_item_data(theta, a, b, c, D)
+    p_matrix = expected_score_matrix(bank, theta)
+    info_matrix = expected_info_matrix(bank, theta)
 
     # Compute tau and tau_info using the calculated p_matrix and info_matrix
-    tau = get_tau(irt_dict, p_matrix, r, length(theta), N)
-    tau_info = get_tau_info(irt_dict, info_matrix, length(theta), N)
+    tau = get_tau(irt_dict, p_matrix, r, N)
+    tau_info = get_tau_info(irt_dict, info_matrix, N)
 
     # Return IRTModelData struct with all required data
     return IRTModelData(method, theta, p_matrix, info_matrix, tau, tau_info,
@@ -77,34 +77,11 @@ function load_irt_data(config_data::Dict{Symbol, Any}, forms_config, bank::DataF
 end
 
 """
-    create_irt_item_data(theta::Vector{Float64}, a::Vector{Float64}, b::Vector{Float64}, c::Vector{Float64}, D::Float64)
-
-Creates the probability and information matrices for dichotomous items only.
-"""
-function create_irt_item_data(theta::Vector{Float64}, a::Vector{Float64},
-                              b::Vector{Float64}, c::Vector{Float64}, D::Float64)
-    num_items = length(a)
-
-    # Initialize 2D arrays for probabilities and information
-    p_matrix = Matrix{Float64}(undef, num_items, length(theta))
-    info_matrix = Matrix{Float64}(undef, num_items, length(theta))
-
-    # Use direct element iteration
-    for (t_idx, θ) in enumerate(theta)
-        # Vectorized computation for probabilities and information for all items at this theta
-        p_matrix[:, t_idx] = prob_3pl.(a, b, c, θ; D=D)
-        info_matrix[:, t_idx] = info_3pl.(a, b, c, θ; D=D)
-    end
-
-    return (p_matrix, info_matrix)
-end
-
-"""
     get_tau(irt_dict::Dict{Symbol, Any}, p_matrix::Matrix{Float64}, r::Int, k::Int, N::Int)::Matrix{Float64}
 
 Calculates or retrieves the tau values based on the probability matrix.
 """
-function get_tau(irt_dict::Dict{Symbol, Any}, p_matrix::Matrix{Float64}, r::Int, k::Int,
+function get_tau(irt_dict::Dict{Symbol, Any}, p_matrix::Matrix{Float64}, r::Int,
                  N::Int)::Matrix{Float64}
     tau = get(irt_dict, :TAU, nothing)
 
@@ -120,7 +97,7 @@ end
 
 Calculates or retrieves the tau_info values based on the information matrix.
 """
-function get_tau_info(irt_dict::Dict{Symbol, Any}, info_matrix::Matrix{Float64}, k::Int,
+function get_tau_info(irt_dict::Dict{Symbol, Any}, info_matrix::Matrix{Float64},
                       N::Int)::Vector{Float64}
     tau_info = get(irt_dict, :TAU_INFO, nothing)
 
@@ -130,6 +107,5 @@ function get_tau_info(irt_dict::Dict{Symbol, Any}, info_matrix::Matrix{Float64},
 
     return calc_info_tau(info_matrix, N)
 end
-
 
 end # module IRTDataLoader
