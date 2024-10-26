@@ -1,0 +1,28 @@
+[FORMS]
+NumForms = 8
+AnchorTests = 4
+ShadowTest = 1
+
+[IRT]
+METHOD = "MIXED"
+THETA = [-2.5, -0.5, 0.0, 0.5, 2.5]
+TAU = []  # or it could be a vector of vectors [[0.5, 0.4], [0.6, 0.5], [0.7, 0.6], [0.8, 0.7]]
+TAU_INFO = [] # or a vector  [0.3, 0.4, 0.5, 0.6]
+RELATIVETARGETWEIGHTS = [1, 1, 1, 1]
+RELATIVETARGETPOINTS = [-0.5, 0.0, 0.5, 1.0]
+R = 2
+D = 1.0
+
+[FILES]
+ITEMSFILE = "data/items.csv"
+ANCHORFILE = "data/anchor.csv"
+CONSTRAINTSFILE = "data/constraints.csv"
+RESULTSFILE = "results/results.csv"
+FORMSFILE = "results/forms.csv"
+TCCFILE = "results/tcc_output.csv"
+PLOTFILE = "results/plot_output.png"
+REPORTCATEGORIES = ["FRIENDS", "ENEMIES", "AREA"]
+REPORTSUMS = ["WORDS", "IMAGES"]
+
+SOLVER = "cplex"
+VERBOSE = 1

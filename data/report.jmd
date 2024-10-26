@@ -1,0 +1,23 @@
+# Automatic Test Assembly Report
+
+This report provides a summary of the forms created, the items used, and detailed analysis of the common items between forms. The report also presents characteristic curves, information curves, and simulation results to visually analyze the performance of the test assembly.
+
+* * *
+
+## 1. Summary of Forms and Items
+
+The following table shows a high-level summary of the forms created, the total number of items used (including anchor items), non-anchor items used, anchor items used, and the number of items not used.
+
+```julia
+# Display form and item summary
+display_final_results(parms, results)
+```
+
+## 2. Item Distribution Across Forms
+
+This table provides the distribution of items across each form, including the total number of items, anchor items, and non-anchor items for each form.
+
+```julia
+# Show item distribution across forms
+display_item_distribution(results, bank)
+```
