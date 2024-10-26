@@ -60,9 +60,19 @@ function load_config(config_data::Dict{Symbol, Any})::BasicConfig
     @info "Loaded configuration: items_file = $items_file, anchor_file = $anchor_file, solver = $solver"
 
     # Return the Config struct
-    return BasicConfig(items_file, anchor_file, constraints_file, forms_file, results_file,
-                       tcc_file,
-                       plot_file, solver, verbose, report_categories, report_sums)
+    return BasicConfig(
+        items_file,
+        anchor_file,
+        constraints_file,
+        forms_file,
+        results_file,
+        tcc_file,
+        plot_file,
+        solver,
+        verbose,
+        report_categories,
+        report_sums
+    )
 end
 
 end # module ConfigLoader

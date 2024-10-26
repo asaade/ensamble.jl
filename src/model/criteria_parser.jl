@@ -21,8 +21,11 @@ for further processing.
   - A normalized string with consistent formatting for operators.
 """
 function normalize(input_str::AbstractString)::AbstractString
-    return uppercase(replace(input_str, r"\s*([!=<>]=|!IN|IN|\&\&|\|\|)\s*" => s" \1 ",
-                             r"\s*,\s*" => ","))
+    return uppercase(
+        replace(
+        input_str, r"\s*([!=<>]=|!IN|IN|\&\&|\|\|)\s*" => s" \1 ", r"\s*,\s*" => ","
+    ),
+    )
 end
 
 """
@@ -67,14 +70,16 @@ function isvalidinput(input_str::AbstractString)::Bool
 end
 
 # Operator map that defines how operators behave in condition expressions
-const OPERATOR_MAP = Dict("!=" => (lhs, rhs) -> lhs .!= rhs,
-                          "<" => (lhs, rhs) -> lhs .< rhs,
-                          "<=" => (lhs, rhs) -> lhs .<= rhs,
-                          "==" => (lhs, rhs) -> lhs .== rhs,
-                          ">" => (lhs, rhs) -> lhs .> rhs,
-                          ">=" => (lhs, rhs) -> lhs .>= rhs,
-                          "IN" => (lhs, rhs) -> lhs .∈ Ref(rhs),
-                          "!IN" => (lhs, rhs) -> lhs .∉ Ref(rhs))
+const OPERATOR_MAP = Dict(
+    "!=" => (lhs, rhs) -> lhs .!= rhs,
+    "<" => (lhs, rhs) -> lhs .< rhs,
+    "<=" => (lhs, rhs) -> lhs .<= rhs,
+    "==" => (lhs, rhs) -> lhs .== rhs,
+    ">" => (lhs, rhs) -> lhs .> rhs,
+    ">=" => (lhs, rhs) -> lhs .>= rhs,
+    "IN" => (lhs, rhs) -> lhs .∈ Ref(rhs),
+    "!IN" => (lhs, rhs) -> lhs .∉ Ref(rhs)
+)
 
 """
     validate_operator(op::AbstractString)
@@ -139,7 +144,11 @@ suggests a similar column name. The operation is defined by the operator (e.g., 
 function apply_condition(op::AbstractString, lhs::Symbol, rhs, df::DataFrame)
     if lhs ∉ Symbol.(names(df))
         similar_col = suggest_similar_column(lhs, df)
-        throw(ArgumentError("Column $lhs does not exist in the DataFrame. Did you mean '$similar_col'?"))
+        throw(
+            ArgumentError(
+            "Column $lhs does not exist in the DataFrame. Did you mean '$similar_col'?"
+        ),
+        )
     end
     lhs_col = df[!, lhs]
     return OPERATOR_MAP[op](lhs_col, rhs)
@@ -264,8 +273,9 @@ Useful for separating column names from conditions.
 
   - A tuple containing the part before and after the comma.
 """
-function split_outside_brackets(input_str::AbstractString)::Tuple{AbstractString,
-                                                                  AbstractString}
+function split_outside_brackets(
+        input_str::AbstractString
+)::Tuple{AbstractString, AbstractString}
     level = 0
     split_pos = nothing
 
@@ -301,8 +311,9 @@ Creates a function that selects a column and applies a condition to it.
 
   - A function that applies the condition and selects the column from a DataFrame.
 """
-function handle_column_and_condition(col_expr::AbstractString,
-                                     condition_expr::AbstractString)::Function
+function handle_column_and_condition(
+        col_expr::AbstractString, condition_expr::AbstractString
+)::Function
     lhs, op, rhs = parse_condition(condition_expr)
     return df -> df[apply_condition(op, lhs, rhs, df), Symbol(col_expr)]
 end
@@ -349,9 +360,13 @@ Handles conditions, logical operators, and column selection.
 
   - A function that applies the parsed criteria to a DataFrame.
 """
-function parse_criteria(input_str::AbstractString; max_length::Int=100)::Function
+function parse_criteria(input_str::AbstractString; max_length::Int = 100)::Function
     if length(input_str) > max_length
-        throw(ArgumentError("Input string exceeds maximum allowed length of $max_length characters"))
+        throw(
+            ArgumentError(
+            "Input string exceeds maximum allowed length of $max_length characters"
+        ),
+        )
     end
 
     input_str = sanitize_input(strip(input_str))

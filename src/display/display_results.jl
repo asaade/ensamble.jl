@@ -31,7 +31,7 @@ Displays the optimization results, including objective value.
 """
 function show_opt_results(model::Model, parms::Parameters)
     parms.verbose > 1 && println(solution_summary(model))
-    println("Objective: ", round(objective_value(model); digits=4))
+    println("Objective: ", round(objective_value(model); digits = 4))
     return println("=====================================")
 end
 
@@ -40,9 +40,7 @@ end
 
 Throws an error if the DataFrame is empty.
 """
-function check_empty!(df::DataFrame)
-    return isempty(df) && throw(ArgumentError("Results are empty."))
-end
+check_empty!(df::DataFrame) = isempty(df) && throw(ArgumentError("Results are empty."))
 
 """
     check_column!(col_name, df)
@@ -86,7 +84,7 @@ function anchor_summary(results::DataFrame, bank::DataFrame)::String
     end
 
     table_matrix = hcat(table_data...)'
-    return pretty_table(String, table_matrix; header=header, alignment=:r)
+    return pretty_table(String, table_matrix; header = header, alignment = :r)
 end
 
 """
@@ -110,11 +108,13 @@ function col_sums(results::DataFrame, bank::DataFrame, cols)::String
 
     for col in cols
         col_sum = [sum(bank[findall(in(skipmissing(results[:, i])), item_ids), col])
-                   for i in 1:num_forms]
+                   for
+                   i in 1:num_forms]
         push!(table_data, col_sum)
     end
 
-    return pretty_table(String, hcat(table_data...); header=["Form"; cols...], alignment=:r)
+    return pretty_table(
+        String, hcat(table_data...); header = ["Form"; cols...], alignment = :r)
 end
 
 """
@@ -122,8 +122,9 @@ end
 
 Returns a table showing the counts of items grouped by category in the specified column for each form.
 """
-function cat_counts(results::DataFrame, bank::DataFrame, col::Union{String, Symbol};
-                    max_cats::Int=10)::String
+function cat_counts(
+        results::DataFrame, bank::DataFrame, col::Union{String, Symbol}; max_cats::Int = 10
+)::String
     check_empty!(results)
     check_column!(String(col), bank)
 
@@ -134,21 +135,23 @@ function cat_counts(results::DataFrame, bank::DataFrame, col::Union{String, Symb
     table_data = []
     for i in 1:num_forms
         selected_items = skipmissing(results[:, i])
-        form_counts = [sum(non_missing_bank[in(selected_items).(non_missing_bank.ID),
-                                            Symbol(col)] .== category)
-                       for category in categories]
+        form_counts = [sum(
+                           non_missing_bank[
+                           in(selected_items).(non_missing_bank.ID), Symbol(col)] .==
+                           category,
+                       ) for category in categories]
         push!(table_data, [i; form_counts...])
     end
 
     if length(categories) <= max_cats
         header = ["Form"; categories...]
         table_matrix = hcat(table_data...)
-        pretty_table(String, table_matrix'; header=header, alignment=:r)
+        pretty_table(String, table_matrix'; header = header, alignment = :r)
     else
         header = ["Category"; [string("Form ", i) for i in 1:num_forms]...]
         table_matrix = hcat([categories]..., [row[2:end] for row in table_data]...)
         valid_rows = [any(row[2:end] .!= 0) for row in eachrow(table_matrix)]
-        pretty_table(String, table_matrix[valid_rows, :]; header=header, alignment=:r)
+        pretty_table(String, table_matrix[valid_rows, :]; header = header, alignment = :r)
     end
 end
 
@@ -169,8 +172,9 @@ function common_items(results::DataFrame)::String
     end
 
     header = [""; collect(1:num_forms)...]
-    return pretty_table(String, hcat(collect(1:num_forms), common_matrix); header=header,
-                        alignment=:r)
+    return pretty_table(
+        String, hcat(collect(1:num_forms), common_matrix); header = header, alignment = :r
+    )
 end
 
 """
@@ -187,12 +191,20 @@ function final_summary(parms::Parameters, results::DataFrame)::String
     used_non_anchors = setdiff(used_items, used_anchors)
 
     labels = [LABEL_FORMS, LABEL_ITEMS, LABEL_NON_ANCHOR, LABEL_ANCHOR, LABEL_UNUSED]
-    values = [size(results, 2), length(used_items), length(used_non_anchors),
-              length(used_anchors),
-              length(items) - length(used_items)]
+    values = [
+        size(results, 2),
+        length(used_items),
+        length(used_non_anchors),
+        length(used_anchors),
+        length(items) - length(used_items)
+    ]
 
-    return pretty_table(String, hcat(labels, string.(values)); header=["Concept", "Count"],
-                        alignment=[:l, :r])
+    return pretty_table(
+        String,
+        hcat(labels, string.(values));
+        header = ["Concept", "Count"],
+        alignment = [:l, :r]
+    )
 end
 
 """
@@ -205,7 +217,8 @@ function tolerances_table(tols::Vector{Float64})::String
     form_ids = [i for i in eachindex(tols)]
     table_data = Dict(k => rpad(v, 6, "0") for (k, v) in zip(form_ids, tols))
 
-    return pretty_table(String, table_data; header=header, sortkeys=true, alignment=:c)
+    return pretty_table(
+        String, table_data; header = header, sortkeys = true, alignment = :c)
 end
 
 """
@@ -213,8 +226,9 @@ end
 
 Gathers summary tables into a dictionary for the final report.
 """
-function gather_tables(parms::Parameters, config::Config, results::DataFrame,
-                       tols::Vector{Float64})::Dict{String, String}
+function gather_tables(
+        parms::Parameters, config::Config, results::DataFrame, tols::Vector{Float64}
+)::Dict{String, String}
     tables = Dict{String, String}()
 
     tables["Summary"] = final_summary(parms, results)
@@ -245,8 +259,10 @@ function save_forms(parms::Parameters, results::DataFrame, config::Config)
     bank = deepcopy(parms.bank)
 
     for v in names(results)
-        bank[!, Symbol(v)] = map(x -> ismissing(x) ? "" : (x == 1 ? v : ""),
-                                 bank.ID .∈ Ref(skipmissing(results[:, v])))
+        bank[!, Symbol(v)] = map(
+            x -> ismissing(x) ? "" : (x == 1 ? v : ""),
+            bank.ID .∈ Ref(skipmissing(results[:, v]))
+        )
     end
 
     save_to_csv(bank, config.forms_file)
@@ -263,8 +279,9 @@ end
 
 Generates the final report and returns it as a dictionary.
 """
-function final_report(parms::Parameters, results::DataFrame, config::Config,
-                      tols::Vector{Float64})::Dict{String, String}
+function final_report(
+        parms::Parameters, results::DataFrame, config::Config, tols::Vector{Float64}
+)::Dict{String, String}
     report_data = gather_tables(parms, config, results, tols)
     save_forms(parms, results, config)
     plot_results(parms, config, results)

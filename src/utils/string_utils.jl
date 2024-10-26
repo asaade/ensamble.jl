@@ -1,7 +1,13 @@
 module StringUtils
 
-export upSymbol, upcase, upcaseKeys, cleanValues, uppercase_dataframe!, safe_read_csv,
-       safe_read_yaml, safe_read_toml
+export upSymbol,
+       upcase,
+       upcaseKeys,
+       cleanValues,
+       uppercase_dataframe!,
+       safe_read_csv,
+       safe_read_yaml,
+       safe_read_toml
 
 using CSV: CSV
 using YAML: YAML
@@ -46,8 +52,7 @@ the output dictionary is of type `Dict{Symbol, Any}`.
   - A standardized dictionary where all keys are symbols and converted to uppercase.
 """
 function upcaseKeys(d::Dict{<:Union{String, Symbol}, Any})::Dict{Symbol, Any}
-    return Dict(upSymbol(k) => isa(v, Dict) ? upcaseKeys(v) : v
-                for (k, v) in d)
+    return Dict(upSymbol(k) => isa(v, Dict) ? upcaseKeys(v) : v for (k, v) in d)
 end
 
 """
@@ -64,8 +69,13 @@ Recursively strips all string values in a dictionary, and ensures the output dic
   - A standardized dictionary where all keys are symbols and converted to uppercase.
 """
 function cleanValues(d::Dict{<:Union{String, Symbol}, Any})::Dict{Symbol, Any}
-    return Dict(k => isa(v, Dict) ? cleanValues(v) : isa(v, String) ? strip(v) : v
-                for (k, v) in d)
+    return Dict(k => if isa(v, Dict)
+                    cleanValues(v)
+                elseif isa(v, String)
+                    strip(v)
+                else
+                    v
+                end for (k, v) in d)
 end
 
 """
@@ -125,9 +135,9 @@ Safely reads a CSV file and returns a DataFrame. Logs an error if the file canno
 """
 function safe_read_csv(file_path::String)::DataFrames.DataFrame
     try
-        return DataFrames.DataFrame(CSV.File(file_path;
-                                             stripwhitespace=true, pool=false,
-                                             stringtype=String))
+        return DataFrames.DataFrame(
+            CSV.File(file_path; stripwhitespace = true, pool = false, stringtype = String)
+        )
     catch e
         @error "Error reading CSV file: $file_path. Error: $e"
         return DataFrames.DataFrame()
@@ -154,7 +164,7 @@ function safe_read_yaml(file_path::String)::Dict{Symbol, Any}
     end
 
     try
-        yaml_dict = YAML.load_file(file_path; dicttype=Dict{Union{String, Symbol}, Any})
+        yaml_dict = YAML.load_file(file_path; dicttype = Dict{Union{String, Symbol}, Any})
         return yaml_dict
     catch e
         @error "Error reading YAML file: $file_path. Error: $e"

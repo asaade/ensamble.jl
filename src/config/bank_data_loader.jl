@@ -112,8 +112,9 @@ function select_valid_items!(bank::DataFrame)::DataFrame
     bank.C = coalesce.(bank.C, 0.0)
 
     # Filter items based on A, B, C limits for dichotomous items
-    filter!(row -> (0.4 <= row.A <= 2.0 && -3.5 <= row.B <= 3.5 && 0.0 <= row.C <= 0.5),
-            bank)
+    filter!(
+        row -> (0.4 <= row.A <= 2.0 && -3.5 <= row.B <= 3.5 && 0.0 <= row.C <= 0.5), bank
+    )
 
     invalid_items = original_size - size(bank, 1)
     invalid_items > 0 &&

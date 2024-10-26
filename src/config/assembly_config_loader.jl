@@ -12,7 +12,6 @@ mutable struct AssemblyConfig
     num_forms::Int           # Number of forms to assemble
     f::Int                   # Fixed number of forms to assemble
     max_items::Int           # Maximum number of items in a form
-    operational_items::Int   # Number of operational items in the bank
     anchor_tests::Int        # Number of anchor tests to include
     anchor_size::Int         # Size of anchor test section in each form
     max_item_use::Int        # Maximum number of times an item can be used across forms
@@ -48,8 +47,9 @@ function load_assembly_config(config_data::Dict{Symbol, Any})::AssemblyConfig
     df = safe_read_csv(constraints_file)
     uppercase_dataframe!(df)
 
-    row_index = findfirst(r -> upcase(r[:ONOFF]) == "ON" && upcase(r[:TYPE]) == "TEST",
-                          eachrow(df))
+    row_index = findfirst(
+        r -> upcase(r[:ONOFF]) == "ON" && upcase(r[:TYPE]) == "TEST", eachrow(df)
+    )
 
     if row_index !== nothing
         row = df[row_index, :]
@@ -67,22 +67,22 @@ function load_assembly_config(config_data::Dict{Symbol, Any})::AssemblyConfig
     anchor_tests = get(assembly_dict, :ANCHORTESTS, 0) # Default to 0 if not provided
 
     # Initialize other fields with default values
-    operational_items = 0
     anchor_size = 0
 
     # Log the loaded configuration for debugging
     @info "Loaded assembly configuration: form_size = $form_size, num_forms = $num_forms, anchor_tests = $anchor_tests"
 
     # Return the AssemblyConfig struct
-    return AssemblyConfig(form_size,
-                          num_forms,
-                          f,
-                          max_items,
-                          operational_items,
-                          anchor_tests,
-                          anchor_size,
-                          max_item_use,
-                          shadow_test_size)
+    return AssemblyConfig(
+        form_size,
+        num_forms,
+        f,
+        max_items,
+        anchor_tests,
+        anchor_size,
+        max_item_use,
+        shadow_test_size
+    )
 end
 
 end # module AssemblyConfigLoader

@@ -62,7 +62,7 @@ function remove_used_items!(parms::Parameters, items_used::Vector{Int})::Paramet
     remaining = setdiff(1:length(parms.bank.ID), items_used)
     parms.bank = parms.bank[remaining, :]
 
-    if parms.method == "TCC"
+    if parms.method in ["TCC", "TCC2"]
         parms.p_matrix = parms.p_matrix[remaining, :]
     elseif parms.method in ["TIC", "TIC2", "TIC3"]
         parms.info_matrix = parms.info_matrix[remaining, :]
@@ -95,8 +95,9 @@ end
 Process the optimization results at each iteration and store them in a DataFrame.
 Removes used items from the working copy of the bank to avoid its use in subsequent forms.
 """
-function process_and_store_results!(model::Model, parms::Parameters,
-                                    results_df::DataFrame)::DataFrame
+function process_and_store_results!(
+        model::Model, parms::Parameters, results_df::DataFrame
+)::DataFrame
     solver_matrix = value.(model[:x])
     item_codes = parms.bank.ID
     items = 1:length(item_codes)
@@ -110,8 +111,7 @@ function process_and_store_results!(model::Model, parms::Parameters,
         missing_rows = max_items - form_length
 
         padded_codes_vector = if missing_rows > 0
-            vcat(codes_in_form,
-                 fill(MISSING_VALUE_FILLER, missing_rows))
+            vcat(codes_in_form, fill(MISSING_VALUE_FILLER, missing_rows))
         else
             codes_in_form
         end
@@ -150,15 +150,17 @@ function handle_anchor_items(parms::Parameters, orig_parms::Parameters)::Paramet
         parms.anchor_tests = (parms.anchor_tests % total_anchors) + 1
 
         # Select current anchor items based on the anchor test value
-        current_anchor_items = filter(row -> !ismissing(row.ANCHOR) &&
-                                          row.ANCHOR == parms.anchor_tests, orig_parms.bank)
+        current_anchor_items = filter(
+            row -> !ismissing(row.ANCHOR) && row.ANCHOR == parms.anchor_tests,
+            orig_parms.bank
+        )
         non_anchor_items = filter(row -> ismissing(row.ANCHOR), parms.bank)
 
         # Combine non-anchor items and current anchor items
         parms.bank = vcat(non_anchor_items, current_anchor_items)
 
         # Update parameters based on the method
-        if parms.method == "TCC"
+        if parms.method in ["TCC", "TCC2"]
             parms.p_matrix = orig_parms.p_matrix[parms.bank.INDEX, :]
         elseif parms.method in ["TIC", "TIC2", "TIC3"]
             parms.info_matrix = orig_parms.info_matrix[parms.bank.INDEX, :]
@@ -178,7 +180,7 @@ end
 Main entry point for assembling tests. Loads configurations, runs the solver,
 and processes the results, then generates and saves a report.
 """
-function assemble_tests(config_file::String="data/config.toml")::DataFrame
+function assemble_tests(config_file::String = "data/config.toml")::DataFrame
     config, orig_parms = configure_system(config_file)
 
     # validate_parameters(orig_parms)
@@ -206,7 +208,7 @@ function assemble_tests(config_file::String="data/config.toml")::DataFrame
 
         if run_optimization(model)
             results_df = process_and_store_results!(model, parms, results_df)
-            tolerances = vcat(tolerances, round(objective_value(model); digits=4))
+            tolerances = vcat(tolerances, round(objective_value(model); digits = 4))
             show_results(model, parms)
             assembled_forms += parms.num_forms
             parms.f -= parms.num_forms
