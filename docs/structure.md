@@ -1,4 +1,4 @@
-.
+```text
 ├── data
 │  ├── anchor.csv
 │  ├── config.toml
@@ -42,3 +42,4 @@
 │     └── string_utils.jl
 └── tests
 └── test_parser.jl
+```

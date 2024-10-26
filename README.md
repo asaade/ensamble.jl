@@ -1,7 +1,3 @@
-Here is the revised version of the `README.md` with the requested additions:
-
-* * *
-
 # Ensamble.jl
 
 **Automatic Test Assembly (ATA) in Julia using Mixed Integer Programming (MIP)**
