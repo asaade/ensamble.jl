@@ -57,7 +57,7 @@ mutable struct Parameters
     anchor_size::Int
     method::String
     theta::Union{Vector{Float64}, Nothing}
-    p_matrix::Matrix{Float64}
+    score_matrix::Matrix{Float64}
     info_matrix::Matrix{Float64}
     tau::Matrix{Float64}
     tau_info::Vector{Float64}
@@ -118,7 +118,7 @@ function transform_parameters_to_flat(
         forms_config.anchor_size,           # anchor_size
         irt_data.method,                    # method
         irt_data.theta,                     # theta (Vector{Float64})
-        irt_data.p_matrix,                  # p (Matrix{Float64})
+        irt_data.score_matrix,                  # p (Matrix{Float64})
         irt_data.info_matrix,               # info (Matrix{Float64})
         irt_data.tau,                       # tau (Matrix{Float64})
         irt_data.tau_info,                  # tau_info (Vector{Float64})

@@ -1,10 +1,9 @@
 module Constraints
 
-# Export all functions for external use
 export constraint_items_per_form,
        constraint_item_count,
+       constraint_score_sum,
        constraint_item_sum,
-       group_by_selected,
        constraint_friends_in_form,
        constraint_enemies_in_form,
        constraint_exclude_items,
@@ -12,6 +11,7 @@ export constraint_items_per_form,
        constraint_add_anchor!,
        constraint_max_use,
        constraint_forms_overlap,
+       constraint_forms_overlap2, # Experimental
        objective_match_characteristic_curve!,
        objective_match_mean_var!,
        objective_match_information_curve!,
@@ -76,61 +76,102 @@ function constraint_items_per_form(
 end
 
 """
-    constraint_item_count(model::Model, parms::Parameters, selected::BitVector, minItems::Int, maxItems::Int=minItems)
+    constraint_item_count(model::Model, parms::Parameters, selected::BitVector,
+                          minItems::Int, maxItems::Int=minItems)
 
-Constrains the number of selected items, ensuring it is within the specified range for both operational forms and the shadow test (if applicable).
+Constrains the count of selected items to fall within `minItems` and `maxItems` for each form.
 """
-function constraint_item_count(
-        model::Model,
-        parms::Parameters,
-        selected::BitVector,
-        minItems::Int,
-        maxItems::Int = minItems
-)
-    @assert(minItems<=maxItems, "Error in item_count: maxItems < MinItems")
+function constraint_item_count(model::Model, parms::Parameters, selected::BitVector,
+                               minItems::Int, maxItems::Int=minItems)
+    @assert(minItems <= maxItems, "Error in item_count: maxItems < MinItems")
 
     x = model[:x]
     items = collect(1:size(x, 1))[selected]
     forms = operational_forms(x, parms.shadow_test_size)
 
-    # Constraints for item count in operational forms
-    @constraint(model, [f = 1:forms], sum(x[items, f])>=minItems)
-    @constraint(model, [f = 1:forms], sum(x[items, f])<=maxItems)
+    # Constraints for operational forms
+    @constraint(model, [f = 1:forms], sum(x[items, f]) >= minItems)
+    @constraint(model, [f = 1:forms], sum(x[items, f]) <= maxItems)
 
-    # Handle shadow test constraints if applicable and if anchor test is in use
+    # Shadow test constraints if applicable
     if parms.shadow_test_size > 0
         shadow_test_col = size(x, 2)
 
-        # Check if an anchor test is selected
         if parms.anchor_tests > 0
             # Separate anchor and non-anchor items
             non_anchor_items = filter(i -> ismissing(parms.bank.ANCHOR[i]), items)
-            anchor_items = filter(i -> !ismissing(parms.bank.ANCHOR[i]), items)
-
-            # Adjust item count bounds by excluding anchor items
-            adjusted_minItems = max(minItems - length(anchor_items), 0)
-            adjusted_maxItems = max(maxItems - length(anchor_items), 0)
-
-            # Constraints for shadow test item count (non-anchor items only)
-            @constraint(model,
-                sum(x[non_anchor_items,
-                    shadow_test_col])>=
-                adjusted_minItems * parms.shadow_test_size)
-            @constraint(model,
-                sum(x[non_anchor_items,
-                    shadow_test_col])<=
-                adjusted_maxItems * parms.shadow_test_size)
+            anchor_count = sum(!ismissing(parms.bank.ANCHOR[i]) for i in items)
         else
-            # No anchor test: apply minItems and maxItems constraints to all selected items
-            @constraint(model,
-                sum(x[items, shadow_test_col])>=minItems * parms.shadow_test_size)
-            @constraint(model,
-                sum(x[items, shadow_test_col])<=maxItems * parms.shadow_test_size)
+            non_anchor_items = items
+            anchor_count = 0
         end
+
+        # Adjust min and max based on anchor item count
+        effective_minItems = max(0, minItems - anchor_count)
+        effective_maxItems = max(0, maxItems - anchor_count)
+
+        # Shadow test constraints for non-anchor items
+        @constraint(model,
+            sum(x[non_anchor_items, shadow_test_col]) >= effective_minItems * parms.shadow_test_size)
+        @constraint(model,
+            sum(x[non_anchor_items, shadow_test_col]) <= effective_maxItems * parms.shadow_test_size)
     end
 
     return model
 end
+
+
+
+"""
+    constraint_score_sum(model::Model, parms::Parameters, selected::BitVector,
+                              minScore::Float64, maxScore::Float64=minScore)
+
+Constrains the sum of selected item scores within `minScore` and `maxScore` bounds for each form.
+"""
+function constraint_score_sum(model::Model, parms::Parameters, selected::BitVector,
+                                   minScore::Int64, maxScore::Int64=minScore)
+    @assert(minScore <= maxScore, "Error in item_score_sum: maxScore < minScore")
+
+    x = model[:x]
+    items = collect(1:size(x, 1))[selected]
+    forms = operational_forms(x, parms.shadow_test_size)
+
+    # Calculate scores based on num_categories in Parameters
+    scores = [parms.bank.NUM_CATEGORIES[i] - 1 for i in items]
+
+    # Constraints for operational forms
+    @constraint(model, [f = 1:forms], sum(x[items[i], f] * scores[i] for i in eachindex(items)) >= minScore)
+    @constraint(model, [f = 1:forms], sum(x[items[i], f] * scores[i] for i in eachindex(items)) <= maxScore)
+
+    # Shadow test constraints if applicable
+    if parms.shadow_test_size > 0
+        shadow_test_col = size(x, 2)
+
+        if parms.anchor_tests > 0
+            # Separate anchor and non-anchor items within the selected items
+            non_anchor_items = filter(i -> ismissing(parms.bank.ANCHOR[i]), items)
+            anchor_items = filter(i -> !ismissing(parms.bank.ANCHOR[i]), items)
+
+            # Calculate anchor item contribution to the score sum
+            anchor_score_sum = sum(scores[i] for i in 1:length(anchor_items))
+            effective_minScore = max(0, minScore - anchor_score_sum)
+            effective_maxScore = max(0, maxScore - anchor_score_sum)
+        else
+            non_anchor_items = items
+            effective_minScore, effective_maxScore = minScore, maxScore
+        end
+
+        # Shadow test constraints for non-anchor items
+        @constraint(model,
+            sum(x[non_anchor_items[i], shadow_test_col] * scores[i] for i in eachindex(non_anchor_items)) >= effective_minScore * parms.shadow_test_size)
+        @constraint(model,
+            sum(x[non_anchor_items[i], shadow_test_col] * scores[i] for i in eachindex(non_anchor_items)) <= effective_maxScore * parms.shadow_test_size)
+    end
+
+    return model
+end
+
+
 
 # ---------------------------------------------------------------------------
 # Constraint Functions for item value sums
@@ -139,65 +180,57 @@ end
 """
     constraint_item_sum(model::Model, parms::Parameters, vals, minVal, maxVal=minVal)
 
-Combines the item sum constraints for operational forms and the shadow test.
-Ensures the sum of item values is between `minVal` and `maxVal` for both operational and shadow forms.
+Constrains the sum of selected values to be within `minVal` and `maxVal` for each form.
 """
-function constraint_item_sum(model::Model, parms::Parameters, vals, minVal, maxVal = minVal)
-    @assert(minVal<=maxVal, "Error in item_sum: maxVal < minVal")
+function constraint_item_sum(model::Model, parms::Parameters, vals, minVal, maxVal=minVal)
+    @assert(minVal <= maxVal, "Error in item_sum: maxVal < minVal")
 
     x = model[:x]
     items, forms = size(x)
     forms = operational_forms(x, parms.shadow_test_size)
 
-    # Handle cases for single-column and two-column `vals` input
-    if ndims(vals) == 1
-        val = vals
-        cond = trues(length(vals))  # Default to including all items if no condition provided
-    else
-        val = vals[:, 2]
-        cond = vals[:, 1]
-    end
+    # Separate val and condition columns, if provided
+    val = ndims(vals) == 1 ? vals : vals[:, 2]
+    cond = ndims(vals) == 1 ? trues(length(vals)) : vals[:, 1]
 
-    items = collect(1:size(x, 1))[cond]
-
-    # Sum constraints for operational forms (include all items
-    @constraint(model, [f = 1:forms], sum(x[i, f] * val[i] for i in items)>=minVal)
-    @constraint(model, [f = 1:forms], sum(x[i, f] * val[i] for i in items)<=maxVal)
-
-    # Separate items into anchor and non-anchor groups if anchor tests are enabled
+    # Separate anchor and non-anchor items if anchor tests are used
     if parms.anchor_tests > 0
-        anchor_items = filter(i -> !ismissing(parms.bank.ANCHOR[i]), items)
-        non_anchor_items = filter(i -> ismissing(parms.bank.ANCHOR[i]), items)
+        anchor_items = filter(i -> !ismissing(parms.bank.ANCHOR[i]), 1:items)
+        non_anchor_items = filter(i -> ismissing(parms.bank.ANCHOR[i]), 1:items)
 
-        # Calculate the sum for anchor items in operational forms
-        anchor_val_sum = sum(val[i] for i in anchor_items)
+        # Calculate anchor item contributions for sum
+        anchor_val_sum = sum(val[i] for i in anchor_items if cond[i])
 
-        # Adjust minVal and maxVal based on anchor items' contribution
+        # Adjust minVal and maxVal based on anchor items
         effective_minVal = max(0, minVal - anchor_val_sum)
         effective_maxVal = max(0, maxVal - anchor_val_sum)
     else
-        # No anchor test: treat all items as regular items
-        anchor_items = Int[]   # Empty list of anchor items
-        non_anchor_items = items  # All items are non-anchor
+        non_anchor_items = 1:items
         effective_minVal, effective_maxVal = minVal, maxVal
     end
 
-    # Shadow test constraints (only for non-anchor items if anchors are enabled)
+    # Constraints for operational forms
+    @constraint(model, [f = 1:forms],
+        sum(x[i, f] * val[i] for i in 1:items if cond[i]) >= minVal)
+    @constraint(model, [f = 1:forms],
+        sum(x[i, f] * val[i] for i in 1:items if cond[i]) <= maxVal)
+
+    # Shadow test constraints if applicable
     if parms.shadow_test_size > 0
-        shadow_test_col = size(x, 2)
+        zcol = size(x, 2)
 
         @constraint(model,
-            sum(x[i, shadow_test_col] * val[i]
-            for i in non_anchor_items)>=
-            effective_minVal * parms.shadow_test_size)
+            sum(x[i, zcol] * val[i] for i in non_anchor_items if cond[i]) >=
+                effective_minVal * parms.shadow_test_size)
         @constraint(model,
-            sum(x[i, shadow_test_col] * val[i]
-            for i in non_anchor_items)<=
-            effective_maxVal * parms.shadow_test_size)
+            sum(x[i, zcol] * val[i] for i in non_anchor_items if cond[i]) <=
+                effective_maxVal * parms.shadow_test_size)
     end
 
     return model
 end
+
+
 
 # ---------------------------------------------------------------------------
 # Constraint Functions for item groups (friends, enemies, anchors)
@@ -374,6 +407,83 @@ function constraint_forms_overlap(
     end
 end
 
+
+"""
+    constraint_forms_overlap2(
+        model::Model, parms::Parameters, minItems::Int, maxItems::Int = minItems
+    )
+
+Constrains the number of overlapping items across test forms to be within specified bounds.
+"""
+function constraint_forms_overlap2(
+        model::Model, parms::Parameters, minItems::Int, maxItems::Int = minItems
+)
+    @assert(0 <= minItems <= maxItems, "Error in forms_overlap: maxItems < MinItems")
+
+    x, z = model[:x], model[:z]
+    num_items, num_forms = size(x)
+
+    # Create the binary variable `z` for item overlap tracking
+    # @variable(model, z[1:num_items, 1:num_forms, 1:num_forms], Bin)
+
+    # Set up strict overlap constraints when shadow tests and anchors are not in use
+    if parms.shadow_test_size < 1 && parms.anchor_tests == 0
+        items = collect(1:num_items)
+
+        # Apply overlap constraints
+        if minItems == maxItems
+            @constraint(model,
+                [t1 = 1:(num_forms - 1), t2 = (t1 + 1):num_forms],
+                sum(z[i, t1, t2] for i in items) == maxItems)
+        else
+            @constraint(model,
+                [t1 = 1:(num_forms - 1), t2 = (t1 + 1):num_forms],
+                sum(z[i, t1, t2] for i in items) <= maxItems)
+            @constraint(model,
+                [t1 = 1:(num_forms - 1), t2 = (t1 + 1):num_forms],
+                sum(z[i, t1, t2] for i in items) >= minItems)
+        end
+
+        # Ensure `z` matches the overlap between x[i, t1] and x[i, t2]
+        @constraint(model,
+            [i = items, t1 = 1:(num_forms - 1), t2 = (t1 + 1):num_forms],
+            2 * z[i, t1, t2] <= x[i, t1] + x[i, t2])
+        @constraint(model,
+            [i = items, t1 = 1:(num_forms - 1), t2 = (t1 + 1):num_forms],
+            z[i, t1, t2] >= x[i, t1] + x[i, t2] - 1)
+
+    # Handle shadow tests by introducing auxiliary variables to represent overlap
+    elseif parms.shadow_test_size > 0
+        shadow_test_col = size(x, 2)
+
+        # Define auxiliary binary variable `w` for overlap between `x[i, f]` and `x[i, shadow_test_col]`
+        @variable(model, w[1:num_items, 1:num_forms], Bin)
+
+        # Set up constraints for `w` to represent the overlap condition
+        @constraint(model, [i = 1:num_items, f = 1:num_forms], w[i, f] <= x[i, f])
+        @constraint(model, [i = 1:num_items, f = 1:num_forms], w[i, f] <= x[i, shadow_test_col])
+        @constraint(model, [i = 1:num_items, f = 1:num_forms], w[i, f] >= x[i, f] + x[i, shadow_test_col] - 1)
+
+        # Apply overlap constraints to `w` instead of the product of `x` terms
+        if minItems == maxItems
+            @constraint(model,
+                [f = 1:num_forms],
+                sum(w[i, f] for i in 1:num_items) == maxItems * parms.shadow_test_size)
+        else
+            @constraint(model,
+                [f = 1:num_forms],
+                sum(w[i, f] for i in 1:num_items) <= maxItems * parms.shadow_test_size)
+            @constraint(model,
+                [f = 1:num_forms],
+                sum(w[i, f] for i in 1:num_items) >= minItems * parms.shadow_test_size)
+        end
+    end
+
+    return model
+end
+
+
+
 # ---------------------------------------------------------------------------
 # Objective Functions for Test Assembly Optimization
 # ---------------------------------------------------------------------------
@@ -381,143 +491,88 @@ end
 """
     objective_match_characteristic_curve!(model::Model, parms::Parameters)
 
-Constrains the characteristic curve by matching the sum of the probability of correct response for each form at theta points `k`.
+Constrains test characteristic curves to match a reference (tau matrix) within tolerance.
 """
 function objective_match_characteristic_curve!(model::Model, parms::Parameters)
     R, K = 1:(parms.r), 1:(parms.k)
-    P, tau = parms.p_matrix, parms.tau
+    P, tau = parms.score_matrix, parms.tau
     x, y = model[:x], model[:y]
     items, forms = size(x)
-    zcol = forms
+    zcol = forms  # Column for shadow test if applicable
     forms -= parms.shadow_test_size > 0 ? 1 : 0
 
-    # Weighting factors for each power r
-    w = [1.1 - (0.1 * r) for r in R]
+    w = [1.1 - 0.1 * r for r in R]
 
-    # Constraints for operational forms (include both anchor and non-anchor items)
-    @constraint(model,
-        [f = 1:forms, k = K, r = R],
-        sum(P[i, k]^r * x[i, f] for i in 1:items)<=tau[r, k] + w[r] * y)
-    @constraint(model,
-        [f = 1:forms, k = K, r = R],
-        sum(P[i, k]^r * x[i, f] for i in 1:items)>=tau[r, k] - w[r] * y)
+    # Separate anchor and non-anchor items if anchor tests are used
+    if parms.anchor_tests > 0
+        anchor_items = filter(i -> !ismissing(parms.bank.ANCHOR[i]), 1:items)
+        non_anchor_items = filter(i -> ismissing(parms.bank.ANCHOR[i]), 1:items)
 
-    # Handle shadow test constraints if applicable
+        # Calculate anchor contributions for (r, k) pairs
+        anchor_contribution = zeros(Float64, length(R), length(K))
+        for k in K, r in R
+            anchor_contribution[r, k] = sum(P[i, k]^r for i in anchor_items)
+        end
+    else
+        non_anchor_items = 1:items
+        anchor_contribution = zeros(Float64, length(R), length(K))
+    end
+
+    # Constraints for operational forms
+    @constraint(model, [f = 1:forms, k = K, r = R],
+        sum(P[i, k]^r * x[i, f] for i in 1:items) <= tau[r, k] + w[r] * y)
+    @constraint(model, [f = 1:forms, k = K, r = R],
+        sum(P[i, k]^r * x[i, f] for i in 1:items) >= tau[r, k] - w[r] * y)
+
+    # Constraints for shadow test
     if parms.shadow_test_size > 0
         shadow_test_size = parms.shadow_test_size
 
-        if parms.anchor_tests > 0
-            # Separate anchor and non-anchor items
-            anchor_items = filter(i -> !ismissing(parms.bank.ANCHOR[i]), 1:items)
-            non_anchor_items = filter(i -> ismissing(parms.bank.ANCHOR[i]), 1:items)
-
-            # Initialize and calculate anchor contributions for each (r, k) pair
-            anchor_contribution = zeros(Float64, length(R), length(K))
-            for k in K, r in R
-                anchor_contribution[r, k] = sum(P[i, k]^r for i in anchor_items)
-            end
-
-            # Shadow test constraints with anchor contribution subtracted
-            @constraint(model,
-                [k = K, r = R],
-                sum(P[i, k]^r * x[i, zcol]
-                for i in non_anchor_items)<=
+        @constraint(model, [k = K, r = R],
+            sum(P[i, k]^r * x[i, zcol] for i in non_anchor_items) <=
                 (tau[r, k] - anchor_contribution[r, k] + w[r] * y) * shadow_test_size)
-            @constraint(model,
-                [k = K, r = R],
-                sum(P[i, k]^r * x[i, zcol]
-                for i in non_anchor_items)>=
+        @constraint(model, [k = K, r = R],
+            sum(P[i, k]^r * x[i, zcol] for i in non_anchor_items) >=
                 (tau[r, k] - anchor_contribution[r, k] - w[r] * y) * shadow_test_size)
-        else
-            # No anchors: shadow test constraints without anchor adjustment
-            @constraint(model,
-                [k = K, r = R],
-                sum(P[i, k]^r * x[i, zcol]
-                for i in 1:items)<=
-                (tau[r, k] + w[r] * y) * shadow_test_size)
-            @constraint(model,
-                [k = K, r = R],
-                sum(P[i, k]^r * x[i, zcol]
-                for i in 1:items)>=
-                (tau[r, k] - w[r] * y) * shadow_test_size)
-        end
     end
 
     return model
 end
 
+
 """
     objective_match_mean_var!(model::Model, parms::Parameters, α::Float64 = 1.0)
 
-Adds constraints to the MIP model to ensure that the test forms' expected score means and variances match those of the reference form at each theta point, using a single weighted slack variable.
-
-# Arguments
-
-  - `model::Model`: The optimization model to which the constraints will be added.
-
-  - `parms::Parameters`: A struct or dictionary containing the following fields:
-
-      + `tau_mean::Vector{Float64}`: The expected score means for the reference form at each theta point (vector of length `K`).
-      + `tau_var::Vector{Float64}`: The expected score variances for the reference form at each theta point (vector of length `K`).
-      + `expected_score_matrix::Matrix{Float64}`: The matrix of expected scores for each item at each theta point (items x theta points).
-      + `x::VariableRef`: The binary decision variable matrix indicating item selection for each form (items x forms).
-      + `y::VariableRef`: The slack variable for deviations in both mean and variance constraints (scalar or vector).
-  - `α::Float64`: Weighting factor for the variance constraint (default is 1.0, meaning equal importance for mean and variance).
-
-# Behavior
-
-This function adds constraints to match the means and variances of expected scores between the test forms and the reference form, using a single slack variable to balance both constraints.
-
-## Constraints:
-
- 1. **Mean of Expected Scores**: Ensures that the sum of expected scores for each test form at each theta point matches the corresponding expected score from the reference form.
-
-      + ( sum_{i=1}^{N} E[X_i(    heta_k)] x_i leq    au_{    ext{mean}}(     heta_k) + y )
-      + ( sum_{i=1}^{N} E[X_i(    heta_k)] x_i geq    au_{    ext{mean}}(     heta_k) - y )
-
- 2. **Variance of Expected Scores**: Ensures that the variance of expected scores for each test form at each theta point matches that of the reference form, scaled by the weight ( lpha ).
-
-      + ( sum_{i=1}^{N} lpha (E[X_i(    heta_k)] -      au_{    ext{mean}}(     heta_k))^2 x_i leq      au_{    ext{var}}(  heta_k) + y )
-      + ( sum_{i=1}^{N} lpha (E[X_i(    heta_k)] -      au_{    ext{mean}}(     heta_k))^2 x_i geq      au_{    ext{var}}(  heta_k) - y )
-
-The constraints are added for all test forms and all theta points.
-
-# Returns  # Number of theta points
-
-# Expected score means and variances for the reference form
-
-  - `model::Model`: The updated model with the new constraints added.  # Matrix of expected scores (items x theta points)  # Number of theta points
+Matches expected score means and variances of test forms to reference values across theta points.
 """
 function objective_match_mean_var!(model::Model, parms::Parameters, α::Float64 = 1.0)
-    K = 1:(parms.k)  # Number of theta points
-    tau_mean, tau_var = parms.tau_mean, parms.tau_var  # Expected score means and variances for the reference form
-    expected_scores = parms.p_matrix  # Matrix of expected scores (items x theta points)
-    x, y = model[:x], model[:y]  # Decision variables
-    items, forms = size(x)  # Number of items and forms
-    zcol = forms  # Shadow test column
-    forms -= parms.shadow_test_size > 0 ? 1 : 0  # Adjust forms if shadow test is used
+    K = 1:parms.k  # Number of theta points
+    tau_mean, tau_var = parms.tau_mean, parms.tau_var
+    expected_scores = parms.score_matrix
+    x, y = model[:x], model[:y]
+    items, forms = size(x)
+    zcol = forms  # Shadow test column if applicable
+    forms -= parms.shadow_test_size > 0 ? 1 : 0
 
-    # Initialize anchor and non-anchor items based on anchor test usage
+    # Separate anchor and non-anchor items if anchor tests are used
     if parms.anchor_tests > 0
         anchor_items = filter(i -> !ismissing(parms.bank.ANCHOR[i]), 1:items)
         non_anchor_items = filter(i -> ismissing(parms.bank.ANCHOR[i]), 1:items)
-    else
-        anchor_items = Int[]   # Empty list of anchor items
-        non_anchor_items = 1:items  # All items treated as non-anchor if no anchors
-    end
 
-    # Precompute anchor contributions for mean and variance adjustments if anchors are present
-    anchor_mean_contribution = zeros(Float64, length(K))
-    anchor_var_contribution = zeros(Float64, length(K))
-
-    if !isempty(anchor_items)
+        # Calculate anchor contributions to means and variances for each theta point
+        anchor_mean_contribution = zeros(Float64, length(K))
+        anchor_var_contribution = zeros(Float64, length(K))
         for k in K
             anchor_mean_contribution[k] = sum(expected_scores[i, k] for i in anchor_items)
             anchor_var_contribution[k] = sum((expected_scores[i, k] - tau_mean[k])^2 for i in anchor_items)
         end
+    else
+        non_anchor_items = 1:items
+        anchor_mean_contribution = zeros(Float64, length(K))
+        anchor_var_contribution = zeros(Float64, length(K))
     end
 
-    # Apply constraints for operational forms
+    # Constraints for operational forms: match mean and variance
     @constraint(model, [f = 1:forms, k = K],
         sum(expected_scores[i, k] * x[i, f] for i in 1:items) <= tau_mean[k] + y)
     @constraint(model, [f = 1:forms, k = K],
@@ -528,22 +583,19 @@ function objective_match_mean_var!(model::Model, parms::Parameters, α::Float64 
     @constraint(model, [f = 1:forms, k = K],
         sum(α * (expected_scores[i, k] - tau_mean[k])^2 * x[i, f] for i in 1:items) >= tau_var[k] - y)
 
-    # Apply constraints for shadow test (if applicable) with adjusted mean and variance targets
+    # Constraints for shadow test if applicable
     if parms.shadow_test_size > 0
         shadow_test_size = parms.shadow_test_size
 
-        # Calculate effective tau values considering anchor contributions
         for k in K
             effective_tau_mean = tau_mean[k] - anchor_mean_contribution[k]
             effective_tau_var = tau_var[k] - anchor_var_contribution[k]
 
-            # Shadow test mean constraints
             @constraint(model,
                 sum(expected_scores[i, k] * x[i, zcol] for i in non_anchor_items) <= effective_tau_mean + y * shadow_test_size)
             @constraint(model,
                 sum(expected_scores[i, k] * x[i, zcol] for i in non_anchor_items) >= effective_tau_mean - y * shadow_test_size)
 
-            # Shadow test variance constraints with weighting factor α
             @constraint(model,
                 sum(α * (expected_scores[i, k] - tau_mean[k])^2 * x[i, zcol] for i in non_anchor_items) <= effective_tau_var + y * shadow_test_size)
             @constraint(model,
@@ -555,10 +607,11 @@ function objective_match_mean_var!(model::Model, parms::Parameters, α::Float64 
 end
 
 
-"""
-    objective_max_info(model::Model, parms::Parameters)
 
-Maximizes information at each point `k`, ensuring that the sum of `info[i, k] * x[i, f]` meets or exceeds the weighted target.
+"""
+    objective_match_information_curve!(model::Model, parms::Parameters)
+
+Constrains information curves to match target values at each theta point.
 """
 function objective_match_information_curve!(model::Model, parms::Parameters)
     K, info, tau_info = parms.k, parms.info_matrix, parms.tau_info
@@ -567,105 +620,128 @@ function objective_match_information_curve!(model::Model, parms::Parameters)
     zcol = forms
     forms -= parms.shadow_test_size > 0 ? 1 : 0
 
-    # Constraints for information curve in operational forms (include anchor and non-anchor items)
-    @constraint(model,
-        [f = 1:forms, k = 1:K],
-        sum(info[i, k] * x[i, f] for i in 1:items)<=tau_info[k] + y)
-    @constraint(model,
-        [f = 1:forms, k = 1:K],
-        sum(info[i, k] * x[i, f] for i in 1:items)>=tau_info[k] - y)
+    # Separate anchor and non-anchor items if anchors are used
+    if parms.anchor_tests > 0
+        anchor_items = filter(i -> !ismissing(parms.bank.ANCHOR[i]), 1:items)
+        non_anchor_items = filter(i -> ismissing(parms.bank.ANCHOR[i]), 1:items)
 
-    # Handle shadow test constraints if applicable
+        # Calculate anchor contributions for each theta point
+        anchor_info_contribution = zeros(Float64, K)
+        for k in 1:K
+            anchor_info_contribution[k] = sum(info[i, k] for i in anchor_items)
+        end
+    else
+        non_anchor_items = 1:items
+        anchor_info_contribution = zeros(Float64, K)
+    end
+
+    # Constraints for operational forms
+    @constraint(model, [f = 1:forms, k = 1:K],
+        sum(info[i, k] * x[i, f] for i in 1:items) <= tau_info[k] + y)
+    @constraint(model, [f = 1:forms, k = 1:K],
+        sum(info[i, k] * x[i, f] for i in 1:items) >= tau_info[k] - y)
+
+    # Shadow test constraints if applicable
     if parms.shadow_test_size > 0
         shadow_test_size = parms.shadow_test_size
 
-        if parms.anchor_tests > 0
-            # Separate anchor and non-anchor items
-            anchor_items = filter(i -> !ismissing(parms.bank.ANCHOR[i]), 1:items)
-            non_anchor_items = filter(i -> ismissing(parms.bank.ANCHOR[i]), 1:items)
-
-            # Calculate anchor contribution for each theta point k
-            anchor_info_contribution = zeros(Float64, K)
-            for k in 1:K
-                anchor_info_contribution[k] = sum(info[i, k] for i in anchor_items)
-            end
-
-            # Shadow test constraints with anchor contribution subtracted
-            @constraint(model,
-                [k = 1:K],
-                sum(info[i, k] * x[i, zcol]
-                for i in non_anchor_items) <=
+        @constraint(model, [k = 1:K],
+            sum(info[i, k] * x[i, zcol] for i in non_anchor_items) <=
                 (tau_info[k] - anchor_info_contribution[k] + y) * shadow_test_size)
-            @constraint(model,
-                [k = 1:K],
-                sum(info[i, k] * x[i, zcol]
-                for i in non_anchor_items) >=
+        @constraint(model, [k = 1:K],
+            sum(info[i, k] * x[i, zcol] for i in non_anchor_items) >=
                 (tau_info[k] - anchor_info_contribution[k] - y) * shadow_test_size)
-        else
-            # No anchors: apply constraints to all items directly
-            @constraint(model,
-                [k = 1:K],
-                sum(α * info[i, k] * x[i, zcol]
-                for i in 1:items)<=
-                (tau_info[k] + y) * shadow_test_size)
-            @constraint(model,
-                [k = 1:K],
-                sum(α * info[i, k] * x[i, zcol]
-                for i in 1:items)>=
-                (tau_info[k] - y) * shadow_test_size)
-        end
     end
 
     return model
 end
+
 
 """
     objective_info_relative2(model::Model, parms::Parameters)
 
-Maximizes information at alternating points `k` across forms, ensuring that each form meets or exceeds the weighted target.
+Maximizes information at alternating theta points across forms, with each form meeting a weighted target.
 """
 function objective_info_relative2(model::Model, parms::Parameters)
-    R = parms.relative_target_weights  # Vector of weights for each theta point k
-    K = length(R)                      # Number of theta points
-    info = parms.info_matrix            # Item information matrix (Items x K)
-    x, y = model[:x], model[:y]         # Decision variables and slack variable
-    _, forms = size(x)
+    R = parms.relative_target_weights
+    K = length(R)  # Number of theta points
+    info = parms.info_matrix
+    x, y = model[:x], model[:y]
+    items, forms = size(x)
 
-    # Define a tolerance for the information consistency across forms sharing the same k
-    # tolerance = 0.05  # Allow a small tolerance for information consistency
+    # Separate anchor and non-anchor items if applicable
+    if parms.anchor_tests > 0
+        anchor_items = filter(i -> !ismissing(parms.bank.ANCHOR[i]), 1:items)
+        non_anchor_items = filter(i -> ismissing(parms.bank.ANCHOR[i]), 1:items)
 
-    # Group forms by their associated k points
-    form_groups = Dict(k => [] for k in 1:K)
-    for f in 1:forms
-        k = (f - 1) % K + 1  # Rotate over theta points
-        push!(form_groups[k], f)
+        # Calculate anchor contributions
+        anchor_info_contribution = zeros(Float64, K)
+        for k in 1:K
+            anchor_info_contribution[k] = sum(info[i, k] for i in anchor_items)
+        end
+    else
+        non_anchor_items = 1:items
+        anchor_info_contribution = zeros(Float64, K)
     end
 
-    # Maximize information at the specific theta point k for each form
+    # Constraints for each form, rotating theta points (k) for max information at each
+    k = 0
     for f in 1:forms
-        k = (f - 1) % K + 1  # Rotate over theta points
+        k = k % K + 1  # Rotate over the theta points (K)
 
-        # Maximize the information at theta point k for form f
-        @constraint(model, info[:, k]' * x[:, f]>=R[k] * y)
+        # Information constraints at the current theta point
+        @constraint(model,
+            sum(info[i, k] * x[i, f] for i in 1:items) >= R[k] * y + anchor_info_contribution[k])
     end
-
-    # # Enforce consistency: Ensure that forms sharing the same k point have similar information
-    # for k in 1:K
-    #     # Get the forms that share the same k point
-    #     forms_for_k = form_groups[k]
-
-    #     # Ensure the information levels are consistent (within tolerance) across these forms
-    #     for i in 1:(length(forms_for_k) - 1)
-    #         f1 = forms_for_k[i]
-    #         f2 = forms_for_k[i + 1]
-
-    #         # Constrain the information of form f1 and form f2 to be within the tolerance at point k
-    #         @constraint(model, info[:, k]' * x[:, f1] - info[:, k]' * x[:, f2] <= tolerance)
-    #         @constraint(model, info[:, k]' * x[:, f1] - info[:, k]' * x[:, f2] >= tolerance)
-    #     end
-    # end
 
     return model
 end
+
+
+"""
+    objective_max_info(model::Model, parms::Parameters)
+
+Maximizes information at each theta point, ensuring the sum of information meets a weighted target.
+"""
+function objective_max_info(model::Model, parms::Parameters)
+    R = parms.relative_target_weights
+    K = parms.k
+    info = parms.info_matrix
+    x, y = model[:x], model[:y]
+    items, forms = size(x)
+    zcol = forms
+    forms -= parms.shadow_test_size > 0 ? 1 : 0
+
+    # Separate anchor and non-anchor items if anchor tests are included
+    if parms.anchor_tests > 0
+        anchor_items = filter(i -> !ismissing(parms.bank.ANCHOR[i]), 1:items)
+        non_anchor_items = filter(i -> ismissing(parms.bank.ANCHOR[i]), 1:items)
+
+        # Calculate anchor contributions for each theta point
+        anchor_info_contribution = zeros(Float64, K)
+        for k in 1:K
+            anchor_info_contribution[k] = sum(info[i, k] for i in anchor_items)
+        end
+    else
+        non_anchor_items = 1:items
+        anchor_info_contribution = zeros(Float64, K)
+    end
+
+    # Constraints for operational forms
+    @constraint(model, [f = 1:forms, k = 1:K],
+        sum(info[i, k] * x[i, f] for i in 1:items) >= R[k] * y)
+
+    # Constraints for shadow test if applicable
+    if parms.shadow_test_size > 0
+        shadow_test_size = parms.shadow_test_size
+
+        @constraint(model, [k = 1:K],
+            sum(info[i, k] * x[i, zcol] for i in non_anchor_items) >=
+                (R[k] * y * shadow_test_size - anchor_info_contribution[k]))
+    end
+
+    return model
+end
+
 
 end  # module ATAConstraints

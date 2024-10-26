@@ -66,7 +66,7 @@ include alphanumeric characters, comparison operators, logical operators, and ba
   - `true` if the string contains only valid characters; `false` otherwise.
 """
 function isvalidinput(input_str::AbstractString)::Bool
-    return match(r"^[a-zA-Z0-9\[\]\,\s\<\>\=\'\!\|\&\-\.]+$", input_str) !== nothing
+    return match(r"^[a-zA-Z0-9\[\]\,\s\<\>\=\'\"\"\!\|\&\-\.]+$", input_str) !== nothing
 end
 
 # Operator map that defines how operators behave in condition expressions

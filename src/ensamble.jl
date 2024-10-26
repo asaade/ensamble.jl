@@ -63,11 +63,11 @@ function remove_used_items!(parms::Parameters, items_used::Vector{Int})::Paramet
     parms.bank = parms.bank[remaining, :]
 
     if parms.method in ["TCC", "TCC2"]
-        parms.p_matrix = parms.p_matrix[remaining, :]
+        parms.score_matrix = parms.score_matrix[remaining, :]
     elseif parms.method in ["TIC", "TIC2", "TIC3"]
         parms.info_matrix = parms.info_matrix[remaining, :]
     elseif parms.method == "MIXED"
-        parms.p_matrix = parms.p_matrix[remaining, :]
+        parms.score_matrix = parms.score_matrix[remaining, :]
         parms.info_matrix = parms.info_matrix[remaining, :]
     else
         error("Unknown $(parms.method) optimization method used.")
@@ -136,7 +136,7 @@ end
 
 Update the item bank used for the next iteration
 by removing the old anchor items and adding the new anchor items iterating on anchor forms.
-Also retrives the original p_matrix or info_matrix for these items, depending on the objective in use.
+Also retrives the original score_matrix or info_matrix for these items, depending on the objective in use.
 """
 function handle_anchor_items(parms::Parameters, orig_parms::Parameters)::Parameters
     # Ensure anchor tests are available and cycle through them
@@ -161,11 +161,11 @@ function handle_anchor_items(parms::Parameters, orig_parms::Parameters)::Paramet
 
         # Update parameters based on the method
         if parms.method in ["TCC", "TCC2"]
-            parms.p_matrix = orig_parms.p_matrix[parms.bank.INDEX, :]
+            parms.score_matrix = orig_parms.score_matrix[parms.bank.INDEX, :]
         elseif parms.method in ["TIC", "TIC2", "TIC3"]
             parms.info_matrix = orig_parms.info_matrix[parms.bank.INDEX, :]
         elseif parms.method == "MIXED"
-            parms.p_matrix = orig_parms.p_matrix[parms.bank.INDEX, :]
+            parms.score_matrix = orig_parms.score_matrix[parms.bank.INDEX, :]
             parms.info_matrix = orig_parms.info_matrix[parms.bank.INDEX, :]
         else
             error("Unsupported method: $(parms.method)")

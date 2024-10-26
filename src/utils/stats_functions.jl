@@ -425,40 +425,30 @@ function expected_score_matrix(
     num_items = nrow(bank)
     num_thetas = length(θ_values)
 
-    # Initialize the matrix to hold expected scores (num_items x num_theta_values)
+    # Initialize the matrix to hold expected scores (num_items x num_thetas)
     score_matrix = zeros(Float64, num_items, num_thetas)
-
-    # Pre-extract column names for B parameters (thresholds/difficulties)
-    b_columns = filter(col -> occursin(r"^B\d*$|^B$", string(col)), names(bank))
 
     # Parallelize the loop over items
     @threads for idx in 1:num_items
-        @inbounds begin  # Use @inbounds to avoid bounds checking inside the loop
-
-            # Extract necessary information from the DataFrame once per item
+        @inbounds begin
             model = bank[idx, :MODEL_TYPE]
             a = bank[idx, :A]
-            c = if model == "3PL"
-                bank[idx, :C]
-            else
-                nothing
-            end
-
-            # Extract B parameters (thresholds or difficulties)
+            c = if model == "3PL" bank[idx, :C] else nothing end
+            b_columns = filter(col -> occursin(r"^B\d*$|^B$", string(col)), names(bank))
             bs = [bank[idx, col] for col in b_columns if !ismissing(bank[idx, col])]
 
-            # Calculate expected scores for all θ values
+            # Calculate expected scores for all θ values using the expected_score_item
             expected_scores = map(
                 θ -> expected_score_item(model, a, bs, c, θ; D = D), θ_values
             )
 
-            # Store the expected scores in the matrix
             score_matrix[idx, :] .= expected_scores
         end
     end
 
     return score_matrix
 end
+
 
 function expected_info_matrix(
         bank::DataFrame, θ_values::Vector{Float64}; D::Float64 = 1.0
@@ -483,26 +473,26 @@ function expected_info_matrix(
     return info_matrix
 end
 
-function calc_tau(p_matrix::Matrix{Float64}, r::Int, N::Int)::Matrix{Float64}
+function calc_tau(score_matrix::Matrix{Float64}, r::Int, N::Int)::Matrix{Float64}
     """
     Calculate the tau matrix for given probabilities.
 
     # Arguments:
-    - `p_matrix`: Probability matrix (Items x K).
+    - `score_matrix`: Probability matrix (Items x K).
     - `r`: Number of powers.
     - `N`: Sample size.
 
     # Returns:
     - Tau matrix (R x K).
     """
-    k = size(p_matrix, 2)  # Number of theta points is the number of columns of p_matrix
+    k = size(score_matrix, 2)  # Number of theta points is the number of columns of score_matrix
     tau = zeros(Float64, r, k)  # Initialize tau matrix (R x K)
-    num_items = size(p_matrix, 1)  # Number of items
+    num_items = size(score_matrix, 1)  # Number of items
 
     # Sample and accumulate tau for 250 batches
     for _ in 1:250
         sampled_rows = rand(1:num_items, N)  # Sample N rows
-        buffer = p_matrix[sampled_rows, :]  # N x K matrix
+        buffer = score_matrix[sampled_rows, :]  # N x K matrix
 
         for r_index in 1:r
             # Sum buffer raised to r_index-th power along the first dimension (rows)

@@ -28,6 +28,7 @@ const MODEL_FILE = "./results/model.lp"
 const VALID_TYPES = [
     "TEST",
     "NUMBER",
+    "SCORE",
     "SUM",
     "ENEMIES",
     "ALLORNONE",
@@ -137,7 +138,7 @@ function read_constraints(file_path::String, parms::Parameters)
             condition_expr = String(row[:CONDITION])
             lb = get(row, :LB, 0)
             ub = get(row, :UB, 0)
-            if type in ["TEST", "NUMBER", "SUM", "MAXUSE", "OVERLAP"]
+            if type in ["TEST", "NUMBER", "SCORE", "SUM", "MAXUSE", "OVERLAP"]
                 validate_bounds!(lb, ub, cond_id)
             end
 
@@ -251,6 +252,9 @@ function apply_individual_constraint!(
     elseif constraint.type == "NUMBER"
         condition = constraint.condition(bank)
         constraint_item_count(model, parms, condition, lb, ub)
+    elseif constraint.type == "SCORE"
+        condition = constraint.condition(bank)
+        constraint_score_sum(model, parms, condition, lb, ub)
     elseif constraint.type == "SUM"
         item_vals = constraint.condition(bank)
         constraint_item_sum(model, parms, item_vals, lb, ub)
