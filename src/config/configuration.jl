@@ -49,7 +49,6 @@ mutable struct Parameters
     n::Int
     num_forms::Int
     max_items::Int
-    operational_items::Int
     max_item_use::Int
     f::Int
     shadow_test_size::Int
@@ -62,6 +61,8 @@ mutable struct Parameters
     info_matrix::Matrix{Float64}
     tau::Matrix{Float64}
     tau_info::Vector{Float64}
+    tau_mean::Vector{Float64}
+    tau_var::Vector{Float64}
     r::Int
     k::Int
     D::Float64
@@ -76,18 +77,20 @@ end
 Transform the nested NestedConfig structure into the flatter Config version.
 """
 function transform_config_to_flat(basic_config::BasicConfig)::Config
-    return Config(Dict{Symbol, Any}(),  # forms (placeholder, could be added)
-                  basic_config.items_file,
-                  basic_config.anchor_items_file,
-                  basic_config.forms_file,
-                  basic_config.constraints_file,
-                  basic_config.results_file,
-                  basic_config.tcc_file,
-                  basic_config.plot_file,
-                  basic_config.solver,
-                  basic_config.verbose,
-                  basic_config.report_categories,
-                  basic_config.report_sums)
+    return Config(
+        Dict{Symbol, Any}(),  # forms (placeholder, could be added)
+        basic_config.items_file,
+        basic_config.anchor_items_file,
+        basic_config.forms_file,
+        basic_config.constraints_file,
+        basic_config.results_file,
+        basic_config.tcc_file,
+        basic_config.plot_file,
+        basic_config.solver,
+        basic_config.verbose,
+        basic_config.report_categories,
+        basic_config.report_sums
+    )
 end
 
 """
@@ -96,33 +99,38 @@ end
 Transform the necessary components (forms_config, irt_data, bank, flat_config)
 into the flat Parameters structure.
 """
-function transform_parameters_to_flat(forms_config::AssemblyConfig,
-                                      irt_data::IRTModelData,
-                                      bank::DataFrame,
-                                      flat_config::Config)::Parameters
+function transform_parameters_to_flat(
+        forms_config::AssemblyConfig,
+        irt_data::IRTModelData,
+        bank::DataFrame,
+        flat_config::Config
+)::Parameters
     # Transform to the flat Parameters structure
-    return Parameters(forms_config.form_size,             # n
-                      forms_config.num_forms,             # num_forms
-                      forms_config.max_items,             # max_items
-                      forms_config.operational_items,     # operational_items
-                      forms_config.max_item_use,          # max_item_use
-                      forms_config.f,                     # f
-                      forms_config.shadow_test_size,           # shadow_test_size
-                      bank,                               # bank
-                      forms_config.anchor_tests,          # anchor_tests
-                      forms_config.anchor_size,           # anchor_size
-                      irt_data.method,                    # method
-                      irt_data.theta,                     # theta (Vector{Float64})
-                      irt_data.p_matrix,                  # p (Matrix{Float64})
-                      irt_data.info_matrix,               # info (Matrix{Float64})
-                      irt_data.tau,                       # tau (Matrix{Float64})
-                      irt_data.tau_info,                  # tau_info (Vector{Float64})
-                      irt_data.r,
-                      irt_data.k,
-                      irt_data.D,
-                      irt_data.relative_target_weights,   # relative_target_weights (Vector{Float64})
-                      irt_data.relative_target_points,    # relative_target_points (Vector{Float64})
-                      flat_config.verbose)
+    return Parameters(
+        forms_config.form_size,             # n
+        forms_config.num_forms,             # num_forms
+        forms_config.max_items,             # max_items
+        forms_config.max_item_use,          # max_item_use
+        forms_config.f,                     # f
+        forms_config.shadow_test_size,           # shadow_test_size
+        bank,                               # bank
+        forms_config.anchor_tests,          # anchor_tests
+        forms_config.anchor_size,           # anchor_size
+        irt_data.method,                    # method
+        irt_data.theta,                     # theta (Vector{Float64})
+        irt_data.p_matrix,                  # p (Matrix{Float64})
+        irt_data.info_matrix,               # info (Matrix{Float64})
+        irt_data.tau,                       # tau (Matrix{Float64})
+        irt_data.tau_info,                  # tau_info (Vector{Float64})
+        irt_data.tau_mean,
+        irt_data.tau_var,
+        irt_data.r,
+        irt_data.k,
+        irt_data.D,
+        irt_data.relative_target_weights,   # relative_target_weights (Vector{Float64})
+        irt_data.relative_target_points,    # relative_target_points (Vector{Float64})
+        flat_config.verbose
+    )
 end
 
 """
@@ -131,7 +139,7 @@ end
 Entry point function that loads and prepares the system configuration.
 Reads from a TOML configuration file, loads data, and returns the system parameters.
 """
-function configure(inFile::String="data/config.toml")::Tuple{Config, Parameters}
+function configure(inFile::String = "data/config.toml")::Tuple{Config, Parameters}
     # Read TOML configuration and validate in safe_read_toml
     config_data = try
         upcaseKeys(safe_read_toml(inFile))
@@ -168,8 +176,10 @@ function configure(inFile::String="data/config.toml")::Tuple{Config, Parameters}
 
     # Transform the configuration into flat structures
     flat_config = transform_config_to_flat(basic_config)
-    return (flat_config,
-            transform_parameters_to_flat(forms_config, irt_data, bank, flat_config))
+    return (
+        flat_config, transform_parameters_to_flat(
+            forms_config, irt_data, bank, flat_config)
+    )
 end
 
 end # module Configuration

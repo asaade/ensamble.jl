@@ -13,10 +13,12 @@ Data structure for holding the IRT model data.
 mutable struct IRTModelData
     method::String          # Method (e.g., TCC, TIC, etc.)
     theta::Vector{Float64}          # Theta points (ability levels)
-    p_matrix::Matrix{Float64}     # 3D array: (items, theta, categories) for probability
-    info_matrix::Matrix{Float64}  # 3D array: (items, theta, categories) for information
-    tau::Matrix{Float64}            # Tau matrix (aggregated probabilities or information)
+    p_matrix::Matrix{Float64}       # 3D array: (items, theta, categories) for probability
+    info_matrix::Matrix{Float64}    # 3D array: (items, theta, categories) for information
+    tau::Matrix{Float64}            # Tau mean (aggregated expected scores for versions)
     tau_info::Vector{Float64}       # Tau info (aggregated information at theta points)
+    tau_mean::Vector{Float64}       # Tau mean (aggregated expected scores for versions)
+    tau_var::Vector{Float64}        # Tau variance (expected scores var)
     relative_target_weights::Vector{Float64}  # Weights for relative target points
     relative_target_points::Vector{Float64}   # Target theta points for equating tests
     k::Int                          # Number of theta points
@@ -39,8 +41,9 @@ based on the input configuration and item bank.
 
   - An `IRTModelData` struct containing IRT parameters and matrices for the assembly process.
 """
-function load_irt_data(config_data::Dict{Symbol, Any}, forms_config,
-                       bank::DataFrame)::IRTModelData
+function load_irt_data(
+        config_data::Dict{Symbol, Any}, forms_config, bank::DataFrame
+)::IRTModelData
     # Ensure IRT configuration exists
     if !haskey(config_data, :IRT)
         throw(ArgumentError("Configuration must contain the 'IRT' key."))
@@ -51,7 +54,7 @@ function load_irt_data(config_data::Dict{Symbol, Any}, forms_config,
     theta = get(irt_dict, :THETA, [-1.8, -0.5, 0.0, 0.5, 1.8])
     D = get(irt_dict, :D, 1.0)
     r = get(irt_dict, :R, 2)
-    if any(x->x ∉ ["1PL", "2PL", "3PL"], bank[:, "MODEL_TYPE"])
+    if any(x -> x ∉ ["1PL", "2PL", "3PL"], bank[:, "MODEL_TYPE"])
         r = 1
     end
     N = forms_config.form_size # get(config_data[:FORMS], :N, 1)
@@ -59,7 +62,11 @@ function load_irt_data(config_data::Dict{Symbol, Any}, forms_config,
     relative_target_weights = get(irt_dict, :RELATIVETARGETWEIGHTS, [1.0, 1.0])
     relative_target_points = get(irt_dict, :RELATIVETARGETPOINTS, [-1.0, 1.0])
     if length(relative_target_weights) != length(relative_target_points)
-        throw(ArgumentError("The length of 'RELATIVETARGETWEIGHTS' and 'RELATIVETARGETPOINTS' must match."))
+        throw(
+            ArgumentError(
+            "The length of 'RELATIVETARGETWEIGHTS' and 'RELATIVETARGETPOINTS' must match.",
+        ),
+        )
     end
 
     # Calculate 3D probability and information matrices for dichotomous items
@@ -70,10 +77,24 @@ function load_irt_data(config_data::Dict{Symbol, Any}, forms_config,
     tau = get_tau(irt_dict, p_matrix, r, N)
     tau_info = get_tau_info(irt_dict, info_matrix, N)
 
+    tau_mean, tau_var = calc_expected_scores_reference!(p_matrix, N)
+
     # Return IRTModelData struct with all required data
-    return IRTModelData(method, theta, p_matrix, info_matrix, tau, tau_info,
-                        relative_target_weights, relative_target_points, length(theta), r,
-                        D)
+    return IRTModelData(
+        method,
+        theta,
+        p_matrix,
+        info_matrix,
+        tau,
+        tau_info,
+        tau_mean,
+        tau_var,
+        relative_target_weights,
+        relative_target_points,
+        length(theta),
+        r,
+        D
+    )
 end
 
 """
@@ -81,8 +102,9 @@ end
 
 Calculates or retrieves the tau values based on the probability matrix.
 """
-function get_tau(irt_dict::Dict{Symbol, Any}, p_matrix::Matrix{Float64}, r::Int,
-                 N::Int)::Matrix{Float64}
+function get_tau(
+        irt_dict::Dict{Symbol, Any}, p_matrix::Matrix{Float64}, r::Int, N::Int
+)::Matrix{Float64}
     tau = get(irt_dict, :TAU, nothing)
 
     if tau !== nothing && !isempty(tau)
@@ -97,8 +119,9 @@ end
 
 Calculates or retrieves the tau_info values based on the information matrix.
 """
-function get_tau_info(irt_dict::Dict{Symbol, Any}, info_matrix::Matrix{Float64},
-                      N::Int)::Vector{Float64}
+function get_tau_info(
+        irt_dict::Dict{Symbol, Any}, info_matrix::Matrix{Float64}, N::Int
+)::Vector{Float64}
     tau_info = get(irt_dict, :TAU_INFO, nothing)
 
     if tau_info !== nothing && !isempty(tau_info)

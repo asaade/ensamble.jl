@@ -28,8 +28,9 @@ end
 
 Simulates test scores based on ability distribution for 3PL items.
 """
-function simulate_scores(parms::Parameters, results::DataFrame,
-                         dist::Distribution=Normal(0, 1))
+function simulate_scores(
+        parms::Parameters, results::DataFrame, dist::Distribution = Normal(0, 1)
+)
     bank = parms.bank
     n_items, n_forms = size(results)
     n_items += 1  # Add one extra row to account for the padded zero score
@@ -50,8 +51,9 @@ function simulate_scores(parms::Parameters, results::DataFrame,
         total_scores = observed_score_continuous(params, dist; parms.D)
 
         # Pad the results if needed and store in the simulation matrix
-        sim_matrix[:, form] = vcat(total_scores,
-                                   fill(missing, n_items - length(total_scores)))
+        sim_matrix[:, form] = vcat(
+            total_scores, fill(missing, n_items - length(total_scores))
+        )
     end
 
     return sim_matrix
@@ -62,8 +64,12 @@ end
 
 Generates characteristic curve data for all forms using dichotomous items.
 """
-function char_curves(parms::Parameters, results::DataFrame,
-                     theta_range::Union{AbstractVector, AbstractRange}, r::Int=1)
+function char_curves(
+        parms::Parameters,
+        results::DataFrame,
+        theta_range::Union{AbstractVector, AbstractRange},
+        r::Int = 1
+)
     bank = parms.bank
     n_forms = size(results, 2)
     n_thetas = length(theta_range)
@@ -79,7 +85,7 @@ function char_curves(parms::Parameters, results::DataFrame,
         # Recalculate probabilities dynamically for each theta value
         for (j, theta) in enumerate(theta_range)
             for k in eachindex(selected)
-                prob = prob_3pl(a[k], b[k], c[k], theta; D=parms.D)
+                prob = prob_3pl(a[k], b[k], c[k], theta; D = parms.D)
                 scores[j] += prob^r  # Summing the probability for correct response
             end
         end
@@ -88,7 +94,7 @@ function char_curves(parms::Parameters, results::DataFrame,
     end
 
     curves = DataFrame(curves_matrix, Symbol.(names(results)))
-    return round.(curves, digits=2)
+    return round.(curves, digits = 2)
 end
 
 """
@@ -97,8 +103,10 @@ end
 
 Generates expected scrore curve data for all forms using dichotomous items.
 """
-function expected_score_curves(parms::Parameters, results::DataFrame,
-                               theta_range::Union{AbstractVector, AbstractRange})::DataFrame
+function expected_score_curves(
+        parms::Parameters, results::DataFrame, theta_range::Union{
+            AbstractVector, AbstractRange}
+)::DataFrame
     bank = parms.bank
     theta::Vector{Float64} = collect(theta_range)
     n_forms = size(results, 2)  # Number of forms (columns in results)
@@ -116,12 +124,12 @@ function expected_score_curves(parms::Parameters, results::DataFrame,
         scores = expected_score_matrix(bank[idx, :], theta; parms.D)
 
         # Store the sum of the scores for this form in the curves matrix
-        curves_matrix[:, i] = sum(scores; dims=1)  # Sum along items (rows)
+        curves_matrix[:, i] = sum(scores; dims = 1)  # Sum along items (rows)
     end
 
     # Convert the curves matrix into a DataFrame and round the results
     curves = DataFrame(curves_matrix, Symbol.(names(results)))
-    return round.(curves, digits=2)
+    return round.(curves, digits = 2)
 end
 
 """
@@ -129,8 +137,10 @@ end
 
 Generates information curve data for all forms using dichotomous items.
 """
-function info_curves(parms::Parameters, results::DataFrame,
-                     theta_range::Union{AbstractVector, AbstractRange})
+function info_curves(
+        parms::Parameters, results::DataFrame, theta_range::Union{
+            AbstractVector, AbstractRange}
+)
     bank = parms.bank
     n_forms = size(results, 2)
     n_thetas = length(theta_range)
@@ -146,7 +156,7 @@ function info_curves(parms::Parameters, results::DataFrame,
         # Recalculate information dynamically for each theta value
         for (j, theta) in enumerate(theta_range)
             for k in eachindex(selected)
-                info[j] += info_3pl(a[k], b[k], c[k], theta; D=parms.D)
+                info[j] += info_3pl(a[k], b[k], c[k], theta; D = parms.D)
             end
         end
 
@@ -154,11 +164,13 @@ function info_curves(parms::Parameters, results::DataFrame,
     end
 
     info_data = DataFrame(info_matrix, Symbol.(names(results)))
-    return round.(info_data, digits=2)
+    return round.(info_data, digits = 2)
 end
 
-function expected_info_curves(parms::Parameters, results::DataFrame,
-                              theta_range::Union{AbstractVector, AbstractRange})
+function expected_info_curves(
+        parms::Parameters, results::DataFrame, theta_range::Union{
+            AbstractVector, AbstractRange}
+)
     bank = parms.bank
     theta::Vector{Float64} = collect(theta_range)
     n_forms = size(results, 2)  # Number of forms (columns in results)
@@ -176,12 +188,12 @@ function expected_info_curves(parms::Parameters, results::DataFrame,
         info = expected_info_matrix(bank[idx, :], theta; parms.D)
 
         # Store the sum of the information for this form in the curves matrix
-        curves_matrix[:, i] = sum(info; dims=1)  # Sum along items (rows)
+        curves_matrix[:, i] = sum(info; dims = 1)  # Sum along items (rows)
     end
 
     # Convert the curves matrix into a DataFrame and round the results
     curves = DataFrame(curves_matrix, Symbol.(names(results)))
-    return round.(curves, digits=2)
+    return round.(curves, digits = 2)
 end
 
 """
@@ -189,18 +201,20 @@ end
 
 Saves a DataFrame to a CSV file.
 """
-function save_to_csv(data::DataFrame, file::String)
-    return CSV.write(file, data)
-end
+save_to_csv(data::DataFrame, file::String) = CSV.write(file, data)
 
 """
     plot_results(parms, conf, results, theta_range=-3.0:0.1:3.0, plot_file="results/combined_plot.pdf") -> DataFrame
 
 Generates and plots characteristic curves, information curves, and simulated scores.
 """
-function plot_results(parms::Parameters, conf::Config, results::DataFrame,
-                      theta_range::Union{AbstractVector, AbstractRange}=-4.0:0.1:4.0,
-                      plot_file::String="results/combined_plot.pdf")::DataFrame
+function plot_results(
+        parms::Parameters,
+        conf::Config,
+        results::DataFrame,
+        theta_range::Union{AbstractVector, AbstractRange} = -4.0:0.1:4.0,
+        plot_file::String = "results/combined_plot.pdf"
+)::DataFrame
 
     # Generate characteristic and information curves
     char_data, info_data = make_curves(parms, results, theta_range)
@@ -222,8 +236,10 @@ end
 
 Generates both characteristic and information curves.
 """
-function make_curves(parms::Parameters, results::DataFrame,
-                     theta_range::Union{AbstractVector, AbstractRange})
+function make_curves(
+        parms::Parameters, results::DataFrame, theta_range::Union{
+            AbstractVector, AbstractRange}
+)
     char_data = expected_score_curves(parms, results, theta_range)
     info_data = expected_info_curves(parms, results, theta_range)
     return char_data, info_data
@@ -234,39 +250,67 @@ end
 
 Combines characteristic, information, and simulation plots.
 """
-function combine_plots(parms::Parameters, theta_range::Union{AbstractVector, AbstractRange},
-                       char_data::DataFrame, info_data::DataFrame, sim_data::DataFrame)
+function combine_plots(
+        parms::Parameters,
+        theta_range::Union{AbstractVector, AbstractRange},
+        char_data::DataFrame,
+        info_data::DataFrame,
+        sim_data::DataFrame
+)
     theme(:dao)
-    gr(; size=(950, 850), legend=:topright)
+    gr(; size = (950, 850), legend = :topright)
 
     # Plot characteristic curves with improved labels and styles
-    p1 = @df char_data plot(theta_range, cols(),
-                            title="Test Characteristic Curves",
-                            xlabel="Ability (θ)", ylabel="Expected Score",
-                            linewidth=2, label="", grid=:both, legend=:topright,
-                            xticks=:auto, yticks=:auto, color=:viridis,
-                            ylims=(0, parms.max_items))
-    (parms.method == "TCC" || parms.method == "MIXED") &&
-        scatter!(parms.theta, parms.tau[1, :]; label="", markersize=4)
+    p1 = @df char_data plot(
+        theta_range,
+        cols(),
+        title = "Test Characteristic Curves",
+        xlabel = "Ability (θ)",
+        ylabel = "Expected Score",
+        linewidth = 2,
+        label = "",
+        grid = :both,
+        legend = :topright,
+        xticks = :auto,
+        yticks = :auto,
+        color = :viridis,
+        ylims = (0, parms.max_items)
+    )
+    (parms.method in ["TCC", "TCC2", "MIXED"]) &&
+        scatter!(parms.theta, parms.tau[1, :]; label = "", markersize = 4)
 
     # Add information curves on the same graph using dual axes (right axis for info curves)
-    p2 = @df info_data plot(theta_range, cols(),
-                            title="Test Information Curves",
-                            xlabel="Ability (θ)", ylabel="Information",
-                            linewidth=2, label="", grid=:both, color=:plasma)
+    p2 = @df info_data plot(
+        theta_range,
+        cols(),
+        title = "Test Information Curves",
+        xlabel = "Ability (θ)",
+        ylabel = "Information",
+        linewidth = 2,
+        label = "",
+        grid = :both,
+        color = :plasma
+    )
 
     # Overlay a reference line at θ = 0
-    vline!([0]; color=:gray, linestyle=:dash, label="")
+    vline!([0]; color = :gray, linestyle = :dash, label = "")
 
     # # Plot simulated observed scores with score distribution (optional)
-    p3 = @df sim_data plot(1:size(sim_data, 1), cols(),
-                           title="Simulated Observed Scores", xlabel="Score",
-                           ylabel="Frequency",
-                           linewidth=2, label="", grid=:both, color=:inferno)
+    p3 = @df sim_data plot(
+        1:size(sim_data, 1),
+        cols(),
+        title = "Simulated Observed Scores",
+        xlabel = "Score",
+        ylabel = "Frequency",
+        linewidth = 2,
+        label = "",
+        grid = :both,
+        color = :inferno
+    )
 
     # # Combine plots into a single layout with consistent sizes
     # plot(p1, p2, p3; layout=(2, 2), size=(950, 850), margin=8mm)
-    return plot(p1, p2, p3; layout=(2, 2), size=(950, 850), margin=8mm)
+    return plot(p1, p2, p3; layout = (2, 2), size = (950, 850), margin = 8mm)
 end
 
 """
@@ -274,8 +318,13 @@ end
 
 Saves the curves to a CSV and the plot to a file.
 """
-function save_all(curves::DataFrame, theta_range::Union{AbstractVector, AbstractRange},
-                  conf::Config, plot::AbstractPlot, plot_file::String)
+function save_all(
+        curves::DataFrame,
+        theta_range::Union{AbstractVector, AbstractRange},
+        conf::Config,
+        plot::AbstractPlot,
+        plot_file::String
+)
     insertcols!(curves, 1, :THETA => collect(theta_range))
     save_to_csv(curves, conf.tcc_file)
 
