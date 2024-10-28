@@ -33,3 +33,65 @@ The TOML configuration file defines parameters for test assembly settings, item 
 
 - **SOLVER**: Name of the solver (e.g., `cplex`) used for optimization.
 - **VERBOSE**: Level of verbosity for logging and debugging, where `0` is silent, and higher values increase detail in the output.
+
+
+## Example configuration
+
+Here is an example of a configuration for assembling tests using the Test Characteristic Curve (TCC) method. This example uses TCC constraints to control the score distribution across test forms:
+
+### Configuration (TOML) for TCC Optimization
+```toml
+[FORMS]
+NumForms = 5
+AnchorTests = 2
+ShadowTest = 1
+
+[IRT]
+METHOD = "TCC"
+THETA = [-3.0, -1.0, 0.0, 1.0, 3.0]
+TAU = [[0.5, 0.4, 0.6], [0.6, 0.5, 0.7], [0.7, 0.6, 0.8], [0.8, 0.7, 0.9]]
+TAU_INFO = [0.3, 0.4, 0.5, 0.6, 0.7]
+RELATIVETARGETWEIGHTS = [1, 1, 1, 1, 1]
+RELATIVETARGETPOINTS = [-1.0, 0.0, 1.0]
+R = 3
+D = 1.0
+
+[FILES]
+ITEMSFILE = "data/items.csv"
+ANCHORFILE = "data/anchor.csv"
+CONSTRAINTSFILE = "data/constraints.csv"
+RESULTSFILE = "results/results.csv"
+FORMSFILE = "results/forms.csv"
+TCCFILE = "results/tcc_output.csv"
+PLOTFILE = "results/plot_output.png"
+REPORTCATEGORIES = ["CATEGORY_A", "CATEGORY_B"]
+REPORTSUMS = ["WORD_COUNT", "IMAGE_COUNT"]
+
+SOLVER = "cplex"
+VERBOSE = 1
+```
+
+### Example of `items.csv` File Format
+The `items.csv` file should contain columns with item parameters, typically including:
+- `ID`: Unique identifier for each item
+- `MODEL_TYPE`: Specifies model type (e.g., "2PL", "3PL", "PCM")
+- `A`: Discrimination parameter
+- `B`: Difficulty (or threshold) parameters, usually as multiple columns `B1`, `B2`, `B3` for polytomous items
+- `C`: Guessing parameter (for "3PL" model)
+- `NUM_CATEGORIES`: Number of response categories for polytomous items
+
+Example `items.csv`:
+```csv
+ID,MODEL_TYPE,A,B1,B2,B3,C,NUM_CATEGORIES
+item1,2PL,1.0,-1.0,,
+item2,3PL,0.8,0.5,,0.2
+item3,PCM,1.2,0.5,1.0,1.5,,4
+item4,GPCM,0.9,0.3,1.2,,
+```
+
+This example defines:
+- **Form Configuration**: Configures the number of forms, anchor, and shadow tests.
+- **IRT Settings**: Specifies TCC-based constraints with key parameters such as theta values, target tau means, and tau information.
+- **File Paths**: Specifies paths to required input and output files.
+
+For effective assembly, verify that the items and constraints align with the test blueprint requirements.
