@@ -61,17 +61,17 @@ Specifies the type of constraint to apply. The available types are:
      ```
 
 3. **Enemies**: Specifies that items meeting the condition should be mutually exclusive in the selection. This is useful when items are too similar or should not appear together in a form.
-   - **Example**: Ensure only one of the two items (`ID` in ["A1", "A2"]) is included:
+   - **Example**: Ensure only one of the two items (`ID` in [A1, A2]) is included:
      ```
      CONSTRAINT_ID, TYPE, CONDITION
-     C3, Enemies, ID IN ["A1", "A2"]
+     C3, Enemies, ID IN [A1, A2]
      ```
 
 4. **Include**: Forces the inclusion of items that meet the specified condition.
-   - **Example**: Always include items where `AREA == "Math"`:
+   - **Example**: Always include items where `AREA == Math`:
      ```
      CONSTRAINT_ID, TYPE, CONDITION
-     C4, Include, AREA == "Math"
+     C4, Include, AREA == Math
      ```
 
 5. **Exclude**: Ensures that items meeting the specified condition are excluded from the selection.
@@ -82,20 +82,20 @@ Specifies the type of constraint to apply. The available types are:
      ```
 
 6. **AllOrNone**: Ensures that all items meeting a condition are either included together or excluded entirely.
-   - **Example**: Either include all items `ID IN ["B1", "B2"]` or none:
+   - **Example**: Either include all items `ID IN [B1, B2]` or none:
      ```
      CONSTRAINT_ID, TYPE, CONDITION
-     C6, AllOrNone, ID IN ["B1", "B2"]
+     C6, AllOrNone, ID IN [B1, B2]
      ```
 
 
 #### CONDITION
 The condition restricts the items the constraint applies to. It is optional and can be left blank if the constraint applies to all items.
 
-Conditions are specified using column names and logical expressions (e.g., `LEVEL == 3`, `AREA == "Math"`). Conditions can be combined using logical operators such as `&&` (AND) and `||` (OR) or set membership operators such as `IN` (e.g., `LEVEL IN [2, 3, 4]`).
+Conditions are specified using column names and logical expressions (e.g., `LEVEL == 3`, `AREA == Math`). Conditions can be combined using logical operators such as `&&` (AND) and `||` (OR) or set membership operators such as `IN` (e.g., `LEVEL IN [2, 3, 4]`).
 
 **Examples**:
-- `LEVEL == 3 && AREA == "Math"`: Applies the constraint to items in the "Math" area with level 3.
+- `LEVEL == 3 && AREA == Math`: Applies the constraint to items in the Math area with level 3.
 - `DIFFICULTY >= 0.5 || PTBIS > 0.2`: Applies if difficulty is at least 0.5 or if the item discrimination index (PTBIS) is greater than 0.2.
 
 #### LB (Lower Bound) and UB (Upper Bound)
@@ -143,17 +143,17 @@ C3, Exclude, PTBIS < 0.15, ON
 ```
 
 #### Applying Enemy Constraints
-To specify that only one of the items `ID == "A1"` or `ID == "A2"` can be included:
+To specify that only one of the items `ID == A1` or `ID == A2` can be included:
 ```
 CONSTRAINT_ID, TYPE, CONDITION, ONOFF
-C4, Enemies, ID IN ["A1", "A2"], ON
+C4, Enemies, ID IN [A1, A2], ON
 ```
 
 #### Ensuring All-or-None Selection for Grouped Items
-To include both or none of the items where `ID` is in ["B1", "B2"]:
+To include both or none of the items where `ID` is in [B1, B2]:
 ```
 CONSTRAINT_ID, TYPE, CONDITION, ONOFF
-C5, AllOrNone, ID IN ["B1", "B2"], ON
+C5, AllOrNone, ID IN [B1, B2], ON
 ```
 
 
@@ -182,9 +182,9 @@ A constraint condition is specified in the `CONDITION` column and defines criter
      UB: 15
      ```
 
-   - Include between 10 and 20 items with `AREA == "Math"`:
+   - Include between 10 and 20 items with `AREA == Math`:
      ```
-     CONDITION: AREA == "Math"
+     CONDITION: AREA == Math
      LB: 10
      UB: 20
      ```
@@ -211,17 +211,17 @@ A constraint condition is specified in the `CONDITION` column and defines criter
      UB: 800
      ```
 
-   - Sum of `POINTS` for items with `AREA == "Science"`:
+   - Sum of `POINTS` for items with `AREA == Science`:
      ```
-     CONDITION: POINTS, AREA == "Science"
+     CONDITION: POINTS, AREA == Science
      LB: 50
      UB: 70
      ```
 
 #### 3. **Enemies** - Ensures mutual exclusivity among items
-   - Only one of items with `ID` in `["A1", "A2", "A3"]` can be included:
+   - Only one of items with `ID` in `[A1, A2, A3]` can be included:
      ```
-     CONDITION: ID IN ["A1", "A2", "A3"]
+     CONDITION: ID IN [A1, A2, A3]
      ```
 
    - Select only one item with difficulty above 0.6 and level 4:
@@ -230,14 +230,14 @@ A constraint condition is specified in the `CONDITION` column and defines criter
      ```
 
 #### 4. **Include** - Ensures certain items are always included
-   - Always include items in `["B1", "B2"]`:
+   - Always include items in `[B1, B2]`:
      ```
-     CONDITION: ID IN ["B1", "B2"]
+     CONDITION: ID IN [B1, B2]
      ```
 
-   - Always include items with difficulty above 0.5 in the "Math" area:
+   - Always include items with difficulty above 0.5 in the Math area:
      ```
-     CONDITION: DIFFICULTY > 0.5 && AREA == "Math"
+     CONDITION: DIFFICULTY > 0.5 && AREA == Math
      ```
 
 #### 5. **Exclude** - Ensures certain items are never included
@@ -252,14 +252,14 @@ A constraint condition is specified in the `CONDITION` column and defines criter
      ```
 
 #### 6. **AllOrNone** - Ensures all items in a condition group are included or excluded together
-   - Either include all or none of the items with `ID IN ["C1", "C2", "C3"]`:
+   - Either include all or none of the items with `ID IN [C1, C2, C3]`:
      ```
-     CONDITION: ID IN ["C1", "C2", "C3"]
+     CONDITION: ID IN [C1, C2, C3]
      ```
 
-   - Either include all or none of the items with `LEVEL == 2` in the "Science" area:
+   - Either include all or none of the items with `LEVEL == 2` in the Science area:
      ```
-     CONDITION: LEVEL == 2 && AREA == "Science"
+     CONDITION: LEVEL == 2 && AREA == Science
      ```
 
 ---
@@ -347,10 +347,10 @@ When you need to impose a sum constraint on items that meet multiple criteria, y
 
 | CONSTRAINT_ID | TYPE | WHAT | CONDITION                           | LB  | UB  | ONOFF |
 |---------------|------|------|-------------------------------------|-----|-----|-------|
-| C3            | Sum  | Item | `WORD_COUNT, AREA == "Math" && LEVEL >= 3` | 200 | 500 | ON    |
+| C3            | Sum  | Item | `WORD_COUNT, AREA == Math && LEVEL >= 3` | 200 | 500 | ON    |
 
-- **Explanation**: The total `WORD_COUNT` of items in the "Math" area with `LEVEL >= 3` must be between 200 and 500.
-- **Application**: Only items meeting both conditions (`AREA == "Math"` and `LEVEL >= 3`) are included in the sum.
+- **Explanation**: The total `WORD_COUNT` of items in the Math area with `LEVEL >= 3` must be between 200 and 500.
+- **Application**: Only items meeting both conditions (`AREA == Math` and `LEVEL >= 3`) are included in the sum.
 
 ---
 
