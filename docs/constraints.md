@@ -103,14 +103,13 @@ Specifies the type of constraint to apply. The available types are:
      ```
 
 
-
 #### CONDITION
 The condition restricts the items the constraint applies to. It is optional and can be left blank if the constraint applies to all items.
 
-Conditions are specified using column names and logical expressions (e.g., `LEVEL == 3`, `AREA == Math`). Conditions can be combined using logical operators such as `&&` (AND) and `||` (OR) or set membership operators such as `IN` (e.g., `LEVEL IN [2, 3, 4]`).
+Conditions are specified using *column names from the item bank file* and logical expressions (e.g., `LEVEL == 3`, `AREA == Math`). Conditions can be combined using logical operators such as `&&` (AND) and `||` (OR) or set membership operators such as `IN` (e.g., `LEVEL IN [2, 3, 4]`).
 
 **Examples**:
-- `LEVEL == 3 && AREA == Math`: Applies the constraint to items in the Math area with level 3.
+- `LEVEL == 3 && AREA == Math`: Applies the constraint to items in the column 'AREA' with the name 'Math' and in the column 'LEVEL' with a value of 3.
 - `DIFFICULTY >= 0.5 || PTBIS > 0.2`: Applies if difficulty is at least 0.5 or if the item discrimination index (PTBIS) is greater than 0.2.
 
 #### LB (Lower Bound) and UB (Upper Bound)
