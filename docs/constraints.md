@@ -19,21 +19,21 @@ The file is expected to have the following columns:
 
 ### An example
 
-| ID  | CONSTRAINT_ID | TYPE      | CONDITION                  | LB   | UB   | ONOFF |
-| --- | ---           | ---       | ---                        | ---  | ---  | ---   |
-| 1   | C1            | Test      |                            | 80   | 80   | ON    |
-| 2   | C2            | Score     | AREA == 1                  | 18   | 22   | ON    |
-| 3   | C3            | Score     | AREA == 2                  | 18   | 22   | ON    |
-| 4   | C4            | Score     | AREA == 3                  | 18   | 22   | ON    |
-| 5   | C5            | Score     | AREA == 4                  | 18   | 22   | ON    |
-| 6   | C6            | Sum       | Words                      | 2800 | 3400 | ON    |
-| 7   | C7            | Enemies   | Enemies                    | 0    | 0    | ON    |
-| 8   | C8            | AllOrNone | Friends                    | 0    | 0    | ON    |
-| 9   | C9            | MaxUse    |                            | 0    | 2    | ON    |
-| 10  | C10           | overlap   |                            | 10   | 10   | OFF   |
-| 11  | C11           | Exclude   | CORR <= 0.12               | 0    | 0    | OFF   |
-| 12  | C12           | AllOrNone | ID in [ITEM0001,ITEM0002]  | 0    | 0    | ON    |
-| 13  | C13           | Enemies   | ID in [ITEM0036,ITEM00039] | 0    | 0    | ON    |
+| ID | CONSTRAINT_ID | TYPE      | CONDITION                  | LB   | UB   | ONOFF |
+|----|---------------|-----------|----------------------------|------|------|-------|
+| 1  | C1            | Test      |                            | 80   | 80   | ON    |
+| 2  | C2            | Score     | AREA == 1                  | 18   | 22   | ON    |
+| 3  | C3            | Score     | AREA == 2                  | 18   | 22   | ON    |
+| 4  | C4            | Score     | AREA == 3                  | 18   | 22   | ON    |
+| 5  | C5            | Score     | AREA == 4                  | 18   | 22   | ON    |
+| 6  | C6            | Sum       | Words                      | 2800 | 3400 | ON    |
+| 7  | C7            | Enemies   | Enemies                    |      |      | ON    |
+| 8  | C8            | AllOrNone | Friends                    |      |      | ON    |
+| 9  | C9            | MaxUse    |                            | 0    | 2    | ON    |
+| 10 | C10           | Overlap   |                            | 10   | 10   | OFF   |
+| 11 | C11           | Exclude   | CORR <= 0.12               |      |      | OFF   |
+| 12 | C12           | AllOrNone | ID in [ITEM0001,ITEM0002]  |      |      | ON    |
+| 13 | C13           | Enemies   | ID in [ITEM0036,ITEM00039] |      |      | ON    |
 
 
 
