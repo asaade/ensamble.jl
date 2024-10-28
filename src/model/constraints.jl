@@ -21,27 +21,26 @@ export constraint_items_per_form,
 
 #
 
+using ..Configuration
 using DataFrames
 using JuMP
-
-using ..Configuration
 
 # ---------------------------------------------------------------------------
 # Helper Functions
 # ---------------------------------------------------------------------------
 
 """
-    operational_forms(x, shadow_test_size) -> Int
+    operational_forms(x, shadow_test_size)
 
 Helper function to calculate the number of operational forms, adjusting for shadow tests.
 """
-function operational_forms(x, shadow_test_size)
+function operational_forms(x, shadow_test_size::Int)
     forms = size(x, 2)
     return shadow_test_size > 0 ? forms - 1 : forms
 end
 
 """
-    group_by_selected(selected::Vector) -> GroupedDataFrame
+    group_by_selected(selected::Union{Vector, BitVector})
 
 Helper function to group items based on the `selected` vector, ignoring missing values.
 """
