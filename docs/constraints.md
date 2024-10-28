@@ -88,6 +88,21 @@ Specifies the type of constraint to apply. The available types are:
      C6, AllOrNone, ID IN [B1, B2]
      ```
 
+7. **Overlap**: Forces the forms to share a number of items. Is more compute-intensive and only works without anchors and shadow tests.
+   - **Example**: Include 10 common items between each two forms:
+     ```
+     CONSTRAINT_ID, TYPE, CONDITION, LB, UB
+     C7, Overlap,, 10, 10
+     ```
+
+7. **MaxUse**: Ensures that an items only appears at most that number of times in the forms.
+   - **Example**: All items (except anchor items) should appear only in one form, at the most:
+     ```
+     CONSTRAINT_ID, TYPE, CONDITION, LB, UB
+     C7, MaxUse,, 0, 1
+     ```
+
+
 
 #### CONDITION
 The condition restricts the items the constraint applies to. It is optional and can be left blank if the constraint applies to all items.
