@@ -17,6 +17,27 @@ The file is expected to have the following columns:
 
 **Note**: Using a spreadsheet application like Excel is recommended for editing this file, as it helps maintain the proper structure and visibility for each constraint.
 
+### An example
+
+| ID  | CONSTRAINT_ID | TYPE      | CONDITION                  | LB   | UB   | ONOFF |
+| --- | ---           | ---       | ---                        | ---  | ---  | ---   |
+| 1   | C1            | Test      |                            | 80   | 80   | ON    |
+| 2   | C2            | Score     | AREA == 1                  | 18   | 22   | ON    |
+| 3   | C3            | Score     | AREA == 2                  | 18   | 22   | ON    |
+| 4   | C4            | Score     | AREA == 3                  | 18   | 22   | ON    |
+| 5   | C5            | Score     | AREA == 4                  | 18   | 22   | ON    |
+| 6   | C6            | Sum       | Words                      | 2800 | 3400 | ON    |
+| 7   | C7            | Enemies   | Enemies                    | 0    | 0    | ON    |
+| 8   | C8            | AllOrNone | Friends                    | 0    | 0    | ON    |
+| 9   | C9            | MaxUse    |                            | 0    | 2    | ON    |
+| 10  | C10           | overlap   |                            | 10   | 10   | OFF   |
+| 11  | C11           | Exclude   | CORR <= 0.12               | 0    | 0    | OFF   |
+| 12  | C12           | AllOrNone | ID in [ITEM0001,ITEM0002]  | 0    | 0    | ON    |
+| 13  | C13           | Enemies   | ID in [ITEM0036,ITEM00039] | 0    | 0    | ON    |
+
+
+
+
 ### Column Descriptions
 
 #### CONSTRAINT_ID
@@ -451,7 +472,7 @@ This would also raise a conflict, as these two rules cannot be applied simultane
 In practice, here’s how the system might resolve a typical conflict between `INCLUDE` and `EXCLUDE` constraints:
 
 | CONSTRAINT_ID | TYPE     | WHAT  | CONDITION           | LB | UB | ONOFF |
-|---------------|----------|-------|----------------------|----|----|-------|
+|---------------|----------|-------|---------------------|----|----|-------|
 | C5            | INCLUDE  | Item  | `ID == 'Q1'`        |    |    | ON    |
 | C6            | EXCLUDE  | Item  | `ID == 'Q1'`        |    |    | ON    |
 
