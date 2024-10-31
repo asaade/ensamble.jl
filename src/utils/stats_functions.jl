@@ -433,7 +433,11 @@ function expected_score_matrix(
         @inbounds begin
             model = bank[idx, :MODEL_TYPE]
             a = bank[idx, :A]
-            c = if model == "3PL" bank[idx, :C] else nothing end
+            c = if model == "3PL"
+                bank[idx, :C]
+            else
+                nothing
+            end
             b_columns = filter(col -> occursin(r"^B\d*$|^B$", string(col)), names(bank))
             bs = [bank[idx, col] for col in b_columns if !ismissing(bank[idx, col])]
 
@@ -448,7 +452,6 @@ function expected_score_matrix(
 
     return score_matrix
 end
-
 
 function expected_info_matrix(
         bank::DataFrame, θ_values::Vector{Float64}; D::Float64 = 1.0

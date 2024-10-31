@@ -79,7 +79,8 @@ function load_irt_data(
     end
 
     # Check if num_categories is already in Bank
-    if !("NUM_CATEGORIES" in names(bank)) || isempty(bank.NUM_CATEGORIES) || any(x -> ismissing(x), bank.NUM_CATEGORIES)
+    if !("NUM_CATEGORIES" in names(bank)) || isempty(bank.NUM_CATEGORIES) ||
+       any(x -> ismissing(x), bank.NUM_CATEGORIES)
         # Compute num_categories and add to Parameters
         bank.NUM_CATEGORIES = calculate_num_categories(bank)
     end
@@ -135,8 +136,6 @@ function calculate_num_categories(bank::DataFrame)::Vector{Int}
 
     return num_categories
 end
-
-
 
 """
     get_tau(irt_dict::Dict{Symbol, Any}, score_matrix::Matrix{Float64}, r::Int, k::Int, N::Int)::Matrix{Float64}
