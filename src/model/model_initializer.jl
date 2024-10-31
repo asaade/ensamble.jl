@@ -5,9 +5,9 @@ export read_constraints, initialize_model!, configure_solver!
 using CSV
 using DataFrames
 using JuMP
+using Logging
 using StatsBase
 using StringDistances
-using Logging
 
 using ..Configuration
 using ..Utils
@@ -16,7 +16,10 @@ using ..Utils
 include("constraints.jl")
 include("criteria_parser.jl")
 include("solvers.jl")
+include("constraint_validation.jl")
+
 using .Constraints
+using .ConstraintValidation
 using .CriteriaParser
 using .SolverConfiguration
 
@@ -25,81 +28,9 @@ const APPLYING_CONSTRAINT_MESSAGE = "Applying constraint: "
 const INITIALIZING_MODEL_MESSAGE = "Initializing optimization model..."
 const MODEL_FILE = "./results/model.lp"
 
-const VALID_TYPES = [
-    "TEST",
-    "NUMBER",
-    "SCORE",
-    "SUM",
-    "ENEMIES",
-    "ALLORNONE",
-    "MAXUSE",
-    "OVERLAP",
-    "INCLUDE",
-    "EXCLUDE"
-]
 const CONFLICTING_CONSTRAINTS = ["ALLORNONE", "ENEMIES", "INCLUDE", "EXCLUDE"]
 
 level = Logging.Info
-
-"""
-    find_closest(input::String, valid_labels::Vector{String})::String
-                      valid_labels::Vector{String})::String
-
-Find the closest valid label from the `valid_labels` list based on string similarity
-(using Levenshtein distance).
-"""
-function find_closest(input::String, valid_labels::Vector{String})::String
-    distances = [evaluate(Levenshtein(), lowercase(input), lowercase(label))
-                 for
-                 label in valid_labels]
-    closest_label_index = argmin(distances)
-    return valid_labels[closest_label_index]
-end
-
-"""
-    validate_cond_id!(cond_id::String, cond_ids_seen::Set{String})
-
-Check if the `cond_id` is unique. If not, raise an error indicating the duplication.
-"""
-function validate_cond_id!(cond_id::String, cond_ids_seen::Set{String})
-    if cond_id in cond_ids_seen
-        error(
-            "Duplicate CONSTRAINT_ID: '$cond_id' found. Please ensure all constraint IDs are unique.",
-        )
-    end
-    push!(cond_ids_seen, cond_id)
-    return cond_id
-end
-
-"""
-    validate_type!(type::String, valid_types::Vector{String}, cond_id::String)
-
-Check if `type` is valid. If not, raise an error and suggest the closest valid label.
-"""
-function validate_type!(type::String, valid_types::Vector{String}, cond_id::String)
-    matched_type = findfirst(t -> lowercase(type) == lowercase(t), valid_types)
-    if matched_type === nothing
-        closest_label = find_closest(type, valid_types)
-        error(
-            "Invalid TYPE '$type' for constraint '$cond_id'. Suggestion: Use '$closest_label'.",
-        )
-    end
-    return type
-end
-
-"""
-    validate_bounds!(lb::Number, ub::Number, cond_id::String)
-
-Ensure LB and UB are valid numbers and LB ≤ UB.
-"""
-function validate_bounds!(lb::Number, ub::Number, cond_id::String)
-    if !(isa(lb, Number) && isa(ub, Number))
-        error("LB and UB must be valid numbers in '$cond_id'.")
-    end
-    if lb > ub
-        error("UB must be greater than or equal to LB in '$cond_id'.")
-    end
-end
 
 """
     read_constraints(file_path::String, parms::Parameters)
@@ -127,8 +58,8 @@ function read_constraints(file_path::String, parms::Parameters)
     for row in eachrow(df)
         row = map(upcase, row)
         if row[:ONOFF] == "ON"
-            cond_id = validate_cond_id!(String(row[:CONSTRAINT_ID]), cond_ids_seen)
-            type = validate_type!(String(row[:TYPE]), VALID_TYPES, cond_id)
+            cond_id = validate_cond_id(String(row[:CONSTRAINT_ID]), cond_ids_seen)
+            type = validate_type(String(row[:TYPE]), cond_id)
 
             # Track and enforce rules for TEST, OVERLAP, and MAXUSE
             if lowercase(type) in keys(type_counts)
@@ -138,15 +69,13 @@ function read_constraints(file_path::String, parms::Parameters)
             condition_expr = String(row[:CONDITION])
             lb = get(row, :LB, 0)
             ub = get(row, :UB, 0)
-            if type in ["TEST", "NUMBER", "SCORE", "SUM", "MAXUSE", "OVERLAP"]
-                validate_bounds!(lb, ub, cond_id)
-            end
+            validate_bounds(type, lb, ub, cond_id)
 
             # Parse the condition or default to a true condition
             condition = if strip(condition_expr) == ""
                 df -> trues(size(df, 1))
             else
-                CriteriaParser.parse_criteria(condition_expr)
+                validate_condition_syntax(condition_expr, cond_id)
             end
             constraints[cond_id] = Constraint(cond_id, type, eval(condition), lb, ub)
         end
@@ -157,7 +86,8 @@ function read_constraints(file_path::String, parms::Parameters)
         if type == "TEST" && count != 1
             error("Constraint 'TEST' must be included exactly once, but $count found.")
         elseif count > 1 && type in ["overlap", "maxuse"]
-            error("Constraint '$type' can only appear once, but $count found.")
+            parms.max_item_use = max(2, parms.max_item_use)
+            warn("Constraint '$type' can only appear once, but $count found. MAX_ITEM_USE set as >= 2")
         end
     end
 
@@ -214,7 +144,7 @@ function set_objective!(model::Model, parms::Parameters)
     end
 
     # Delegate to the appropriate objective function
-    if parms.method in ["TCC", "TCC2"]
+    if parms.method == "TCC"
         objective_match_characteristic_curve!(model, parms)
     elseif parms.method == "TCC2"
         objective_match_mean_var!(model, parms, 3.0)
@@ -226,7 +156,7 @@ function set_objective!(model::Model, parms::Parameters)
     elseif parms.method == "TIC2"
         objective_max_info(model, parms)
     elseif parms.method == "TIC3"
-        objective_info_relative2(model, parms)
+        objective_info_relative(model, parms)
     else
         throw(ArgumentError("Unknown method: $(parms.method)"))
     end
@@ -250,30 +180,30 @@ function apply_individual_constraint!(
         parms.max_items = ub
         constraint_items_per_form(model, parms, lb, ub)
     elseif constraint.type == "NUMBER"
-        condition = constraint.condition(bank)
-        constraint_item_count(model, parms, condition, lb, ub)
+        selected_items = constraint.condition(bank)
+        constraint_item_count(model, parms, selected_items, lb, ub)
     elseif constraint.type == "SCORE"
-        condition = constraint.condition(bank)
-        constraint_score_sum(model, parms, condition, lb, ub)
+        selected_items = constraint.condition(bank)
+        constraint_score_sum(model, parms, selected_items, lb, ub)
     elseif constraint.type == "SUM"
         item_vals = constraint.condition(bank)
         constraint_item_sum(model, parms, item_vals, lb, ub)
     elseif constraint.type == "ENEMIES"
-        condition = constraint.condition(bank)
-        constraint_enemies_in_form(model, parms, condition)
+        selected_items = constraint.condition(bank)
+        constraint_enemies(model, parms, selected_items)
     elseif constraint.type == "ALLORNONE"
-        condition = constraint.condition(bank)
-        constraint_friends_in_form(model, parms, condition)
+        selected_items = constraint.condition(bank)
+        constraint_friends_in_form(model, parms, selected_items)
     elseif constraint.type == "INCLUDE"
-        condition = constraint.condition(bank)
-        constraint_fix_items(model, condition)
+        selected_items = constraint.condition(bank)
+        constraint_fix_items(model, selected_items)
     elseif constraint.type == "EXCLUDE"
-        condition = constraint.condition(bank)
-        constraint_exclude_items(model, condition)
+        selected_items = constraint.condition(bank)
+        constraint_exclude_items(model, selected_items)
     elseif constraint.type == "MAXUSE"
         parms.max_item_use = ub
-        condition = constraint.condition(bank)
-        constraint_max_use(model, parms, condition, ub)
+        selected_items = constraint.condition(bank)
+        constraint_max_use(model, parms, selected_items)
     elseif constraint.type == "OVERLAP"
         constraint_forms_overlap(model, parms, lb, ub)
     else
@@ -420,7 +350,10 @@ function run_conflict_checks!(
 end
 
 """
-    find_all_constraints_by_type(constraints, type)
+    find_all_constraints_by_type(
+        constraints::Dict{String, Constraint}, type::String
+
+)::Vector{Constraint}
 
 Helper function to retrieve all constraints by their type.
 """
@@ -431,7 +364,10 @@ function find_all_constraints_by_type(
 end
 
 """
-    log_conflicts(conflict_type, conflicting_rows, max_rows_to_log)
+    log_conflicts(
+        conflict_type::String, conflicting_rows::DataFrame, max_rows_to_log::Int = 5
+
+)
 
 Logs conflicts found in data.
 """
@@ -447,7 +383,7 @@ function log_conflicts(
 end
 
 """
-    one_to_many_conflict_rule(values1, values2)
+    one_to_many_conflict_rule(values1::Vector, values2::Vector)::Vector{Tuple}
 
 Checks for one-to-many conflicts between two sets of values.
 """
@@ -467,7 +403,10 @@ function one_to_many_conflict_rule(values1::Vector, values2::Vector)::Vector{Tup
 end
 
 """
-    all_or_none_conflict_rule(friends_values, anchor_values)
+    all_or_none_conflict_rule(
+        friends_values::Vector, anchor_values::Vector
+
+)::Vector{Tuple}
 
 Checks for all-or-none conflicts between two sets of values.
 """
@@ -492,7 +431,7 @@ function all_or_none_conflict_rule(
 end
 
 """
-    apply_conflict_rule(values1, values2, rule)
+    apply_conflict_rule(values1::Vector, values2::Vector, rule::Function)::DataFrame
 
 Applies a conflict rule between two sets of values and returns a DataFrame with conflicting pairs if any exist.
 """
