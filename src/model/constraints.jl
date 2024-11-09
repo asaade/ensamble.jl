@@ -556,74 +556,80 @@ end
     objective_match_mean_var!(model::Model, parms::Parameters, α::Float64 = 1.0)
 
 Matches expected score means and variances of test forms to reference values across theta points.
+
+# Arguments
+- `model`: JuMP model containing decision variables x and y
+- `parms`: Parameters object containing test assembly parameters
+- `α`: Weight factor for variance matching (default: 1.0)
 """
-function objective_match_mean_var!(model::Model, parms::Parameters, α::Float64 = 1.0)
-    K = 1:(parms.k)  # Number of theta points
+function objective_match_mean_var!(model::Model, parms::Parameters, α::Float64 = 3.0)
+    # Input validation
+    @assert α > 0 "Weight factor α must be positive"
+    @assert haskey(model, :x) && haskey(model, :y) "Model must contain variables x and y"
+
+    # Extract parameters
+    K = 1:parms.k  # Theta points
     tau_mean, tau_var = parms.tau_mean, parms.tau_var
     expected_scores = parms.score_matrix
     x, y = model[:x], model[:y]
-    items, forms = size(x)
-    zcol = forms  # Shadow test column if applicable
-    forms -= parms.shadow_test_size > 0 ? 1 : 0
+    num_items, num_forms = size(x)
 
-    # Separate anchor and non-anchor items if anchor tests are used
+    # Handle shadow test configuration
+    has_shadow_test = parms.shadow_test_size > 0
+    if has_shadow_test
+        shadow_test_col = num_forms
+        num_forms -= 1
+    end
+
+    # Process anchor items
     if parms.anchor_tests > 0
-        anchor_items = filter(i -> !ismissing(parms.bank.ANCHOR[i]), 1:items)
-        non_anchor_items = filter(i -> ismissing(parms.bank.ANCHOR[i]), 1:items)
+        anchor_items = [i for i in 1:num_items if !ismissing(parms.bank.ANCHOR[i])]
+        non_anchor_items = [i for i in 1:num_items if ismissing(parms.bank.ANCHOR[i])]
 
-        # Calculate anchor contributions to means and variances for each theta point
-        anchor_mean_contribution = zeros(Float64, length(K))
-        anchor_var_contribution = zeros(Float64, length(K))
-        for k in K
-            anchor_mean_contribution[k] = sum(expected_scores[i, k] for i in anchor_items)
-            anchor_var_contribution[k] = sum((expected_scores[i, k] - tau_mean[k])^2
-            for i in anchor_items)
-        end
+        # Pre-compute anchor contributions
+        anchor_mean_contribution = [sum(expected_scores[i, k] for i in anchor_items) for k in K]
+        anchor_var_contribution = [sum((expected_scores[i, k] - tau_mean[k])^2 for i in anchor_items) for k in K]
     else
-        non_anchor_items = 1:items
+        non_anchor_items = 1:num_items
         anchor_mean_contribution = zeros(Float64, length(K))
         anchor_var_contribution = zeros(Float64, length(K))
     end
 
-    # Constraints for operational forms: match mean and variance
-    @constraint(model, [f = 1:forms, k = K],
-        sum(expected_scores[i, k] * x[i, f] for i in 1:items)<=tau_mean[k] + y)
-    @constraint(model, [f = 1:forms, k = K],
-        sum(expected_scores[i, k] * x[i, f] for i in 1:items)>=tau_mean[k] - y)
+    # Operational forms constraints
+    @constraint(model, mean_upper[f=1:num_forms, k=K],
+        sum(expected_scores[i, k] * x[i, f] for i in 1:num_items) <= tau_mean[k] + y)
+    @constraint(model, mean_lower[f=1:num_forms, k=K],
+        sum(expected_scores[i, k] * x[i, f] for i in 1:num_items) >= tau_mean[k] - y)
 
-    @constraint(model, [f = 1:forms, k = K],
-        sum(α * (expected_scores[i, k] - tau_mean[k])^2 * x[i, f]
-        for i in 1:items)<=tau_var[k] + y)
-    @constraint(model, [f = 1:forms, k = K],
-        sum(α * (expected_scores[i, k] - tau_mean[k])^2 * x[i, f]
-        for i in 1:items)>=tau_var[k] - y)
+    @constraint(model, var_upper[f=1:num_forms, k=K],
+        sum(α * (expected_scores[i, k] - tau_mean[k])^2 * x[i, f] for i in 1:num_items) <= tau_var[k] + y)
+    @constraint(model, var_lower[f=1:num_forms, k=K],
+        sum(α * (expected_scores[i, k] - tau_mean[k])^2 * x[i, f] for i in 1:num_items) >= tau_var[k] - y)
 
-    # Constraints for shadow test if applicable
-    if parms.shadow_test_size > 0
+    # Shadow test constraints
+    if has_shadow_test
         shadow_test_size = parms.shadow_test_size
+        effective_tau_mean = [tau_mean[k] - anchor_mean_contribution[k] for k in K]
+        effective_tau_var = [tau_var[k] - anchor_var_contribution[k] for k in K]
 
-        for k in K
-            effective_tau_mean = tau_mean[k] - anchor_mean_contribution[k]
-            effective_tau_var = tau_var[k] - anchor_var_contribution[k]
+        @constraint(model, shadow_mean_upper[k=K],
+            sum(expected_scores[i, k] * x[i, shadow_test_col] for i in non_anchor_items) <=
+            effective_tau_mean[k] + shadow_test_size * y)
+        @constraint(model, shadow_mean_lower[k=K],
+            sum(expected_scores[i, k] * x[i, shadow_test_col] for i in non_anchor_items) >=
+            effective_tau_mean[k] - shadow_test_size * y)
 
-            @constraint(model,
-                sum(expected_scores[i, k] * x[i, zcol]
-                for i in non_anchor_items)<=effective_tau_mean + y * shadow_test_size)
-            @constraint(model,
-                sum(expected_scores[i, k] * x[i, zcol]
-                for i in non_anchor_items)>=effective_tau_mean - y * shadow_test_size)
-
-            @constraint(model,
-                sum(α * (expected_scores[i, k] - tau_mean[k])^2 * x[i, zcol]
-                for i in non_anchor_items)<=effective_tau_var + y * shadow_test_size)
-            @constraint(model,
-                sum(α * (expected_scores[i, k] - tau_mean[k])^2 * x[i, zcol]
-                for i in non_anchor_items)>=effective_tau_var - y * shadow_test_size)
-        end
+        @constraint(model, shadow_var_upper[k=K],
+            sum(α * (expected_scores[i, k] - tau_mean[k])^2 * x[i, shadow_test_col] for i in non_anchor_items) <=
+            effective_tau_var[k] + shadow_test_size * y)
+        @constraint(model, shadow_var_lower[k=K],
+            sum(α * (expected_scores[i, k] - tau_mean[k])^2 * x[i, shadow_test_col] for i in non_anchor_items) >=
+            effective_tau_var[k] - shadow_test_size * y)
     end
 
     return model
 end
+
 
 """
     objective_match_information_curve!(model::Model, parms::Parameters)

@@ -3,7 +3,7 @@ module Ensamble
 export assemble_tests, load_irt_data
 
 using Revise
-# Import necessary packages
+
 using JuMP
 using DataFrames
 using Logging
@@ -12,7 +12,9 @@ using PrettyTables
 include("constants.jl")
 
 # Include local modules (this loads the code from each file)
+include("errors/error_types.jl")
 include("utils/utils.jl")
+include("validation/config_validation.jl")
 include("config/configuration.jl")
 include("display/display_results.jl")
 include("model/model_initializer.jl")
@@ -24,10 +26,13 @@ include("model/model_initializer.jl")
 # Revise.track("src/model/model_initializer.jl")
 
 # Use the included modules
+using .ATAErrors
 using .Utils
+using .ConfigValidation
 using .Configuration
 using .DisplayResults
 using .ModelInitializer
+
 # Set global log level
 Logging.global_logger(Logging.ConsoleLogger(stderr, Logging.Info))
 

@@ -11,7 +11,7 @@ export calc_tau,
        expected_score_item,
        expected_score_matrix,
        expected_info_matrix,
-       calc_expected_scores_reference!
+       calc_expected_scores_reference
 
 using Base.Threads
 using DataFrames
@@ -476,135 +476,191 @@ function expected_info_matrix(
     return info_matrix
 end
 
-function calc_tau(score_matrix::Matrix{Float64}, r::Int, N::Int)::Matrix{Float64}
+
+function calc_tau(
+    score_matrix::Matrix{Float64},
+    r::Int,
+    N::Int;
+    num_simulations::Int = 250,
+    rng::AbstractRNG = Random.GLOBAL_RNG,
+)::Matrix{Float64}
     """
     Calculate the tau matrix for given probabilities.
 
     # Arguments:
-    - `score_matrix`: Probability matrix (Items x K).
+    - `score_matrix`: Probability matrix (Items × K).
     - `r`: Number of powers.
     - `N`: Sample size.
+    - `num_simulations`: Number of simulations (default = 250).
+    - `rng`: Random number generator (default = Random.GLOBAL_RNG).
 
     # Returns:
-    - Tau matrix (R x K).
+    - Tau matrix (R × K).
     """
-    k = size(score_matrix, 2)  # Number of theta points is the number of columns of score_matrix
-    tau = zeros(Float64, r, k)  # Initialize tau matrix (R x K)
-    num_items = size(score_matrix, 1)  # Number of items
+    num_items, num_theta_points = size(score_matrix)
+    tau = zeros(Float64, r, num_theta_points)
 
-    # Sample and accumulate tau for 250 batches
-    for _ in 1:250
-        sampled_rows = rand(1:num_items, N)  # Sample N rows
-        buffer = score_matrix[sampled_rows, :]  # N x K matrix
-
-        for r_index in 1:r
-            # Sum buffer raised to r_index-th power along the first dimension (rows)
-            # Ensure sum returns a row vector for broadcasting
-            tau[r_index, :] .+= sum(buffer .^ r_index; dims = 1)[:]  # Use `[:]` to ensure proper shape
-        end
+    if N > num_items
+        error("Sample size N cannot exceed the number of items in the score_matrix.")
     end
 
-    return tau / 250.0  # Average the results
+    # Generate unique seeds for reproducibility
+    seeds = rand(rng, UInt64, num_simulations)
+
+    # Function to process a single simulation
+    function process_simulation(seed)
+        local_rng = MersenneTwister(seed)
+        sampled_indices = randperm(local_rng, num_items)[1:N]  # Sample N items without replacement
+        buffer = score_matrix[sampled_indices, :]  # N × K matrix
+        tau_local = zeros(Float64, r, num_theta_points)
+        for r_index in 1:r
+            tau_local[r_index, :] = sum(buffer .^ r_index; dims = 1)[:]
+        end
+        return tau_local
+    end
+
+    # Process simulations in parallel
+    simulations = ThreadsX.map(process_simulation, seeds)
+
+    # Sum over all simulations
+    for sim_tau in simulations
+        tau .+= sim_tau
+    end
+
+    # Average the results
+    tau ./= num_simulations
+
+    return tau
 end
 
-function calc_info_tau(info_matrix::Matrix{Float64}, N::Int)::Vector{Float64}
+using Random
+using ThreadsX  # Make sure to add the ThreadsX package if not already installed
+
+function calc_info_tau(
+    info_matrix::Matrix{Float64},
+    N::Int;
+    num_batches::Int = 250,
+    rng::AbstractRNG = Random.GLOBAL_RNG,
+    sample_with_replacement::Bool = false,
+)::Vector{Float64}
     """
-    Calculate the tau vector for item information functions.
+    Calculate the tau vector for item information functions by simulating sums over random samples.
 
     # Arguments:
-    - `info_matrix`: Information matrix (Items x K).
-    - `N`: Sample size.
+    - `info_matrix`: Information matrix (Items × K), where each row represents an item and each column represents a theta point.
+    - `N`: Number of items to sample in each batch (sample size).
+    - `num_batches`: Number of batches to simulate (default = 250).
+    - `rng`: Random number generator for reproducibility (default = `Random.GLOBAL_RNG`).
+    - `sample_with_replacement`: Whether to sample items with replacement (default = `false`).
 
     # Returns:
-    - Tau information vector (length K).
+    - `tau`: Tau information vector of length `K`, representing the average sum of item information across batches.
     """
-    k = size(info_matrix, 2)  # Number of theta points
-    tau = zeros(Float64, k)  # Initialize tau vector
-    num_items = size(info_matrix, 1)  # Number of items
+    num_items, num_theta_points = size(info_matrix)
+    tau = zeros(Float64, num_theta_points)
 
-    # Sample and accumulate tau for 250 batches
-    for _ in 1:250
-        sampled_rows = rand(1:num_items, N)  # Sample N rows
-        buffer = info_matrix[sampled_rows, :]
-
-        tau .+= sum(buffer; dims = 1)[:]  # Use `[:]` to flatten the sum result to a 1D vector
+    # Error handling
+    if N > num_items && !sample_with_replacement
+        error("Sample size N cannot exceed the number of items when sampling without replacement.")
     end
 
-    return tau / 250.0  # Average the results
+    # Generate unique seeds for reproducibility
+    seeds = rand(rng, UInt64, num_batches)
+
+    # Function to process a single batch
+    function process_batch(seed)
+        local_rng = MersenneTwister(seed)
+        if sample_with_replacement
+            sampled_indices = rand(local_rng, 1:num_items, N)
+        else
+            sampled_indices = randperm(local_rng, num_items)[1:N]
+        end
+        buffer = info_matrix[sampled_indices, :]  # N × K matrix
+        tau_local = sum(buffer; dims = 1)[:]      # Sum over items and flatten to 1D vector
+        return tau_local
+    end
+
+    # Process batches in parallel
+    batch_results = ThreadsX.map(process_batch, seeds)
+
+    # Accumulate the results
+    for batch_tau in batch_results
+        tau .+= batch_tau
+    end
+
+    # Compute the average over batches
+    tau ./= num_batches
+
+    return tau
 end
 
-"""
-    calc_expected_scores_reference!(expected_scores::Matrix{Float64}, N::Int, theta_critical::Vector{Float64}; num_forms::Int = 250)
 
-Calculates the mean and variance of expected scores for the reference form, either from user-provided values or by simulating test forms from the item bank.
+"""
+    calc_expected_scores_reference(expected_scores::Matrix{Float64}, N::Int; num_forms::Int = 250)
+
+Calculates the mean (`tau_mean`) and variance (`tau_var`) of expected scores for the reference form, either from user-provided values or by simulating test forms from the item bank.
 
 # Arguments:
 
-  - `expected_scores`: Matrix of expected scores (Items x Theta points), where each row corresponds to an item, and each column corresponds to a critical theta point.
-  - `N`: Number of items to sample in each simulated form (sample size).
-  - `theta_critical`: Vector of critical theta points (ability levels) used for calculating expected scores.
+  - `expected_scores`: Matrix of expected scores (Items × Theta points), where each row corresponds to an item, and each column corresponds to a critical theta point.
+  - `N`: Number of items to sample in each simulated form (sample size). If `N == 0`, the function calculates `tau_mean` and `tau_var` directly from `expected_scores`.
   - `num_forms`: Number of simulated test forms (default = 250).
 
 # Returns:
 
-  - `tau_mean`: Vector of mean expected scores for each theta point (size `K`).
-  - `tau_var`: Vector of variance of expected scores for each theta point (size `K`).
+  - `tau_mean`: Vector of mean expected scores for each theta point (size `k`).
+  - `tau_var`: Vector of variance of expected scores for each theta point (size `k`).
 """
-function calc_expected_scores_reference!(
+function calc_expected_scores_reference(
         expected_scores::Matrix{Float64},
-        N::Int,
+        N::Int;
         num_forms::Int = 250
 )
-    num_items, k = size(expected_scores)  # Number of items and number of critical theta points
+    num_items, _ = size(expected_scores)  # Number of items and theta points
 
-    # If user provided expected scores for the reference form, calculate mean and variance directly
     if N == 0
+        # Direct calculation from provided expected scores
         tau_mean = vec(mean(expected_scores; dims = 1))
         tau_var = vec(var(expected_scores; dims = 1))
         return tau_mean, tau_var
     end
 
-    # Simulate reference forms if N > 0
-    function process_form(_)
-        # Generate a unique seed using thread ID and time for reproducibility
-        seed = UInt64(Threads.threadid()) + UInt64(time_ns())
+    # Generate unique seeds for RNGs
+    rng = Random.MersenneTwister()
+    seeds = rand(rng, UInt64, num_forms)
+
+    function process_form(seed)
         rng = MersenneTwister(seed)
         if N <= num_items
+            # Sample N unique items without replacement
             sampled_indices = randperm(rng, num_items)[1:N]
         else
-            error(
-                "Sample size N cannot exceed the number of items in the expected_scores matrix.",
-            )
+            error("Sample size N cannot exceed the number of items in the expected_scores matrix.")
         end
 
-        # Sample expected scores for the form
-        sampled_scores = expected_scores[sampled_indices, :]  # Shape: (N, k)
+        # Extract expected scores for sampled items
+        sampled_scores = expected_scores[sampled_indices, :]  # Shape: (N, num_theta_points)
 
-        # Calculate mean and variance for each theta point across the sampled items
-        form_mean = vec(mean(sampled_scores; dims = 1))
-        form_var = vec(var(sampled_scores; dims = 1))
+        # Calculate mean and variance across sampled items for each theta point
+        form_mean = mean(sampled_scores; dims = 1)  # Shape: (1, num_theta_points)
+        form_var = var(sampled_scores; dims = 1)    # Shape: (1, num_theta_points)
         return form_mean, form_var
     end
 
-    # Use ThreadsX.map to process forms in parallel and calculate mean/variance for each form
-    results = ThreadsX.map(process_form, 1:num_forms)
+    # Process forms in parallel using ThreadsX
+    results = ThreadsX.map(process_form, seeds)
 
-    # Initialize the tau mean and tau variance vectors
-    tau_mean = zeros(Float64, k)
-    tau_var = zeros(Float64, k)
+    # Aggregate results
+    form_means = vcat([res[1] for res in results]...)
+    form_vars = vcat([res[2] for res in results]...)
 
-    # Sum the results from all simulated forms
-    for (form_mean, form_var) in results
-        tau_mean .+= form_mean
-        tau_var .+= form_var
-    end
-
-    # Compute the average over the simulated forms
-    tau_mean ./= num_forms
-    tau_var ./= num_forms
+    # Compute overall mean and variance
+    tau_mean = vec(mean(form_means; dims = 1))
+    tau_var = vec(mean(form_vars; dims = 1))
 
     return tau_mean, tau_var
 end
+
 
 """
     observed_score_continuous(item_params::Matrix{Float64}, ability_dist::Normal;
