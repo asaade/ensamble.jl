@@ -25,9 +25,9 @@ Ensamble.jl is a Julia-based ATA solution that integrates **Item Response Theory
 
 ### Why Julia and JuMP?
 
-**Julia** is a high-performance programming language that excels in scientific computing and optimization tasks. It combines the ease of writing high-level code with execution speeds close to lower-level languages like C or Fortran. This makes Julia ideal for test assembly processes, which involve heavy computation and avoid the need to mix different programming languages, as is done in R and Python..
+**Julia** is a high-performance programming language that excels in scientific computing and optimization tasks. It combines the ease of writing high-level code with execution speeds close to lower-level languages like C or Fortran. This makes Julia ideal for test assembly processes, which involve heavy computation and avoid the need to mix different programming languages, as is common in R and Python. Julia's syntax is closer to mathematical notation, making it very intuitive for expressing mathematical models, optimization problems, and complex algorithms.
 
-**JuMP** is a rich domain-specific language for mathematical optimization embedded in Julia. It allows users to formulate complex optimization models in a flexible, high-level manner while interfacing with various solvers. For Ensamble.jl, JuMP manages the optimization of test item selection under predefined constraints.
+**JuMP** is a rich domain-specific language for mathematical optimization embedded in Julia. It allows users to formulate complex optimization models in a flexible, high-level manner. For Ensamble.jl, JuMP manages the optimization of test item selection under predefined constraints. JJuMP integrates seamlessly with high-performance solvers (e.g., Gurobi, CPLEX, HiGHS, GLPK), providing flexibility in choosing solvers for test assembly. While Python and R also have access to solvers, Julia’s JuMP is particularly well-optimized for this purpose.
 
 ### Supported Assembly Methods
 
