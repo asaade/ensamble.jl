@@ -1,78 +1,93 @@
+# src/config/config_loader.jl
 module ConfigLoader
+
+using ..ATAErrors
+using ..ConfigValidation
 using ..Utils
 
 export BasicConfig, load_config
 
-# Define the Config struct (from types.jl)
-mutable struct BasicConfig
-    items_file::String             # Path to item bank file
-    anchor_items_file::String      # Path to anchor items file (empty string if not used)
-    constraints_file::String       # Path to constraints file
-    forms_file::String             # Path to item bank file (output)
-    results_file::String           # Path to results file
-    tcc_file::String               # Path to TCC file
-    plot_file::String              # Path to plot file
-    solver::String                 # Solver type (e.g., "CPLEX", "HiGHS", etc.)
-    verbose::Int                   # Verbosity level
+"""
+Configuration structure for basic settings
+"""
+struct BasicConfig
+    items_file::String
+    anchor_items_file::String
+    constraints_file::String
+    forms_file::String
+    results_file::String
+    tcc_file::String
+    plot_file::String
+    solver::String
+    verbose::Int
     report_categories::Vector{String}
     report_sums::Vector{String}
+
+    # Inner constructor with validation
+    function BasicConfig(items_file::String, anchor_file::String, constraints_file::String,
+                        forms_file::String, results_file::String, tcc_file::String,
+                        plot_file::String, solver::String, verbose::Int,
+                        report_categories::Vector{String}, report_sums::Vector{String})
+        # Validate required files exist
+        for (name, file) in [("items", items_file), ("constraints", constraints_file)]
+            if !isfile(file)
+                throw(FilePathError(name, file, "File does not exist"))
+            end
+        end
+
+        # Validate solver
+        valid_solvers = ["CPLEX", "HIGHS", "GLPK", "CBC", "SCIP"]
+        if !(uppercase(solver) in valid_solvers)
+            throw(ValidationError("Invalid solver specified", "solver", solver))
+        end
+
+        # Validate verbose level
+        if !(0 ≤ verbose ≤ 3)
+            throw(ValidationError("Invalid verbose level", "verbose", verbose))
+        end
+
+        new(items_file, anchor_file, constraints_file, forms_file,
+            results_file, tcc_file, plot_file, uppercase(solver),
+            verbose, report_categories, report_sums)
+    end
 end
 
 """
-    load_config(config_data::Dict{Symbol, Any})::Config
-
-Reads configuration from a TOML dictionary and returns a `Config` struct.
-
-# Arguments
-
-  - `config_data`: A dictionary containing the TOML configuration data.
-
-# Returns
-
-  - A `Config` struct with configuration settings loaded from the dictionary.
+Loads configuration from TOML data
 """
-function load_config(config_data::Dict{Symbol, Any})::BasicConfig
-    # Load only the corresponding part from the dictionary
+function load_config(config_data::Dict{Symbol,Any})::BasicConfig
+    try
+        # Validate complete configuration structure
+        validate_config_data(config_data)
 
-    if !haskey(config_data, :FILES)
-        @error "Configuration file is missing the FILES section."
-        throw(ArgumentError("Missing FILES section in the configuration"))
+        files_data = config_data[:FILES]
+
+        # Create configuration with defaults
+        return BasicConfig(
+            get(files_data, :ITEMSFILE, "items.csv"),
+            get(files_data, :ANCHORFILE, ""),
+            get(files_data, :CONSTRAINTSFILE, "constraints.csv"),
+            get(files_data, :FORMSFILE, "results/forms.csv"),
+            get(files_data, :RESULTSFILE, "results/results.csv"),
+            get(files_data, :TCCFILE, "results/tcc_results.csv"),
+            get(files_data, :PLOTFILE, "results/plot_output.png"),
+            get(files_data, :SOLVER, "CPLEX"),
+            get(files_data, :VERBOSE, 1),
+            convert(Vector{String}, get(files_data, :REPORTCATEGORIES, String[])),
+            convert(Vector{String}, get(files_data, :REPORTSUMS, String[]))
+        )
+
+    catch e
+        if e isa ATAError
+            rethrow(e)
+        else
+            throw(ConfigError(
+                "Failed to load configuration",
+                "load_config",
+                e
+            ))
+        end
     end
-
-    config_data = cleanValues(config_data)
-
-    files_data = config_data[:FILES]
-
-    # Extract necessary fields and provide defaults if needed
-    items_file = get(files_data, :ITEMSFILE, "items.csv")
-    anchor_file = get(files_data, :ANCHORFILE, "anchors.csv")
-    constraints_file = get(files_data, :CONSTRAINTSFILE, "")
-    forms_file = get(files_data, :FORMSFILE, "results/forms.csv")
-    results_file = get(files_data, :RESULTSFILE, "results/results.csv")
-    tcc_file = get(files_data, :TCCFILE, "results/tcc_results.csv")
-    plot_file = get(files_data, :PLOTFILE, "results/combined_plots.pdf")
-    solver = get(files_data, :SOLVER, "CPLEX")  # Default solver is "CPLEX"
-    verbose = get(files_data, :VERBOSE, 1)      # Default verbosity is 1
-    report_categories = get(files_data, :REPORTCATEGORIES, [""])
-    report_sums = get(files_data, :REPORTSUMS, [""])
-
-    # Log the loaded configuration for debugging purposes
-    @info "Loaded configuration: items_file = $items_file, anchor_file = $anchor_file, solver = $solver"
-
-    # Return the Config struct
-    return BasicConfig(
-        items_file,
-        anchor_file,
-        constraints_file,
-        forms_file,
-        results_file,
-        tcc_file,
-        plot_file,
-        solver,
-        verbose,
-        report_categories,
-        report_sums
-    )
 end
 
 end # module ConfigLoader

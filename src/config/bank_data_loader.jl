@@ -1,129 +1,203 @@
+# src/data/bank_data_loader.jl
+
 module BankDataLoader
 
-export read_bank_file
+export read_bank_file, BankLoadError
 
 using DataFrames
 using ..Utils
+using ..ATAErrors
+using ..ConfigValidation
 
 """
-    read_bank_file(items_file::String)::DataFrame
-
-Reads the item bank file and returns a DataFrame.
+Custom errors for bank loading operations
 """
-function read_bank_file(itemsfile::String, anchorsfile::String)::DataFrame
-    bank = read_items_file(itemsfile)
-    bank_size = size(bank, 1)
-    @info "Loaded $bank_size items from $itemsfile"
-
-    anchor = read_anchor_file(anchorsfile)
-    anchor_forms = size(anchor, 2)
-    @info "Loaded $anchor_forms anchor forms from $anchorsfile"
-
-    # Add anchor labels and clean the bank
-    bank = add_anchor_labels!(bank, anchor)
-    bank = select_valid_items!(bank)
-    bank = unique!(bank, :ID)
-    bank = add_aux_labels!(bank)
-
-    return bank
+struct BankLoadError <: ATAError
+    message::String
+    operation::String
+    details::Any
 end
 
-"""
-    read_items_file(items_file::String)::DataFrame
 
-Reads the item file and returns a DataFrame.
+"""
+Reads and processes the item bank file
 """
 function read_items_file(items_file::String)::DataFrame
     try
+        # Read and standardize column names
         bank = safe_read_csv(items_file)
         rename!(bank, uppercase.(names(bank)))
         bank = uppercase_dataframe!(bank)
 
-        # Set missing A values to 1.0 for all models
-        bank.A = coalesce.(bank.A, 1.0)
+        # Validate required columns
+        validate_bank_columns(bank)
 
-        # Set missing C values to 0.0 for all models
+        # Set default values for A and C parameters
+        bank.A = coalesce.(bank.A, 1.0)
         bank.C = coalesce.(bank.C, 0.0)
 
         return bank
     catch e
-        error("Error loading item bank: $e")
+        if e isa ATAError
+            rethrow(e)
+        else
+            throw(BankLoadError(
+                "Failed to load item bank",
+                "read_items_file",
+                e
+            ))
+        end
     end
 end
 
 """
-    read_anchor_file(anchor_file::String)::DataFrame
-
-Reads the anchor items file and returns a DataFrame.
+Reads and processes the anchor items file
 """
 function read_anchor_file(anchor_file::String)::DataFrame
-    if !isempty(anchor_file)
-        try
-            anchor_data = safe_read_csv(anchor_file)
-            rename!(anchor_data, uppercase.(names(anchor_data)))
-            return uppercase_dataframe!(anchor_data)
-        catch e
-            error("Error loading anchor items: $e")
+    if isempty(anchor_file)
+        @info "No anchor file provided, proceeding without anchor items"
+        return DataFrame()
+    end
+
+    try
+        anchor_data = safe_read_csv(anchor_file)
+        rename!(anchor_data, uppercase.(names(anchor_data)))
+        return uppercase_dataframe!(anchor_data)
+    catch e
+        if e isa ATAError
+            rethrow(e)
+        else
+            throw(BankLoadError(
+                "Failed to load anchor items",
+                "read_anchor_file",
+                e
+            ))
         end
-    else
-        @warn "Anchor file is empty or not provided."
-        return DataFrame()  # Return an empty DataFrame if no anchor file is provided
     end
 end
 
 """
-    add_anchor_labels!(bank::DataFrame, anchor_tests::DataFrame)
-
-Adds a column to the DataFrame with an ID number for the anchor test or missing.
+Adds anchor test labels to the item bank
 """
 function add_anchor_labels!(bank::DataFrame, anchor_tests::DataFrame)::DataFrame
-    bank.ANCHOR = Vector{Union{Missing, Int}}(missing, nrow(bank))
+    try
+        bank.ANCHOR = Vector{Union{Missing, Int}}(missing, nrow(bank))
 
-    for i in 1:size(anchor_tests, 2)
-        dfv = view(bank, bank.ID .∈ Ref(anchor_tests[:, i]), :)
-        @. dfv.ANCHOR = i
+        for i in 1:ncol(anchor_tests)  # Using ncol() from DataFrames.jl
+            dfv = view(bank, bank.ID .∈ Ref(anchor_tests[:, i]), :)
+            @. dfv.ANCHOR = i
+        end
+
+        return bank
+    catch e
+        throw(BankLoadError(
+            "Failed to add anchor labels",
+            "add_anchor_labels",
+            e
+        ))
     end
-
-    return bank
 end
 
 """
-    add_aux_labels!(bank::DataFrame)
-
-Adds INDEX and ITEM_USE columns to the DataFrame to be used by some constraints later.
+Adds auxiliary labels (INDEX and ITEM_USE) to the item bank
 """
 function add_aux_labels!(bank::DataFrame)::DataFrame
-    bank.ITEM_USE .= 0  # Initialize ITEM_USE column with zeros
-    bank.INDEX = rownumber.(eachrow(bank))  # Assign index numbers
-    return bank
+    try
+        bank.ITEM_USE .= 0
+        bank.INDEX = rownumber.(eachrow(bank))
+        return bank
+    catch e
+        throw(BankLoadError(
+            "Failed to add auxiliary labels",
+            "add_aux_labels",
+            e
+        ))
+    end
 end
 
 """
-    select_valid_items!(bank::DataFrame)::DataFrame
-
-Cleans the item bank based on IRT limits for A, B, and C.
+Selects valid items based on IRT parameter limits
 """
-function select_valid_items!(bank::DataFrame)::DataFrame
-    original_size = size(bank, 1)
-    dropmissing!(bank, [:B, :ID])  # Remove rows with missing B or ID values
+function select_valid_items!(bank::DataFrame, limits::IRTLimits = DEFAULT_IRT_LIMITS)::DataFrame
+    try
+        original_size = nrow(bank)
 
-    # Fill missing A and C values for dichotomous items
-    bank.A = coalesce.(bank.A, 1.0)
-    bank.C = coalesce.(bank.C, 0.0)
+        # Remove rows with missing essential values
+        dropmissing!(bank, [:B, :ID])
 
-    # Filter items based on A, B, C limits for dichotomous items
-    filter!(
-        row -> (0.4 <= row.A <= 2.0 && -3.5 <= row.B <= 3.5 && 0.0 <= row.C <= 0.5), bank
-    )
+        # Fill missing values
+        bank.A = coalesce.(bank.A, 1.0)
+        bank.C = coalesce.(bank.C, 0.0)
 
-    invalid_items = original_size - size(bank, 1)
-    invalid_items > 0 &&
-        @warn string(invalid_items, " invalid items were filtered out of the bank.")
+        # Validate and log invalid items
+        invalid_items = validate_irt_parameters(bank, limits)
 
-    # Recompute the INDEX column after filtering
-    bank.INDEX = rownumber.(eachrow(bank))
+        if !isempty(invalid_items)
+            @warn "Found $(nrow(invalid_items)) items with invalid IRT parameters"
+            @debug "Invalid items:" invalid_items
+        end
 
-    return bank
+        # Filter valid items
+        filter!(row -> (
+            limits.min_a <= row.A <= limits.max_a &&
+            limits.min_b <= row.B <= limits.max_b &&
+            limits.min_c <= row.C <= limits.max_c
+        ), bank)
+
+        # Log filtering results
+        items_removed = original_size - nrow(bank)
+        if items_removed > 0
+            @info "Removed $items_removed items with invalid parameters"
+        end
+
+        # Update indices
+        bank.INDEX = rownumber.(eachrow(bank))
+
+        return bank
+    catch e
+        throw(BankLoadError(
+            "Failed to select valid items",
+            "select_valid_items",
+            e
+        ))
+    end
+end
+
+"""
+Reads and processes the complete item bank with anchor items
+"""
+function read_bank_file(itemsfile::String, anchorsfile::String)::DataFrame
+    try
+        # Load main item bank
+        bank = read_items_file(itemsfile)
+        @info "Loaded $(nrow(bank)) items from $itemsfile"
+
+        # Load anchor items if provided
+        anchor = read_anchor_file(anchorsfile)
+        if !isempty(anchor)
+            @info "Loaded $(size(anchor, 2)) anchor forms from $anchorsfile"
+        end
+
+        # Process the bank
+        bank = add_anchor_labels!(bank, anchor)
+        bank = select_valid_items!(bank)
+        bank = unique!(bank, :ID)
+        bank = add_aux_labels!(bank)
+
+        @info "Final bank contains $(nrow(bank)) valid items"
+        return bank
+
+    catch e
+        if e isa ATAError
+            rethrow(e)
+        else
+            throw(BankLoadError(
+                "Failed to process item bank",
+                "read_bank_file",
+                e
+            ))
+        end
+    end
 end
 
 end # module BankDataLoader

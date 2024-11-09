@@ -1,17 +1,18 @@
 module Configuration
 
-# Export main configuration-related functions and types
-export configure, Config, Parameters, Constraint, load_irt_data
+export configure, Config, Parameters, Constraint
 
 using DataFrames
 
+using ..ATAErrors
+using ..ConfigValidation
 using ..Utils
 
-# Include all the necessary module files
-include("config_loader.jl")    # Loads configuration file names
-include("assembly_config_loader.jl")  # Loads and checks form configurations
-include("bank_data_loader.jl")  # Loads and checks item bank and anchor test data
-include("irt_data_loader.jl")  # Configures and calculates IRT model data
+# Include submodules
+include("config_loader.jl")
+include("assembly_config_loader.jl")
+include("bank_data_loader.jl")
+include("irt_data_loader.jl")
 
 # Use modules in the current scope for Configuration
 using .ConfigLoader
@@ -139,47 +140,37 @@ end
 Entry point function that loads and prepares the system configuration.
 Reads from a TOML configuration file, loads data, and returns the system parameters.
 """
-function configure(inFile::String = "data/config.toml")::Tuple{Config, Parameters}
-    # Read TOML configuration and validate in safe_read_toml
-    config_data = try
-        upcaseKeys(safe_read_toml(inFile))
-    catch e
-        error("Failed to load configuration from file: $inFile. Error: $e")
-    end
+function configure(config_file::String = "data/config.toml")::Tuple{Config,Parameters}
+    try
+        # Load and validate TOML configuration
+        config_data::Dict{Symbol, Any} = upcaseKeys(safe_read_toml(config_file))
+        validate_config_data(config_data)
 
-    # Load and validate configuration and forms in load_config and load_assembly_config
-    basic_config = try
-        load_config(config_data)
-    catch e
-        error("Error loading basic configuration. Details: $e")
-    end
+        # Load configurations
+        basic_config = load_config(config_data)
+        forms_config = load_assembly_config(config_data)
 
-    forms_config = try
-        load_assembly_config(config_data)
-    catch e
-        error("Error loading forms configuration. Details: $e")
-    end
+        # Load and validate data
+        bank = read_bank_file(basic_config.items_file, basic_config.anchor_items_file)
+        irt_data = load_irt_data(config_data, forms_config, bank)
 
-    # Load and validate the item bank in read_bank_file
-    bank = try
-        read_bank_file(basic_config.items_file, basic_config.anchor_items_file)
-    catch e
-        error("Error reading item bank files. Details: $e")
-    end
+        # Transform to flat structures
+        flat_config = transform_config_to_flat(basic_config)
+        parameters = transform_parameters_to_flat(forms_config, irt_data, bank, flat_config)
 
-    # Load and validate the IRT data in load_irt_data
-    irt_data = try
-        load_irt_data(config_data, forms_config, bank)
-    catch e
-        error("Error loading IRT data. Details: $e")
-    end
+        return (flat_config, parameters)
 
-    # Transform the configuration into flat structures
-    flat_config = transform_config_to_flat(basic_config)
-    return (
-        flat_config, transform_parameters_to_flat(
-            forms_config, irt_data, bank, flat_config)
-    )
+    catch e
+        if e isa ATAError
+            rethrow(e)
+        else
+            throw(ConfigError(
+                "Configuration failed",
+                config_file,
+                e
+            ))
+        end
+    end
 end
 
 end # module Configuration
