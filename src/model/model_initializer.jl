@@ -147,7 +147,8 @@ function set_objective!(model::Model, parms::Parameters)
     if parms.method == "TCC"
         objective_match_characteristic_curve!(model, parms)
     elseif parms.method == "TCC2"
-        objective_match_mean_var!(model, parms, 3.0)
+        # objective_match_mean_var!(model, parms, 3.0)
+        @error("TCC2 is temporarily disabled")
     elseif parms.method == "MIXED"
         objective_match_characteristic_curve!(model, parms)
         objective_match_information_curve!(model, parms)
