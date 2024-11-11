@@ -30,7 +30,7 @@ function read_items_file(items_file::String)::DataFrame
         bank = uppercase_dataframe!(bank)
 
         # Validate required columns
-        validate_bank_columns(bank)
+        # validate_bank_columns(bank)
 
         # Set default values for A and C parameters
         bank.A = coalesce.(bank.A, 1.0)

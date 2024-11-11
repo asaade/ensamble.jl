@@ -19,20 +19,34 @@ export constraint_items_per_form,
        objective_info_relative2,
        constraint_fix_items
 
-#
-
-using ..Configuration
 using DataFrames
 using JuMP
+using ..Configuration
+using ..Utils
+
+# ---------------------------------------------------------------------------
+# Note: Anchor Tests are designed to appear repeatedly, cycling between forms. This behaviour
+# imposes the need of a special treatment, different to the one used with regular items. In order
+# to use the Shadow Test method, our solution was to calculate the contribution of these special
+# items to the target variables and use the result as a proxy for other anchor items in subsequent forms.
+# This special treatment has made the code more complex in most cases.
+# ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
 # Helper Functions
 # ---------------------------------------------------------------------------
 
 """
-    operational_forms(x, shadow_test_size)
+    operational_forms(x::AbstractMatrix, shadow_test_size::Int)::Int
 
-Helper function to calculate the number of operational forms, adjusting for shadow tests.
+Calculate the number of operational forms in the decision variable matrix `x`, adjusting for shadow tests.
+
+# Arguments
+- `x`: The decision variable matrix where rows correspond to items and columns to forms.
+- `shadow_test_size`: The number of shadow tests included. If greater than zero, the last column(s) are shadow tests.
+
+# Returns
+- The number of operational (non-shadow) forms.
 """
 function operational_forms(x, shadow_test_size::Int)
     forms = size(x, 2)
@@ -40,18 +54,27 @@ function operational_forms(x, shadow_test_size::Int)
 end
 
 """
-    group_by_selected(selected::Union{Vector, BitVector})
+    group_by_selected(selected::Union{Vector{T}, BitVector}) where {T}
 
-Helper function to group items based on the `selected` vector, ignoring missing values.
+Group items based on the `selected` vector, ignoring missing values.
+
+# Arguments
+- `selected`: A vector indicating group assignments or selection criteria for items.
+
+# Returns
+- A `GroupedDataFrame` where each group corresponds to a unique value in `selected`.
+
+# Notes
+- Missing values and items not satisfying the selection criteria are excluded.
 """
 function group_by_selected(selected::Union{Vector, BitVector})
     data = DataFrame(; selected = selected, index = 1:length(selected))
     if isa(selected, BitVector)
         data = data[data.selected, :]
     elseif eltype(data.selected) <: AbstractString
-        data = data[data.selected !== missing, :]
+        data = data[data.selected .!== missing, :]
     elseif eltype(data.selected) <: Number
-        data = data[data.selected !== missing || data.selected .> 0, :]
+        data = data[(!ismissing).(data.selected) .| (data.selected .> 0), :]
     end
     return groupby(data, :selected; skipmissing = true)
 end
@@ -61,10 +84,23 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    constraint_items_per_form(model::Model, parms::Parameters, minItems::Int, maxItems::Int=minItems)
+    constraint_items_per_form(
+        model::Model,
+        parms::Parameters,
+        minItems::Int,
+        maxItems::Int = minItems
+    )::Model
 
-Sets a constraint on the number of items in each form (test). The number of items must be between `minItems`
-and `maxItems` for each form.
+Ensure each operational form contains between `minItems` and `maxItems` items.
+
+# Arguments
+- `model`: The JuMP model to which the constraints are added.
+- `parms`: Parameters containing the item bank and settings.
+- `minItems`: Minimum number of items required in each form.
+- `maxItems`: Maximum number of items allowed in each form (defaults to `minItems`).
+
+# Returns
+- The updated `Model` with the new constraints.
 """
 function constraint_items_per_form(
         model::Model, parms::Parameters, minItems::Int, maxItems::Int = minItems
@@ -75,10 +111,25 @@ function constraint_items_per_form(
 end
 
 """
-    constraint_item_count(model::Model, parms::Parameters, selected::BitVector,
-                          minItems::Int, maxItems::Int=minItems)
+    constraint_item_count(
+        model::Model,
+        parms::Parameters,
+        selected::BitVector,
+        minItems::Int,
+        maxItems::Int = minItems
+    )::Model
 
-Constrains the count of selected items to fall within `minItems` and `maxItems` for each form.
+Ensure the number of selected items falls within specified bounds in each form.
+
+# Arguments
+- `model`: The JuMP model to which the constraints are added.
+- `parms`: Parameters containing the item bank and settings.
+- `selected`: Boolean vector indicating which items to include.
+- `minItems`: Minimum number of selected items required in each form.
+- `maxItems`: Maximum number of selected items allowed in each form (defaults to `minItems`).
+
+# Returns
+- The updated `Model` with the new constraints.
 """
 function constraint_item_count(model::Model, parms::Parameters, selected::BitVector,
         minItems::Int, maxItems::Int = minItems)
@@ -122,10 +173,25 @@ function constraint_item_count(model::Model, parms::Parameters, selected::BitVec
 end
 
 """
-    constraint_score_sum(model::Model, parms::Parameters, selected::BitVector,
-                              minScore::Float64, maxScore::Float64=minScore)
+    constraint_score_sum(
+        model::Model,
+        parms::Parameters,
+        selected::BitVector,
+        minScore::Int64,
+        maxScore::Int64 = minScore
+    )::Model
 
-Constrains the sum of selected item scores within `minScore` and `maxScore` bounds for each form.
+Ensure the sum of selected item scores is within `minScore` and `maxScore` for each form.
+
+# Arguments
+- `model`: The JuMP model to which the constraints are added.
+- `parms`: Parameters containing the item bank and settings.
+- `selected`: Boolean vector indicating which items to include.
+- `minScore`: Minimum total score required for the selected items.
+- `maxScore`: Maximum total score allowed (defaults to `minScore`).
+
+# Returns
+- The updated `Model` with the new constraints.
 """
 function constraint_score_sum(model::Model, parms::Parameters, selected::BitVector,
         minScore::Int64, maxScore::Int64 = minScore)
@@ -181,9 +247,25 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    constraint_item_sum(model::Model, parms::Parameters, vals, minVal, maxVal=minVal)
+    constraint_item_sum(
+        model::Model,
+        parms::Parameters,
+        vals,
+        minVal::Real,
+        maxVal::Real = minVal
+    )::Model
 
-Constrains the sum of selected values to be within `minVal` and `maxVal` for each form.
+Ensure the sum of item values is within specified bounds for each form.
+
+# Arguments
+- `model`: The JuMP model to which the constraints are added.
+- `parms`: Parameters containing the item bank and settings.
+- `vals`: A vector or matrix of item values (and optionally conditions).
+- `minVal`: Minimum total value required.
+- `maxVal`: Maximum total value allowed (defaults to `minVal`).
+
+# Returns
+- The updated `Model` with the new constraints.
 """
 function constraint_item_sum(model::Model, parms::Parameters, vals, minVal, maxVal = minVal)
     @assert(minVal<=maxVal, "Error in item_sum: maxVal < minVal")
@@ -240,9 +322,21 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    constraint_friends_in_form(model::Model, parms::Parameters, selected)
+    constraint_friends_in_form(
+        model::Model,
+        parms::Parameters,
+        selected::Union{Vector, BitVector}
+    )::Model
 
-Adds constraints to ensure that friend items (items that must always be together) are assigned to the same form.
+Ensure that friend items are assigned to the same form.
+
+# Arguments
+- `model`: The JuMP model to which the constraints are added.
+- `parms`: Parameters containing the item bank and settings.
+- `selected`: Vector indicating groups of friend items.
+
+# Returns
+- The updated `Model` with the new constraints.
 """
 function constraint_friends_in_form(model::Model, parms::Parameters, selected)
     x = model[:x]
@@ -251,10 +345,9 @@ function constraint_friends_in_form(model::Model, parms::Parameters, selected)
 
     for group in groups
         items = group[!, :index]
-        pivot = items[1]  # Choose the first item as the reference
+        pivot = items[1]  # Reference item
         cnt = length(items)
 
-        # Only add constraints if the group has more than one item
         if cnt > 1
             @constraint(model, [f in 1:forms],
                 sum(x[i, f] for i in items)==(cnt * x[pivot, f]))
@@ -263,9 +356,21 @@ function constraint_friends_in_form(model::Model, parms::Parameters, selected)
 end
 
 """
-    constraint_enemies(model::Model, parms::Parameters, selected)
+    constraint_enemies(
+        model::Model,
+        parms::Parameters,
+        selected::Union{Vector, BitVector}
+    )::Model
 
-Adds constraints to prevent enemy items (items that should not appear together) from being assigned to the same form.
+Ensure that only one enemy item is assigned to the same form.
+
+# Arguments
+- `model`: The JuMP model to which the constraints are added.
+- `parms`: Parameters containing the item bank and settings.
+- `selected`: Vector indicating groups of enemy items.
+
+# Returns
+- The updated `Model` with the new constraints.
 """
 function constraint_enemies(model::Model, parms::Parameters, selected)
     x = model[:x]
@@ -287,9 +392,19 @@ function constraint_enemies(model::Model, parms::Parameters, selected)
 end
 
 """
-    constraint_exclude_items(model::Model, exclude::BitVector)
+    constraint_exclude_items(
+        model::Model,
+        exclude::BitVector
+    )::Model
 
-Excludes specified items from being selected in any form.
+Exclude specified items from being selected in any form.
+
+# Arguments
+- `model`: The JuMP model to which the constraints are added.
+- `exclude`: Boolean vector indicating items to exclude (`true` to exclude).
+
+# Returns
+- The updated `Model` with the items fixed to 0.
 """
 function constraint_exclude_items(model::Model, exclude::BitVector)
     x = model[:x]
@@ -306,9 +421,19 @@ function constraint_exclude_items(model::Model, exclude::BitVector)
 end
 
 """
-    constraint_fix_items(model::Model, fixed::BitVector)
+    constraint_fix_items(
+        model::Model,
+        fixed::BitVector
+    )::Model
 
-Forces certain items to be included in specific forms.
+Force certain items to be included in every form.
+
+# Arguments
+- `model`: The JuMP model to which the constraints are added.
+- `fixed`: Boolean vector indicating items to include (`true` to include).
+
+# Returns
+- The updated `Model` with the items fixed to 1.
 """
 function constraint_fix_items(model::Model, fixed::BitVector)
     x = model[:x]
@@ -324,9 +449,19 @@ function constraint_fix_items(model::Model, fixed::BitVector)
 end
 
 """
-    constraint_add_anchor!(model::Model, parms::Parameters)
+    constraint_add_anchor!(
+        model::Model,
+        parms::Parameters
+    )::Model
 
-Forces the inclusion of anchor items in operational forms, ignoring shadow forms.
+Ensure anchor items are included in all operational forms, ignoring shadow forms.
+
+# Arguments
+- `model`: The JuMP model to which the constraints are added.
+- `parms`: Parameters containing the item bank and settings.
+
+# Returns
+- The updated `Model` with anchor items fixed to 1.
 """
 function constraint_add_anchor!(model::Model, parms::Parameters)
     if parms.anchor_tests > 0
@@ -348,9 +483,21 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    constraint_max_use(model::Model, parms::Parameters, selected::BitVector)
+    constraint_max_use(
+        model::Model,
+        parms::Parameters,
+        selected::BitVector
+    )::Model
 
-Constrains the maximum number of times an item can appear in the test forms, excluding anchor items.
+Constrain the maximum number of times an item can appear across the test forms.
+
+# Arguments
+- `model`: The JuMP model to which the constraints are added.
+- `parms`: Parameters containing the item bank and settings.
+- `selected`: Boolean vector indicating items subject to the constraint.
+
+# Returns
+- The updated `Model` with the new constraints.
 """
 function constraint_max_use(
         model::Model, parms::Parameters, selected::BitVector
@@ -373,9 +520,23 @@ function constraint_max_use(
 end
 
 """
-    constraint_forms_overlap(model::Model, parms::Parameters, minItems::Int, maxItems::Int=minItems)
+    constraint_forms_overlap(
+        model::Model,
+        parms::Parameters,
+        minItems::Int,
+        maxItems::Int = minItems
+    )::Model
 
-Constrains the number of overlapping items between test forms. The overlap between two forms must be between `minItems` and `maxItems`.
+Constrain the number of overlapping (repeated) items between test forms.
+
+# Arguments
+- `model`: The JuMP model to which the constraints are added.
+- `parms`: Parameters containing the item bank and settings.
+- `minItems`: Minimum number of items that must overlap between any two forms.
+- `maxItems`: Maximum number of items that can overlap (defaults to `minItems`).
+
+# Returns
+- The updated `Model` with the new constraints.
 """
 function constraint_forms_overlap(
         model::Model, parms::Parameters, minItems::Int, maxItems::Int = minItems
@@ -413,10 +574,23 @@ end
 
 """
     constraint_forms_overlap2(
-        model::Model, parms::Parameters, minItems::Int, maxItems::Int = minItems
-    )
+        model::Model,
+        parms::Parameters,
+        minItems::Int,
+        maxItems::Int = minItems
+    )::Model
 
-Constrains the number of overlapping items across test forms to be within specified bounds.
+Constrain the number of overlapping items across test forms to be within specified bounds.
+The use of this constraint uses more resources, as it implies a much larger problem.
+
+# Arguments
+- `model`: The JuMP model to which the constraints are added.
+- `parms`: Parameters containing the item bank and settings.
+- `minItems`: Minimum number of items that must overlap between any two forms.
+- `maxItems`: Maximum number of items that can overlap (defaults to `minItems`).
+
+# Returns
+- The updated `Model` with the new constraints.
 """
 function constraint_forms_overlap2(
         model::Model, parms::Parameters, minItems::Int, maxItems::Int = minItems
@@ -444,14 +618,14 @@ function constraint_forms_overlap2(
         # Apply overlap constraints
         if minItems == maxItems
             @constraint(model,
-                [t1 = 1:(num_forms - 1), t2 = (t1 + 1):num_forms],
+                overlap[t1 = 1:(num_forms - 1), t2 = (t1 + 1):num_forms],
                 sum(z[i, t1, t2] for i in items)==maxItems)
         else
             @constraint(model,
-                [t1 = 1:(num_forms - 1), t2 = (t1 + 1):num_forms],
+                overlap_upper[t1 = 1:(num_forms - 1), t2 = (t1 + 1):num_forms],
                 sum(z[i, t1, t2] for i in items)<=maxItems)
             @constraint(model,
-                [t1 = 1:(num_forms - 1), t2 = (t1 + 1):num_forms],
+                overlap_lower[t1 = 1:(num_forms - 1), t2 = (t1 + 1):num_forms],
                 sum(z[i, t1, t2] for i in items)>=minItems)
         end
 
@@ -463,21 +637,21 @@ function constraint_forms_overlap2(
             [i = items, t1 = 1:(num_forms - 1), t2 = (t1 + 1):num_forms],
             z[i, t1, t2]>=x[i, t1] + x[i, t2] - 1)
 
-        # Handle shadow tests by introducing auxiliary variables to represent overlap
     elseif parms.shadow_test_size > 0
+        # Handle shadow tests by introducing auxiliary variables
         shadow_test_col = size(x, 2)
 
-        # Define auxiliary binary variable `w` for overlap between `x[i, f]` and `x[i, shadow_test_col]`
+        # Define auxiliary binary variable `w` for overlap
         @variable(model, w[1:num_items, 1:num_forms], Bin)
 
-        # Set up constraints for `w` to represent the overlap condition
+        # Set up constraints for `w`
         @constraint(model, [i = 1:num_items, f = 1:num_forms], w[i, f]<=x[i, f])
         @constraint(model, [i = 1:num_items, f = 1:num_forms],
             w[i, f]<=x[i, shadow_test_col])
         @constraint(model, [i = 1:num_items, f = 1:num_forms],
             w[i, f]>=x[i, f] + x[i, shadow_test_col] - 1)
 
-        # Apply overlap constraints to `w` instead of the product of `x` terms
+        # Apply overlap constraints to `w`
         if minItems == maxItems
             @constraint(model,
                 [f = 1:num_forms],
@@ -500,11 +674,26 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    objective_match_characteristic_curve!(model::Model, parms::Parameters)
+    objective_match_characteristic_curve!(
+        model::Model,
+        parms::Parameters
+    )::Model
 
-Constrains test characteristic curves to match a reference (tau matrix) within tolerance.
+Match test characteristic curves to target values. Following the suggestion
+of Wim van der Linden, the curves are also compared with their porwers 1..R.
+for a closer match.
+(in the book'Linear models for Optimal Test Desting')
+
+# Arguments
+- `model`: The JuMP model containing decision variables `x` and `y`.
+- `parms`: Parameters containing target curves and item probabilities.
+
+# Returns
+- The updated `Model` with the new constraints.
 """
 function objective_match_characteristic_curve!(model::Model, parms::Parameters)
+    @assert haskey(model, :x) && haskey(model, :y) "Model must contain variables x and y"
+
     R, K = 1:(parms.r), 1:(parms.k)
     P, tau = parms.score_matrix, parms.tau
     x, y = model[:x], model[:y]
@@ -530,20 +719,20 @@ function objective_match_characteristic_curve!(model::Model, parms::Parameters)
     end
 
     # Constraints for operational forms
-    @constraint(model, [f = 1:forms, k = K, r = R],
+    @constraint(model, tcc_upper[f = 1:forms, k = K, r = R],
         sum(P[i, k]^r * x[i, f] for i in 1:items)<=tau[r, k] + w[r] * y)
-    @constraint(model, [f = 1:forms, k = K, r = R],
+    @constraint(model, tcc_lower[f = 1:forms, k = K, r = R],
         sum(P[i, k]^r * x[i, f] for i in 1:items)>=tau[r, k] - w[r] * y)
 
     # Constraints for shadow test
     if parms.shadow_test_size > 0
         shadow_test_size = parms.shadow_test_size
 
-        @constraint(model, [k = K, r = R],
+        @constraint(model, shadow_tcc_upper[k = K, r = R],
             sum(P[i, k]^r * x[i, zcol]
             for i in non_anchor_items)<=
             (tau[r, k] - anchor_contribution[r, k] + w[r] * y) * shadow_test_size)
-        @constraint(model, [k = K, r = R],
+        @constraint(model, shadow_tcc_lower[k = K, r = R],
             sum(P[i, k]^r * x[i, zcol]
             for i in non_anchor_items)>=
             (tau[r, k] - anchor_contribution[r, k] - w[r] * y) * shadow_test_size)
@@ -552,24 +741,37 @@ function objective_match_characteristic_curve!(model::Model, parms::Parameters)
     return model
 end
 
-"""
-    objective_match_mean_var!(model::Model, parms::Parameters, α::Float64 = 1.0)
 
-Matches expected score means and variances of test forms to reference values across theta points.
+
+"""
+    objective_match_mean_var!(
+        model::Model,
+        parms::Parameters,
+        α::Float64 = 3.0
+    )::Model
+
+Match expected score means and variances of test forms to reference values at selected theta points.
 
 # Arguments
-- `model`: JuMP model containing decision variables x and y
-- `parms`: Parameters object containing test assembly parameters
-- `α`: Weight factor for variance matching (default: 1.0)
+- `model`: The JuMP model containing decision variables `x` and `y`.
+- `parms`: Parameters containing expected scores and variances.
+- `α`: Weight factor for variance matching (default: 3.0). Compensates for difference
+       in the scale of the variables (mean and variance).
+
+# Returns
+- The updated `Model` with the new constraints.
 """
-function objective_match_mean_var!(model::Model, parms::Parameters, α::Float64 = 3.0)
-    # Input validation
+function objective_match_mean_var!(model::Model, parms::Parameters, α::Float64 = 10.0)
+    # Validate inputs
     @assert α > 0 "Weight factor α must be positive"
     @assert haskey(model, :x) && haskey(model, :y) "Model must contain variables x and y"
 
     # Extract parameters
     K = 1:parms.k  # Theta points
-    tau_mean, tau_var = parms.tau_mean, parms.tau_var
+
+    # Mean of expected total score for the reference test form and
+    # Variance of the individual items  the reference test form and
+    tau_mean, item_score_means = parms.tau_mean, parms.item_score_means
     expected_scores = parms.score_matrix
     x, y = model[:x], model[:y]
     num_items, num_forms = size(x)
@@ -588,43 +790,47 @@ function objective_match_mean_var!(model::Model, parms::Parameters, α::Float64 
 
         # Pre-compute anchor contributions
         anchor_mean_contribution = [sum(expected_scores[i, k] for i in anchor_items) for k in K]
-        anchor_var_contribution = [sum((expected_scores[i, k] - tau_mean[k])^2 for i in anchor_items) for k in K]
+        anchor_var_contribution = [sum((expected_scores[i, k] - item_score_means[k])^2 for i in anchor_items) for k in K]
     else
         non_anchor_items = 1:num_items
         anchor_mean_contribution = zeros(Float64, length(K))
         anchor_var_contribution = zeros(Float64, length(K))
     end
 
+    # Adjust item_score_means for scale consistency with tau_mean
+    # scale_factor = maximum(tau_mean) / (maximum(item_score_means) + eps())  # Avoid division by zero
+    # item_score_means_scaled = item_score_means * scale_factor
+
     # Operational forms constraints
-    @constraint(model, mean_upper[f=1:num_forms, k=K],
+    @constraint(model, mean_upper[f = 1:num_forms, k = K],
         sum(expected_scores[i, k] * x[i, f] for i in 1:num_items) <= tau_mean[k] + y)
-    @constraint(model, mean_lower[f=1:num_forms, k=K],
+    @constraint(model, mean_lower[f = 1:num_forms, k = K],
         sum(expected_scores[i, k] * x[i, f] for i in 1:num_items) >= tau_mean[k] - y)
 
-    @constraint(model, var_upper[f=1:num_forms, k=K],
-        sum(α * (expected_scores[i, k] - tau_mean[k])^2 * x[i, f] for i in 1:num_items) <= tau_var[k] + y)
-    @constraint(model, var_lower[f=1:num_forms, k=K],
-        sum(α * (expected_scores[i, k] - tau_mean[k])^2 * x[i, f] for i in 1:num_items) >= tau_var[k] - y)
+    @constraint(model, var_upper[f = 1:num_forms, k = K],
+        sum(α * (expected_scores[i, k] - item_score_means[k])^2 * x[i, f] for i in 1:num_items) <= item_score_means[k] + y)
+    @constraint(model, var_lower[f = 1:num_forms, k = K],
+        sum(α * (expected_scores[i, k] - item_score_means[k])^2 * x[i, f] for i in 1:num_items) >= item_score_means[k] - y)
 
-    # Shadow test constraints
+    # Shadow test constraints (if applicable)
     if has_shadow_test
         shadow_test_size = parms.shadow_test_size
         effective_tau_mean = [tau_mean[k] - anchor_mean_contribution[k] for k in K]
-        effective_tau_var = [tau_var[k] - anchor_var_contribution[k] for k in K]
+        effective_item_score_means = [item_score_means[k] - anchor_var_contribution[k] for k in K]
 
-        @constraint(model, shadow_mean_upper[k=K],
+        @constraint(model, shadow_mean_upper[k = K],
             sum(expected_scores[i, k] * x[i, shadow_test_col] for i in non_anchor_items) <=
             effective_tau_mean[k] + shadow_test_size * y)
-        @constraint(model, shadow_mean_lower[k=K],
+        @constraint(model, shadow_mean_lower[k = K],
             sum(expected_scores[i, k] * x[i, shadow_test_col] for i in non_anchor_items) >=
             effective_tau_mean[k] - shadow_test_size * y)
 
-        @constraint(model, shadow_var_upper[k=K],
-            sum(α * (expected_scores[i, k] - tau_mean[k])^2 * x[i, shadow_test_col] for i in non_anchor_items) <=
-            effective_tau_var[k] + shadow_test_size * y)
-        @constraint(model, shadow_var_lower[k=K],
-            sum(α * (expected_scores[i, k] - tau_mean[k])^2 * x[i, shadow_test_col] for i in non_anchor_items) >=
-            effective_tau_var[k] - shadow_test_size * y)
+        @constraint(model, shadow_var_upper[k = K],
+            sum(α * (expected_scores[i, k] - item_score_means[k])^2 * x[i, shadow_test_col] for i in non_anchor_items) <=
+            effective_item_score_means[k] + shadow_test_size * y)
+        @constraint(model, shadow_var_lower[k = K],
+            sum(α * (expected_scores[i, k] - item_score_means[k])^2 * x[i, shadow_test_col] for i in non_anchor_items) >=
+            effective_item_score_means[k] - shadow_test_size * y)
     end
 
     return model
@@ -632,9 +838,19 @@ end
 
 
 """
-    objective_match_information_curve!(model::Model, parms::Parameters)
+    objective_match_information_curve!(
+        model::Model,
+        parms::Parameters
+    )::Model
 
-Constrains information curves to match target values at each theta point.
+Match information curves to target values at each theta point.
+
+# Arguments
+- `model`: The JuMP model containing decision variables `x` and `y`.
+- `parms`: Parameters containing item information and target values.
+
+# Returns
+- The updated `Model` with the new constraints.
 """
 function objective_match_information_curve!(model::Model, parms::Parameters)
     K, info, tau_info = parms.k, parms.info_matrix, parms.tau_info
@@ -642,6 +858,11 @@ function objective_match_information_curve!(model::Model, parms::Parameters)
     items, forms = size(x)
     zcol = forms
     forms -= parms.shadow_test_size > 0 ? 1 : 0
+    if parms.method == "MIXED"
+        α = 1.0
+    else
+        α = 0.5
+    end
 
     # Separate anchor and non-anchor items if anchors are used
     if parms.anchor_tests > 0
@@ -659,32 +880,42 @@ function objective_match_information_curve!(model::Model, parms::Parameters)
     end
 
     # Constraints for operational forms
-    @constraint(model, [f = 1:forms, k = 1:K],
-        sum(info[i, k] * x[i, f] for i in 1:items)<=tau_info[k] + y)
-    @constraint(model, [f = 1:forms, k = 1:K],
-        sum(info[i, k] * x[i, f] for i in 1:items)>=tau_info[k] - y)
+    @constraint(model, info_upper[f = 1:forms, k = 1:K],
+        sum(info[i, k] * x[i, f] for i in 1:items)<=tau_info[k] + y * α)
+    @constraint(model, info_lower[f = 1:forms, k = 1:K],
+        α * sum(info[i, k] * x[i, f] for i in 1:items)>=tau_info[k] - y * α)
 
     # Shadow test constraints if applicable
     if parms.shadow_test_size > 0
         shadow_test_size = parms.shadow_test_size
 
-        @constraint(model, [k = 1:K],
+        @constraint(model, shadow_info_upper[k = 1:K],
             sum(info[i, k] * x[i, zcol]
             for i in non_anchor_items)<=
-            (tau_info[k] - anchor_info_contribution[k] + y) * shadow_test_size)
-        @constraint(model, [k = 1:K],
-            sum(info[i, k] * x[i, zcol]
+            (tau_info[k] - anchor_info_contribution[k] + y  * α) * shadow_test_size)
+        @constraint(model, shadow_info_lower[k = 1:K],
+            α * sum(info[i, k] * x[i, zcol]
             for i in non_anchor_items)>=
-            (tau_info[k] - anchor_info_contribution[k] - y) * shadow_test_size)
+            (tau_info[k] - anchor_info_contribution[k] - y * α) * shadow_test_size)
     end
 
     return model
 end
 
 """
-    objective_info_relative2(model::Model, parms::Parameters)
+    objective_info_relative2(
+        model::Model,
+        parms::Parameters
+    )::Model
 
-Maximizes information at alternating theta points across forms, with each form meeting a weighted target.
+Maximize information at alternating theta points across forms.
+
+# Arguments
+- `model`: The JuMP model containing decision variables `x` and `y`.
+- `parms`: Parameters containing weights and item information.
+
+# Returns
+- The updated `Model` with the new constraints.
 """
 function objective_info_relative(model::Model, parms::Parameters)
     R = parms.relative_target_weights
@@ -723,9 +954,19 @@ function objective_info_relative(model::Model, parms::Parameters)
 end
 
 """
-    objective_max_info(model::Model, parms::Parameters)
+    objective_max_info(
+        model::Model,
+        parms::Parameters
+    )::Model
 
-Maximizes information at each theta point, ensuring the sum of information meets a weighted target.
+Maximize information at each theta point, meeting a weighted target.
+
+# Arguments
+- `model`: The JuMP model containing decision variables `x` and `y`.
+- `parms`: Parameters containing weights and item information.
+
+# Returns
+- The updated `Model` with the new constraints.
 """
 function objective_max_info(model::Model, parms::Parameters)
     R = parms.relative_target_weights
@@ -752,14 +993,14 @@ function objective_max_info(model::Model, parms::Parameters)
     end
 
     # Constraints for operational forms
-    @constraint(model, [f = 1:forms, k = 1:K],
+    @constraint(model, max_info[f = 1:forms, k = 1:K],
         sum(info[i, k] * x[i, f] for i in 1:items)>=R[k] * y)
 
     # Constraints for shadow test if applicable
     if parms.shadow_test_size > 0
         shadow_test_size = parms.shadow_test_size
 
-        @constraint(model, [k = 1:K],
+        @constraint(model, shadow_max_info[k = 1:K],
             sum(info[i, k] * x[i, zcol]
             for i in non_anchor_items)>=
             (R[k] * y * shadow_test_size - anchor_info_contribution[k]))
@@ -768,4 +1009,4 @@ function objective_max_info(model::Model, parms::Parameters)
     return model
 end
 
-end  # module ATAConstraints
+end  # module Constraints
