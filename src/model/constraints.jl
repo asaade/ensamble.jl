@@ -883,7 +883,7 @@ function objective_match_information_curve!(model::Model, parms::Parameters)
     @constraint(model, info_upper[f = 1:forms, k = 1:K],
         sum(info[i, k] * x[i, f] for i in 1:items)<=tau_info[k] + y * α)
     @constraint(model, info_lower[f = 1:forms, k = 1:K],
-        α * sum(info[i, k] * x[i, f] for i in 1:items)>=tau_info[k] - y * α)
+        sum(info[i, k] * x[i, f] for i in 1:items)>=tau_info[k] - y * α)
 
     # Shadow test constraints if applicable
     if parms.shadow_test_size > 0
@@ -894,7 +894,7 @@ function objective_match_information_curve!(model::Model, parms::Parameters)
             for i in non_anchor_items)<=
             (tau_info[k] - anchor_info_contribution[k] + y  * α) * shadow_test_size)
         @constraint(model, shadow_info_lower[k = 1:K],
-            α * sum(info[i, k] * x[i, zcol]
+            sum(info[i, k] * x[i, zcol]
             for i in non_anchor_items)>=
             (tau_info[k] - anchor_info_contribution[k] - y * α) * shadow_test_size)
     end
