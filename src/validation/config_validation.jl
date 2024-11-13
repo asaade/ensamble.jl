@@ -6,6 +6,7 @@ export validate_config_data, validate_files, validate_irt_parameters,
 
 using DataFrames
 using ..ATAErrors
+using ..Utils
 
 """
 Validation limits for IRT parameters
@@ -182,15 +183,44 @@ end
 """
 Validates IRT parameters for each item
 """
-function validate_irt_parameters(bank::DataFrame, limits::IRTLimits = DEFAULT_IRT_LIMITS)
+function validate_irt_parameters(bank::DataFrame)
     invalid_items = DataFrame()
 
+    if !("NUM_CATEGORIES" in names(bank))
+        bank.NUM_CATEGORIES::Vector{Integer} .= 0
+    end
+
+    bank.NUM_CATEGORIES = convert(Vector{Union{Integer, Missing}}, bank.NUM_CATEGORIES)
+
+    bank.CHECK .= false
+
+    if !("C" in names(bank))
+        bank.C .= 0.0
+    end
+
+    b_columns = filter(col -> occursin(r"^B\d*$|^B$", string(col)), names(bank))
+
     for row in eachrow(bank)
-        if !(limits.min_a <= row.A <= limits.max_a &&
-             limits.min_b <= row.B <= limits.max_b &&
-             limits.min_c <= row.C <= limits.max_c)
-            push!(invalid_items, row)
+        row.MODEL in SUPPORTED_MODELS ||
+            throw(ArgumentError("Unsupported model type: $model"))
+
+        categories = length(collect(skipmissing(row[b_columns]))) + 1
+
+        if ismissing(row.C)
+            row.C = 0.0
         end
+
+        if ismissing(row.A) || row.A <= 0.0 || !(0.0 ≤ row.C ≤ 1.0) || categories == 0
+            push!(invalid_items, row)
+            break
+        else
+            row.CHECK = true
+        end
+
+        if ismissing(row.NUM_CATEGORIES) || row.NUM_CATEGORIES != categories
+            row.NUM_CATEGORIES = categories
+        end
+
     end
 
     return invalid_items

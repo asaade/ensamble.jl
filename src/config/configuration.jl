@@ -1,6 +1,9 @@
 module Configuration
 
 export configure, Config, Parameters, Constraint
+export SUPPORTED_DICHOTOMOUS_MODELS
+export SUPPORTED_POLYTOMOUS_MODELS
+export SUPPORTED_MODELS
 
 using DataFrames
 

@@ -30,7 +30,7 @@ function read_items_file(items_file::String)::DataFrame
         bank = uppercase_dataframe!(bank)
 
         # Validate required columns
-        # validate_bank_columns(bank)
+        validate_bank_columns(bank)
 
         # Set default values for A and C parameters
         bank.A = coalesce.(bank.A, 1.0)
@@ -122,27 +122,16 @@ function select_valid_items!(bank::DataFrame, limits::IRTLimits = DEFAULT_IRT_LI
     try
         original_size = nrow(bank)
 
-        # Remove rows with missing essential values
-        dropmissing!(bank, [:B, :ID])
-
-        # Fill missing values
-        bank.A = coalesce.(bank.A, 1.0)
-        bank.C = coalesce.(bank.C, 0.0)
-
         # Validate and log invalid items
-        invalid_items = validate_irt_parameters(bank, limits)
+        invalid_items = validate_irt_parameters(bank)
 
         if !isempty(invalid_items)
-            @warn "Found $(nrow(invalid_items)) items with invalid IRT parameters"
+            @warn "Found $(nrow(invalid_items)) items with invalid IRT parameters or missing ID"
             @debug "Invalid items:" invalid_items
         end
 
-        # Filter valid items
-        filter!(row -> (
-            limits.min_a <= row.A <= limits.max_a &&
-            limits.min_b <= row.B <= limits.max_b &&
-            limits.min_c <= row.C <= limits.max_c
-        ), bank)
+        # Remove rows with missing essential values
+        dropmissing!(bank, [:ID, :CHECK])
 
         # Log filtering results
         items_removed = original_size - nrow(bank)
