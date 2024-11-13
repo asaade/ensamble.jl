@@ -1,6 +1,6 @@
 module Charts
 
-export plot_results, save_to_csv, simulate_scores
+export plot_results, save_to_csv, simulate_scores, simulate_scores_log
 
 using CSV, DataFrames, Plots, StatsPlots, Distributions, Measures
 using Base.Threads
@@ -24,40 +24,166 @@ function irt_params(bank::DataFrame, items::Vector)
 end
 
 """
-    simulate_scores(parms, results, dist=Normal(0, 1)) -> DataFrame
+    irt_params(bank, idx) -> Tuple{Float64, Union{Float64, Vector{Float64}}, Union{Float64, Nothing}, String}
 
-Simulates test scores based on ability distribution for 3PL items.
+Extracts IRT parameters (discrimination `a`, difficulty `bs`, guessing `c`, and model type)
+for a specified item index from an item bank DataFrame.
+
+# Arguments
+- `bank::DataFrame`: A DataFrame containing IRT item parameters.
+- `idx::Int`: Index of the item to extract parameters for.
+
+# Returns
+- `Tuple{Float64, Union{Float64, Vector{Float64}}, Union{Float64, Nothing}, String}`: A tuple containing
+  the discrimination (`a`), difficulty parameters (`bs` as `Float64` or `Vector{Float64}`), guessing parameter (`c`),
+  and the model type as a string.
+"""
+function irt_params2(bank::DataFrame, idx::Int)
+    model = bank[idx, :MODEL]
+    a = if model == "RASCH"
+        1.0
+    else
+        bank[idx, :A]
+    end
+
+    # Set c to 0.0 for non-3PL models to ensure consistent type handling as Float64
+    c = if model == "3PL"
+        bank[idx, :C]
+    else
+        0.0  # Set to 0.0 for all other models
+    end
+
+    # Extracting difficulty parameters (bs)
+    b_columns = filter(col -> occursin(r"^B\d*$|^B$", string(col)), names(bank))
+    bs_values = [bank[idx, col] for col in b_columns if !ismissing(bank[idx, col])]
+
+    # Ensure bs is always a vector, even for dichotomous models
+    bs = if model in SUPPORTED_DICHOTOMOUS_MODELS && length(bs_values) == 1
+        [bs_values[1]]  # Wrap single value in a vector
+    else
+        bs_values  # Already a vector for polytomous models
+    end
+
+    return a, bs, c, model
+end
+
+
+
+"""
+    simulate_scores(bank, results, dist; D = 1.0) -> Matrix{Union{Missing, Float64}}
+
+Simulates test scores based on a given ability distribution and an item bank, applying
+the Lord-Wingersky recursion formula to compute observed score distributions.
+
+# Arguments
+- `bank::DataFrame`: A DataFrame containing item parameters (including model type, discrimination, etc.).
+- `results::DataFrame`: A DataFrame where each column corresponds to a form (test version)
+  and rows represent item IDs.
+- `dist::Distribution=Normal(0, 1)`: The ability distribution for simulated examinees (default is standard normal).
+- `D::Float64=1.0`: Scaling constant for IRT models (typically 1 or 1.7).
+
+# Returns
+- `Matrix{Union{Missing, Float64}}`: A matrix where each column represents simulated scores
+  for a corresponding test form, with rows representing different possible total scores.
 """
 function simulate_scores(
-        parms::Parameters, results::DataFrame, dist::Distribution = Normal(0, 1)
+    bank::DataFrame,
+    results::DataFrame,
+    dist::Distribution = Normal(0, 1);
+    D = 1.0
 )
-    bank = parms.bank
-    n_items, n_forms = size(results)
-    n_items += 1  # Add one extra row to account for the padded zero score
+    n_forms = size(results, 2)
+    total_scores_list = Vector{Vector{Float64}}()
+    max_total_score = 0
 
-    # Preallocate a matrix to store the results for all forms
-    sim_matrix = Matrix{Union{Missing, Float64}}(missing, n_items, n_forms)
+    # Create a mapping from item IDs to indices in bank
+    id_to_index = Dict(id => idx for (idx, id) in enumerate(bank.ID))
 
-    @threads for form in 1:n_forms
-        selected_items = results[:, form]
+    for form in 1:n_forms
+        # Extract item IDs for the current form
+        items = skipmissing(results[:, form])
 
-        # Extract IRT parameters (a, b, c) for the selected items (dichotomous 3PL model)
-        a, b, c = irt_params(bank, selected_items)
+        # Get indices of items in bank.ID
+        items_idx = [id_to_index[item_id] for item_id in items if haskey(id_to_index, item_id)]
 
-        # Prepare the item_params matrix for lw_dist (parameters: a, b, c for each item)
-        params = Matrix(hcat(a, b, c))  # Corrected: no transpose needed
+        # Extract parameters for selected items
+        params = [irt_params2(bank, idx) for idx in items_idx]
 
-        # Apply Lord-Wingersky recursion to calculate the score distribution
-        total_scores = observed_score_continuous(params, dist; parms.D)
+        # Prepare the item_params list for lw_dist
+        item_params = [Tuple(param) for param in params]
 
-        # Pad the results if needed and store in the simulation matrix
-        sim_matrix[:, form] = vcat(
-            total_scores, fill(missing, n_items - length(total_scores))
-        )
+        # Calculate observed score distribution
+        total_scores = observed_score_continuous(item_params, dist; D = D)
+
+        # Store total_scores in list
+        push!(total_scores_list, total_scores)
+
+        # Update max_total_score
+        max_total_score = max(max_total_score, length(total_scores) - 1)
+    end
+
+    # Now, create sim_matrix with size (max_total_score + 1, n_forms)
+    sim_matrix = zeros(max_total_score + 1, n_forms)
+
+    # For each form, pad total_scores to length max_total_score + 1, and store in sim_matrix
+    for (form_idx, total_scores) in enumerate(total_scores_list)
+        padded_scores = vcat(total_scores, zeros(max_total_score + 1 - length(total_scores)))
+        sim_matrix[:, form_idx] = padded_scores
     end
 
     return sim_matrix
 end
+
+
+function simulate_scores_log(
+    bank::DataFrame,
+    results::DataFrame,
+    dist::Distribution = Normal(0, 1);
+    D = 1.0
+)
+    n_forms = size(results, 2)
+    total_scores_list = Vector{Vector{Float64}}()
+    max_total_score = 0
+
+    # Create a mapping from item IDs to indices in bank
+    id_to_index = Dict(id => idx for (idx, id) in enumerate(bank.ID))
+
+    for form in 1:n_forms
+        # Extract item IDs for the current form
+        items = skipmissing(results[:, form])
+
+        # Get indices of items in bank.ID
+        items_idx = [id_to_index[item_id] for item_id in items if haskey(id_to_index, item_id)]
+
+        # Extract parameters for selected items
+        params = [irt_params2(bank, idx) for idx in items_idx]
+
+        # Prepare the item_params list for lw_dist_log
+        item_params = [Tuple(param) for param in params]
+
+        # Calculate observed score distribution
+        total_scores = observed_score_continuous_log(item_params, dist; D = D)
+
+        # Store total_scores in list
+        push!(total_scores_list, total_scores)
+
+        # Update max_total_score
+        max_total_score = max(max_total_score, length(total_scores) - 1)
+    end
+
+    # Now, create sim_matrix with size (max_total_score + 1, n_forms)
+    sim_matrix = zeros(max_total_score + 1, n_forms)
+
+    # For each form, pad total_scores to length max_total_score + 1, and store in sim_matrix
+    for (form_idx, total_scores) in enumerate(total_scores_list)
+        padded_scores = vcat(total_scores, zeros(max_total_score + 1 - length(total_scores)))
+        sim_matrix[:, form_idx] = padded_scores
+    end
+
+    return sim_matrix
+end
+
+
 
 """
     char_curves(parms, results, theta_range, r=1) -> DataFrame
@@ -215,12 +341,11 @@ function plot_results(
         theta_range::Union{AbstractVector, AbstractRange} = -4.0:0.1:4.0,
         plot_file::String = "results/combined_plot.pdf"
 )::DataFrame
-
     # Generate characteristic and information curves
     char_data, info_data = make_curves(parms, results, theta_range)
 
     # Generate simulation data
-    sim_data = DataFrame(simulate_scores(parms, results), :auto)
+    sim_data = DataFrame(simulate_scores(parms.bank, results), :auto)
 
     # Combine all plots
     combined = combine_plots(parms, theta_range, char_data, info_data, sim_data)
@@ -296,8 +421,10 @@ function combine_plots(
     vline!([0]; color = :gray, linestyle = :dash, label = "")
 
     # # Plot simulated observed scores with score distribution (optional)
+    max_total_score = size(sim_data, 1) - 1
+    scores = 0:max_total_score
     p3 = @df sim_data plot(
-        1:size(sim_data, 1),
+        scores,
         cols(),
         title = "Simulated Observed Scores",
         xlabel = "Score",

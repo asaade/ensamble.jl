@@ -2,6 +2,8 @@
 
 module IRTDataLoader
 
+export IRTModelData, load_irt_data
+
 using DocStringExtensions
 using DataFrames
 using LinearAlgebra
@@ -10,7 +12,6 @@ using ..Utils
 using ..ATAErrors
 using ..ConfigValidation
 using ..AssemblyConfigLoader
-export IRTModelData, load_irt_data
 
 # Custom error types
 """
@@ -25,11 +26,6 @@ end
 struct IRTCalculationError <: IRTError
     message::String
 end
-
-# Constants
-const SUPPORTED_DICHOTOMOUS_MODELS = ["1PL", "2PL", "3PL"]
-const SUPPORTED_POLYTOMOUS_MODELS = ["PCM", "GPCM", "GRM"]
-const SUPPORTED_MODELS = vcat(SUPPORTED_DICHOTOMOUS_MODELS, SUPPORTED_POLYTOMOUS_MODELS)
 
 """
     IRTModelData
@@ -87,23 +83,23 @@ end
 
 
 """
-    calculate_num_categories(bank::DataFrame)::Vector{Int}
+    num_categories(bank::DataFrame)::Vector{Int}
 
 Calculate the number of categories for all items in the bank.
 """
-function calculate_num_categories(bank::DataFrame)::Vector{Int}
+function num_categories(bank::DataFrame)::Vector{Int}
     num_items = nrow(bank)
     num_categories = Vector{Int}(undef, num_items)
     b_columns = filter(col -> occursin(r"^B\d*$|^B$", string(col)), names(bank))
 
     for idx in 1:num_items
-        model_type = bank[idx, :MODEL_TYPE]
+        model = bank[idx, :MODEL]
 
-        if !(model_type in SUPPORTED_MODELS)
-            throw(IRTModelError("Unsupported model type: $model_type"))
+        if !(model in SUPPORTED_MODELS)
+            throw(IRTModelError("Unsupported model type: $model"))
         end
 
-        num_categories[idx] = if model_type in SUPPORTED_DICHOTOMOUS_MODELS
+        num_categories[idx] = if model in SUPPORTED_DICHOTOMOUS_MODELS
             2
         else
             bs = [bank[idx, col] for col in b_columns if !ismissing(bank[idx, col])]
@@ -171,14 +167,14 @@ function load_irt_data(
 
     # Determine r value based on model types
     r = get(irt_dict, :R, 2)
-    if any(x -> x ∉ SUPPORTED_DICHOTOMOUS_MODELS, bank.MODEL_TYPE)
+    if any(x -> x ∉ SUPPORTED_DICHOTOMOUS_MODELS, bank.MODEL)
         r = 1
     end
 
     # Ensure num_categories is present
     if !("NUM_CATEGORIES" in names(bank)) || isempty(bank.NUM_CATEGORIES) ||
        any(x -> ismissing(x), bank.NUM_CATEGORIES)
-        bank.NUM_CATEGORIES = calculate_num_categories(bank)
+        bank.NUM_CATEGORIES = num_categories(bank)
     end
 
     # Calculate tau values

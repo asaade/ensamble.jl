@@ -10,14 +10,20 @@ export upSymbol,
        uppercase_dataframe!,
         calc_tau,
        calc_info_tau,
-       prob_3pl,
+       prob_3pl, prob_item,
        info_3pl,
        observed_score_continuous,
        lw_dist,
+       observed_score_continuous_log,
+       lw_dist_log,
+
        expected_score_item,
        expected_score_matrix,
        expected_info_matrix,
        calc_scores_reference
+export SUPPORTED_DICHOTOMOUS_MODELS
+export SUPPORTED_POLYTOMOUS_MODELS
+export SUPPORTED_MODELS
 
 export ensure_dir, safe_read_csv, safe_read_toml
 
