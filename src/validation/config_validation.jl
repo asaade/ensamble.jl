@@ -2,7 +2,7 @@
 module ConfigValidation
 
 export validate_config_data, validate_files, validate_irt_parameters,
-    IRTLimits, DEFAULT_IRT_LIMITS, validate_bank_columns
+       IRTLimits, DEFAULT_IRT_LIMITS, validate_bank_columns
 
 using DataFrames
 using ..ATAErrors
@@ -41,7 +41,7 @@ end
 """
 Validates the complete configuration data structure
 """
-function validate_config_data(config_data::Dict{Symbol,Any})::Nothing
+function validate_config_data(config_data::Dict{Symbol, Any})::Nothing
     # Check required sections
     required_sections = [:FILES, :FORMS, :IRT]
     missing_sections = filter(s -> !haskey(config_data, s), required_sections)
@@ -65,7 +65,7 @@ end
 """
 Validates the FORMS section of the configuration
 """
-function validate_forms_section(config_data::Dict{Symbol,Any})::Nothing
+function validate_forms_section(config_data::Dict{Symbol, Any})::Nothing
     required_data = [:NUMFORMS, :ANCHORTESTS, :SHADOWTEST]
 
     # Check required data in FORMS
@@ -82,11 +82,10 @@ function validate_forms_section(config_data::Dict{Symbol,Any})::Nothing
     return nothing
 end
 
-
 """
 Validates the FILES section of the configuration
 """
-function validate_files_section(files_data::Dict{Symbol,Any})::Nothing
+function validate_files_section(files_data::Dict{Symbol, Any})::Nothing
     required_files = [:ITEMSFILE, :CONSTRAINTSFILE]
 
     # Check required files
@@ -115,7 +114,7 @@ end
 """
 Validates the IRT section of the configuration
 """
-function validate_irt_section(irt_dict::Dict{Symbol,Any})::Nothing
+function validate_irt_section(irt_dict::Dict{Symbol, Any})::Nothing
 
     # Validate required fields
     required_fields = [:METHOD, :THETA]
@@ -143,7 +142,7 @@ function validate_irt_config(config_data::Dict{Symbol, Any})::Dict{Symbol, Any}
         throw(IRTConfigError("Target weights and points must have same length"))
     end
 
-        # Validate METHOD
+    # Validate METHOD
     valid_methods = ["TCC", "TCC2", "TIC", "TIC2", "MIXED"]
     if !haskey(irt_data, :METHOD) || !(uppercase(irt_data[:METHOD]) in valid_methods)
         throw(ValidationError(
@@ -220,7 +219,6 @@ function validate_irt_parameters(bank::DataFrame)
         if ismissing(row.NUM_CATEGORIES) || row.NUM_CATEGORIES != categories
             row.NUM_CATEGORIES = categories
         end
-
     end
 
     return invalid_items

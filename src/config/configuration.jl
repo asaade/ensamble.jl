@@ -143,7 +143,7 @@ end
 Entry point function that loads and prepares the system configuration.
 Reads from a TOML configuration file, loads data, and returns the system parameters.
 """
-function configure(config_file::String = "data/config.toml")::Tuple{Config,Parameters}
+function configure(config_file::String = "data/config.toml")::Tuple{Config, Parameters}
     try
         # Load and validate TOML configuration
         config_data::Dict{Symbol, Any} = upcaseKeys(safe_read_toml(config_file))

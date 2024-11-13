@@ -18,7 +18,7 @@ struct ConfigError <: ATAError
     component::String
     details::Any
 
-    ConfigError(msg::String, comp::String, det=nothing) = new(msg, comp, det)
+    ConfigError(msg::String, comp::String, det = nothing) = new(msg, comp, det)
 end
 
 """
@@ -29,7 +29,7 @@ struct ValidationError <: ATAError
     context::String
     invalid_data::Any
 
-    ValidationError(msg::String, ctx::String, data=nothing) = new(msg, ctx, data)
+    ValidationError(msg::String, ctx::String, data = nothing) = new(msg, ctx, data)
 end
 
 """
@@ -40,7 +40,7 @@ struct OptimizationError <: ATAError
     solver_status::Symbol
     model_info::Any
 
-    OptimizationError(msg::String, status::Symbol, info=nothing) = new(msg, status, info)
+    OptimizationError(msg::String, status::Symbol, info = nothing) = new(msg, status, info)
 end
 
 """
@@ -51,13 +51,13 @@ struct ConstraintError <: ATAError
     constraint_id::String
     details::Any
 
-    ConstraintError(msg::String, id::String, det=nothing) = new(msg, id, det)
+    ConstraintError(msg::String, id::String, det = nothing) = new(msg, id, det)
 end
 
 """
 Handles error by logging and optionally rethrowing
 """
-function handle_error(error::ATAError; rethrow::Bool=true)
+function handle_error(error::ATAError; rethrow::Bool = true)
     error_type = typeof(error)
 
     # Log error with context
@@ -72,7 +72,7 @@ function handle_error(error::ATAError; rethrow::Bool=true)
     end
 
     # Optionally rethrow the error
-    rethrow && throw(error)
+    return rethrow && throw(error)
 end
 
 """

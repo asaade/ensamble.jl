@@ -25,9 +25,9 @@ struct BasicConfig
 
     # Inner constructor with validation
     function BasicConfig(items_file::String, anchor_file::String, constraints_file::String,
-                        forms_file::String, results_file::String, tcc_file::String,
-                        plot_file::String, solver::String, verbose::Int,
-                        report_categories::Vector{String}, report_sums::Vector{String})
+            forms_file::String, results_file::String, tcc_file::String,
+            plot_file::String, solver::String, verbose::Int,
+            report_categories::Vector{String}, report_sums::Vector{String})
         # Validate required files exist
         for (name, file) in [("items", items_file), ("constraints", constraints_file)]
             if !isfile(file)
@@ -46,7 +46,7 @@ struct BasicConfig
             throw(ValidationError("Invalid verbose level", "verbose", verbose))
         end
 
-        new(items_file, anchor_file, constraints_file, forms_file,
+        return new(items_file, anchor_file, constraints_file, forms_file,
             results_file, tcc_file, plot_file, uppercase(solver),
             verbose, report_categories, report_sums)
     end
@@ -55,7 +55,7 @@ end
 """
 Loads configuration from TOML data
 """
-function load_config(config_data::Dict{Symbol,Any})::BasicConfig
+function load_config(config_data::Dict{Symbol, Any})::BasicConfig
     try
         # Validate complete configuration structure
         validate_config_data(config_data)

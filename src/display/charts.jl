@@ -30,13 +30,15 @@ Extracts IRT parameters (discrimination `a`, difficulty `bs`, guessing `c`, and 
 for a specified item index from an item bank DataFrame.
 
 # Arguments
-- `bank::DataFrame`: A DataFrame containing IRT item parameters.
-- `idx::Int`: Index of the item to extract parameters for.
+
+  - `bank::DataFrame`: A DataFrame containing IRT item parameters.
+  - `idx::Int`: Index of the item to extract parameters for.
 
 # Returns
-- `Tuple{Float64, Union{Float64, Vector{Float64}}, Union{Float64, Nothing}, String}`: A tuple containing
-  the discrimination (`a`), difficulty parameters (`bs` as `Float64` or `Vector{Float64}`), guessing parameter (`c`),
-  and the model type as a string.
+
+  - `Tuple{Float64, Union{Float64, Vector{Float64}}, Union{Float64, Nothing}, String}`: A tuple containing
+    the discrimination (`a`), difficulty parameters (`bs` as `Float64` or `Vector{Float64}`), guessing parameter (`c`),
+    and the model type as a string.
 """
 function irt_params2(bank::DataFrame, idx::Int)
     model = bank[idx, :MODEL]
@@ -67,8 +69,6 @@ function irt_params2(bank::DataFrame, idx::Int)
     return a, bs, c, model
 end
 
-
-
 """
     simulate_scores(bank, results, dist; D = 1.0) -> Matrix{Union{Missing, Float64}}
 
@@ -76,21 +76,23 @@ Simulates test scores based on a given ability distribution and an item bank, ap
 the Lord-Wingersky recursion formula to compute observed score distributions.
 
 # Arguments
-- `bank::DataFrame`: A DataFrame containing item parameters (including model type, discrimination, etc.).
-- `results::DataFrame`: A DataFrame where each column corresponds to a form (test version)
-  and rows represent item IDs.
-- `dist::Distribution=Normal(0, 1)`: The ability distribution for simulated examinees (default is standard normal).
-- `D::Float64=1.0`: Scaling constant for IRT models (typically 1 or 1.7).
+
+  - `bank::DataFrame`: A DataFrame containing item parameters (including model type, discrimination, etc.).
+  - `results::DataFrame`: A DataFrame where each column corresponds to a form (test version)
+    and rows represent item IDs.
+  - `dist::Distribution=Normal(0, 1)`: The ability distribution for simulated examinees (default is standard normal).
+  - `D::Float64=1.0`: Scaling constant for IRT models (typically 1 or 1.7).
 
 # Returns
-- `Matrix{Union{Missing, Float64}}`: A matrix where each column represents simulated scores
-  for a corresponding test form, with rows representing different possible total scores.
+
+  - `Matrix{Union{Missing, Float64}}`: A matrix where each column represents simulated scores
+    for a corresponding test form, with rows representing different possible total scores.
 """
 function simulate_scores(
-    bank::DataFrame,
-    results::DataFrame,
-    dist::Distribution = Normal(0, 1);
-    D = 1.0
+        bank::DataFrame,
+        results::DataFrame,
+        dist::Distribution = Normal(0, 1);
+        D = 1.0
 )
     n_forms = size(results, 2)
     total_scores_list = Vector{Vector{Float64}}()
@@ -104,7 +106,8 @@ function simulate_scores(
         items = skipmissing(results[:, form])
 
         # Get indices of items in bank.ID
-        items_idx = [id_to_index[item_id] for item_id in items if haskey(id_to_index, item_id)]
+        items_idx = [id_to_index[item_id]
+                     for item_id in items if haskey(id_to_index, item_id)]
 
         # Extract parameters for selected items
         params = [irt_params2(bank, idx) for idx in items_idx]
@@ -127,19 +130,19 @@ function simulate_scores(
 
     # For each form, pad total_scores to length max_total_score + 1, and store in sim_matrix
     for (form_idx, total_scores) in enumerate(total_scores_list)
-        padded_scores = vcat(total_scores, zeros(max_total_score + 1 - length(total_scores)))
+        padded_scores = vcat(
+            total_scores, zeros(max_total_score + 1 - length(total_scores)))
         sim_matrix[:, form_idx] = padded_scores
     end
 
     return sim_matrix
 end
 
-
 function simulate_scores_log(
-    bank::DataFrame,
-    results::DataFrame,
-    dist::Distribution = Normal(0, 1);
-    D = 1.0
+        bank::DataFrame,
+        results::DataFrame,
+        dist::Distribution = Normal(0, 1);
+        D = 1.0
 )
     n_forms = size(results, 2)
     total_scores_list = Vector{Vector{Float64}}()
@@ -153,7 +156,8 @@ function simulate_scores_log(
         items = skipmissing(results[:, form])
 
         # Get indices of items in bank.ID
-        items_idx = [id_to_index[item_id] for item_id in items if haskey(id_to_index, item_id)]
+        items_idx = [id_to_index[item_id]
+                     for item_id in items if haskey(id_to_index, item_id)]
 
         # Extract parameters for selected items
         params = [irt_params2(bank, idx) for idx in items_idx]
@@ -176,14 +180,13 @@ function simulate_scores_log(
 
     # For each form, pad total_scores to length max_total_score + 1, and store in sim_matrix
     for (form_idx, total_scores) in enumerate(total_scores_list)
-        padded_scores = vcat(total_scores, zeros(max_total_score + 1 - length(total_scores)))
+        padded_scores = vcat(
+            total_scores, zeros(max_total_score + 1 - length(total_scores)))
         sim_matrix[:, form_idx] = padded_scores
     end
 
     return sim_matrix
 end
-
-
 
 """
     char_curves(parms, results, theta_range, r=1) -> DataFrame

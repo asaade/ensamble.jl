@@ -23,14 +23,14 @@ struct AssemblyConfig
     shadow_test_size::Int   # Size of the shadow test (for iterative algorithms)
 
     function AssemblyConfig(
-        form_size::Int,
-        num_forms::Int,
-        f::Int,
-        max_items::Int,
-        anchor_tests::Int,
-        anchor_size::Int,
-        max_item_use::Int,
-        shadow_test_size::Int
+            form_size::Int,
+            num_forms::Int,
+            f::Int,
+            max_items::Int,
+            anchor_tests::Int,
+            anchor_size::Int,
+            max_item_use::Int,
+            shadow_test_size::Int
     )
         # Validate form size and related parameters
         if form_size <= 0
@@ -81,7 +81,7 @@ struct AssemblyConfig
             ))
         end
 
-        new(form_size, num_forms, f, max_items, anchor_tests,
+        return new(form_size, num_forms, f, max_items, anchor_tests,
             anchor_size, max_item_use, shadow_test_size)
     end
 end
@@ -90,9 +90,9 @@ end
 Extracts form size from constraints file and configuration
 """
 function extract_form_size(
-    constraints_df::DataFrame,
-    default_size::Int
-)::Tuple{Int,Int}
+        constraints_df::DataFrame,
+        default_size::Int
+)::Tuple{Int, Int}
     try
         row_index = findfirst(
             r -> upcase(r[:ONOFF]) == "ON" && upcase(r[:TYPE]) == "TEST",
@@ -121,12 +121,13 @@ end
 Validates and processes assembly configuration data
 """
 function process_assembly_data(
-    assembly_dict::Dict{Symbol,Any}
-)::Dict{Symbol,Int}
+        assembly_dict::Dict{Symbol, Any}
+)::Dict{Symbol, Int}
     try
-        return Dict{Symbol,Int}(
+        return Dict{Symbol, Int}(
             :num_forms => get(assembly_dict, :NUMFORMS, 1),
-            :max_item_use => get(assembly_dict, :MAXITEMUSE, get(assembly_dict, :NUMFORMS, 1)),
+            :max_item_use => get(
+                assembly_dict, :MAXITEMUSE, get(assembly_dict, :NUMFORMS, 1)),
             :shadow_test_size => get(assembly_dict, :SHADOWTEST, 1),
             :anchor_tests => get(assembly_dict, :ANCHORTESTS, 0),
             :anchor_size => 0  # Default value as per original implementation
@@ -143,7 +144,7 @@ end
 """
 Loads assembly configuration from configuration data
 """
-function load_assembly_config(config_data::Dict{Symbol,Any})::AssemblyConfig
+function load_assembly_config(config_data::Dict{Symbol, Any})::AssemblyConfig
     try
         # Validate FORMS section existence
         if !haskey(config_data, :FORMS)

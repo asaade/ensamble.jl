@@ -20,20 +20,20 @@ export SUPPORTED_DICHOTOMOUS_MODELS
 export SUPPORTED_POLYTOMOUS_MODELS
 export SUPPORTED_MODELS
 
-using Random, StatsBase, DataFrames, Distributions, QuadGK, Base.Threads, ThreadsX, FastGaussQuadrature
+using Random, StatsBase, DataFrames, Distributions, QuadGK, Base.Threads, ThreadsX,
+      FastGaussQuadrature
 
 # Constants
 const SUPPORTED_DICHOTOMOUS_MODELS = ["1PL", "2PL", "3PL", "RASCH"]
 const SUPPORTED_POLYTOMOUS_MODELS = ["PCM", "GPCM", "GRM"]
 const SUPPORTED_MODELS = vcat(SUPPORTED_DICHOTOMOUS_MODELS, SUPPORTED_POLYTOMOUS_MODELS)
 
-
 # -----------------------------------------------------------------------------
 # Probability Functions for Item Response Models
 # -----------------------------------------------------------------------------
 
 function prob_3pl(a, b, c, θ; D = 1.0)
-    @assert 0.0 <= c <= 1.0 "Parameter `c` must be between 0 and 1."
+    @assert 0.0<=c<=1.0 "Parameter `c` must be between 0 and 1."
     exponent = D * a * (θ - b)
     p = c + (1 - c) / (1 + exp(-exponent))
     return p
@@ -51,7 +51,7 @@ function prob_grm(a, bs, θ; D = 1.0)
     z = D * a .* (θ .- bs)
     P_star = 1.0 ./ (1.0 .+ exp.(-z))
     P_star = vcat(1.0, P_star, 0.0)
-    prob_category = P_star[1:end-1] .- P_star[2:end]
+    prob_category = P_star[1:(end - 1)] .- P_star[2:end]
     return prob_category
 end
 
@@ -65,11 +65,11 @@ function prob_gpcm(a, b, θ; D = 1.0)
     return prob_category
 end
 
-
-function prob_item(model::String, a::Float64, bs::Vector{Float64}, c::Union{Nothing, Float64}, θ::Float64; D::Float64 = 1.0)
+function prob_item(model::String, a::Float64, bs::Vector{Float64},
+        c::Union{Nothing, Float64}, θ::Float64; D::Float64 = 1.0)
     if model in SUPPORTED_DICHOTOMOUS_MODELS
         # Use the first element of bs for dichotomous models
-        @assert length(bs) == 1 "Expected `bs` to be a single-element vector for dichotomous model."
+        @assert length(bs)==1 "Expected `bs` to be a single-element vector for dichotomous model."
         return [prob_3pl(a, bs[1], c, θ; D = D)]  # Return as a single-element vector
     elseif model == "PCM"
         return prob_pcm(a, bs, θ; D = D)  # Returns a vector of probabilities
@@ -81,8 +81,6 @@ function prob_item(model::String, a::Float64, bs::Vector{Float64}, c::Union{Noth
         error("Unsupported model: $model")
     end
 end
-
-
 
 # -----------------------------------------------------------------------------
 # Expected Score Functions
@@ -168,7 +166,7 @@ function info_gpcm(a, b, θ; D = 1.0)
     return info
 end
 
-function info_item(model, a, bs, c, θ; D = 1.0)
+info_item(model, a, bs, c, θ; D = 1.0) =
     if model in SUPPORTED_DICHOTOMOUS_MODELS
         return info_3pl(a, bs[1], c, θ; D = D)
     elseif model == "PCM"
@@ -180,7 +178,6 @@ function info_item(model, a, bs, c, θ; D = 1.0)
     else
         error("Unsupported model: $model")
     end
-end
 
 # -----------------------------------------------------------------------------
 # Expected Score and Information Matrices
@@ -262,7 +259,8 @@ function calc_tau(score_matrix, r, N; num_simulations = 1000, rng = Random.GLOBA
     return tau
 end
 
-function calc_info_tau(info_matrix, N; num_batches = 1000, rng = Random.GLOBAL_RNG, sample_with_replacement = false)
+function calc_info_tau(info_matrix, N; num_batches = 1000,
+        rng = Random.GLOBAL_RNG, sample_with_replacement = false)
     num_items, num_theta_points = size(info_matrix)
     tau = zeros(num_theta_points)
 
@@ -274,9 +272,11 @@ function calc_info_tau(info_matrix, N; num_batches = 1000, rng = Random.GLOBAL_R
 
     function process_batch(seed)
         local_rng = MersenneTwister(seed)
-        sampled_indices = sample_with_replacement ?
-            rand(local_rng, 1:num_items, N) :
+        sampled_indices = if sample_with_replacement
+            rand(local_rng, 1:num_items, N)
+        else
             randperm(local_rng, num_items)[1:N]
+        end
         buffer = info_matrix[sampled_indices, :]
         tau_local = sum(buffer; dims = 1)[:]
         return tau_local
@@ -296,7 +296,7 @@ function calc_scores_reference(expected_scores, N; num_forms = 1000)
     # Get the number of items and theta points
     num_items, _ = size(expected_scores)
 
-    item_score_means = map(x -> mean(trim(x, prop=0.1)),  eachcol(expected_scores))
+    item_score_means = map(x -> mean(trim(x, prop = 0.1)), eachcol(expected_scores))
 
     # Initialize a random number generator and seeds for reproducibility
     rng = MersenneTwister()
@@ -327,16 +327,15 @@ function calc_scores_reference(expected_scores, N; num_forms = 1000)
     return tau_mean, item_score_means
 end
 
-
 num_categories(bs::Vector{Float64}) = length(bs) + 1
 
 # -----------------------------------------------------------------------------
 # Utility Functions
 # -----------------------------------------------------------------------------
 function lw_dist(
-    item_params::Vector{Tuple{Float64, Vector{Float64}, Float64, String}},
-    θ::Float64;
-    D::Float64 = 1.0
+        item_params::Vector{Tuple{Float64, Vector{Float64}, Float64, String}},
+        θ::Float64;
+        D::Float64 = 1.0
 )
     num_items = length(item_params)
 
@@ -346,7 +345,7 @@ function lw_dist(
 
     max_score = sum(
         num_categories(bs) - 1
-        for (a, bs, c, model) in item_params
+    for (a, bs, c, model) in item_params
     )
 
     # Initialize result vector
@@ -356,7 +355,7 @@ function lw_dist(
     # Process each item
     for (a, bs, c, model) in item_params
         # Get response probabilities for current item
-        response_probs = prob_item(model, a, bs, c, θ; D=D)
+        response_probs = prob_item(model, a, bs, c, θ; D = D)
 
         # Handle dichotomous items
         if length(response_probs) == 1
@@ -393,7 +392,6 @@ function lw_dist(
     return res
 end
 
-
 """
     observed_score_continuous(item_params, ability_dist; D = 1.0, num_points = 21)
 
@@ -401,24 +399,26 @@ Computes the observed score distribution for a test given a set of item paramete
 and an ability distribution, using the Lord-Wingersky recursion and numerical integration.
 
 # Arguments
-- `item_params::Vector{Tuple{Float64, Vector{Float64}, Float64, String}}`:
-   A vector of tuples representing parameters for each item, including discrimination (`a`),
-   difficulty parameters (`bs`), guessing parameter (`c`), and model type (`model`).
-- `ability_dist::ContinuousUnivariateDistribution`:
-   The distribution of abilities (e.g., `Normal(0, 1)`).
-- `D::Float64=1.0`:
-   Scaling constant for IRT models (typically set to 1 or 1.7).
-- `num_points::Int=21`:
-   Number of quadrature points used for integration over the ability distribution.
+
+  - `item_params::Vector{Tuple{Float64, Vector{Float64}, Float64, String}}`:
+    A vector of tuples representing parameters for each item, including discrimination (`a`),
+    difficulty parameters (`bs`), guessing parameter (`c`), and model type (`model`).
+  - `ability_dist::ContinuousUnivariateDistribution`:
+    The distribution of abilities (e.g., `Normal(0, 1)`).
+  - `D::Float64=1.0`:
+    Scaling constant for IRT models (typically set to 1 or 1.7).
+  - `num_points::Int=21`:
+    Number of quadrature points used for integration over the ability distribution.
 
 # Returns
-- `Vector{Float64}`: The observed score distribution as a vector.
+
+  - `Vector{Float64}`: The observed score distribution as a vector.
 """
 function observed_score_continuous(
-    item_params::Vector{Tuple{Float64, Vector{Float64}, Float64, String}},
-    ability_dist::ContinuousUnivariateDistribution;
-    D::Float64 = 1.0,
-    num_points::Int = 101
+        item_params::Vector{Tuple{Float64, Vector{Float64}, Float64, String}},
+        ability_dist::ContinuousUnivariateDistribution;
+        D::Float64 = 1.0,
+        num_points::Int = 101
 )
     num_items = length(item_params)
 
@@ -430,20 +430,19 @@ function observed_score_continuous(
     end
 
     # Calculate maximum possible score
-    # function num_categories(bs::Vector{Float64})
-    #     return length(bs) + 1
-    #     # if model in ("2PL", "3PL")
-    #     #     return 2
-    #     # elseif model in ("PCM", "GPCM", "GRM")
-    #     #     return length(bs) + 1
-    #     # else
-    #     #     error("Unsupported model: $model")
-    #     # end
-    # end
+    function num_categories(bs::Vector{Float64}, model)
+        if model in SUPPORTED_DICHOTOMOUS_MODELS
+            return 2
+        elseif model in SUPPORTED_POLYTOMOUS_MODELS
+            return length(bs) + 1
+        else
+            error("Unsupported model: $model")
+        end
+    end
 
     max_score = sum(
-        num_categories(bs) - 1
-        for (a, bs, c, model) in item_params
+        num_categories(bs, model) - 1
+    for (a, bs, c, model) in item_params
     )
 
     observed_dist = zeros(max_score + 1)
@@ -458,16 +457,16 @@ function observed_score_continuous(
         ws = weights ./ sqrt(pi)
 
         for (θ, w) in zip(θs, ws)
-            score_dist = lw_dist(item_params, θ; D=D)
+            score_dist = lw_dist(item_params, θ; D = D)
             observed_dist .+= w * score_dist
         end
     else
         # For non-Normal distributions, use adaptive quadrature
         function integrand(θ)
-            score_dist = lw_dist(item_params, θ; D=D)
+            score_dist = lw_dist(item_params, θ; D = D)
             return score_dist * pdf(ability_dist, θ)
         end
-        observed_dist, _ = quadgk(θ -> integrand(θ), -Inf, Inf; atol=1e-8, rtol=1e-6)
+        observed_dist, _ = quadgk(θ -> integrand(θ), -Inf, Inf; atol = 1e-8, rtol = 1e-6)
     end
 
     # Normalize the observed distribution to sum to 1
@@ -479,11 +478,10 @@ function observed_score_continuous(
     return observed_dist
 end
 
-
 function lw_dist_log(
-    item_params::Vector{Tuple{Float64, Vector{Float64}, Float64, String}},
-    θ::Float64;
-    D::Float64 = 1.0
+        item_params::Vector{Tuple{Float64, Vector{Float64}, Float64, String}},
+        θ::Float64;
+        D::Float64 = 1.0
 )
     num_items = length(item_params)
 
@@ -494,7 +492,7 @@ function lw_dist_log(
     # Initialize result vector in log domain
     max_score = sum(
         num_categories(bs) - 1
-        for (a, bs, c, model) in item_params
+    for (a, bs, c, model) in item_params
     )
     res = fill(-Inf, max_score + 1)
     res[1] = 0.0  # log(1.0)
@@ -502,7 +500,7 @@ function lw_dist_log(
     # Process each item
     for (a, bs, c, model) in item_params
         # Get response probabilities for current item
-        response_probs = prob_item(model, a, bs, c, θ; D=D)
+        response_probs = prob_item(model, a, bs, c, θ; D = D)
 
         # Handle dichotomous items
         if length(response_probs) == 1
@@ -528,7 +526,8 @@ function lw_dist_log(
             for (score_inc, log_prob_inc) in zip(possible_scores, log_response_probs)
                 new_score = score + score_inc
                 if new_score <= max_score
-                    prov[new_score + 1] = logsumexp((prov[new_score + 1], curr_log_prob + log_prob_inc))
+                    prov[new_score + 1] = logsumexp((
+                        prov[new_score + 1], curr_log_prob + log_prob_inc))
                 end
             end
         end
@@ -555,12 +554,11 @@ function logsumexp(log_probs::Tuple{Float64, Float64})
     end
 end
 
-
 function observed_score_continuous_log(
-    item_params::Vector{Tuple{Float64, Vector{Float64}, Float64, String}},
-    ability_dist::ContinuousUnivariateDistribution;
-    D::Float64 = 1.0,
-    num_points::Int = 41
+        item_params::Vector{Tuple{Float64, Vector{Float64}, Float64, String}},
+        ability_dist::ContinuousUnivariateDistribution;
+        D::Float64 = 1.0,
+        num_points::Int = 41
 )
     num_items = length(item_params)
 
@@ -574,7 +572,7 @@ function observed_score_continuous_log(
     # Calculate maximum possible score
     max_score = sum(
         num_categories(bs) - 1
-        for (a, bs, c, model) in item_params
+    for (a, bs, c, model) in item_params
     )
 
     observed_dist = zeros(max_score + 1)
@@ -589,16 +587,16 @@ function observed_score_continuous_log(
         ws = weights ./ sqrt(pi)
 
         for (θ, w) in zip(θs, ws)
-            score_dist = lw_dist_log(item_params, θ; D=D)
+            score_dist = lw_dist_log(item_params, θ; D = D)
             observed_dist .+= w * score_dist
         end
     else
         # For non-Normal distributions, use adaptive quadrature
         function integrand(θ)
-            score_dist = lw_dist_log(item_params, θ; D=D)
+            score_dist = lw_dist_log(item_params, θ; D = D)
             return score_dist * pdf(ability_dist, θ)
         end
-        observed_dist, _ = quadgk(θ -> integrand(θ), -Inf, Inf; atol=1e-8, rtol=1e-6)
+        observed_dist, _ = quadgk(θ -> integrand(θ), -Inf, Inf; atol = 1e-8, rtol = 1e-6)
     end
 
     # Normalize the observed distribution to sum to 1
@@ -609,176 +607,5 @@ function observed_score_continuous_log(
 
     return observed_dist
 end
-
-
-
-
-# """
-#     prob_item(model::String, a::Real, bs::Vector{<:Real}, c::Real, θ::Real; D::Real=1.0)
-
-# Calculate response probabilities for an item given its parameters and an ability level.
-
-# # Returns
-# - Vector{Float64}: Probability for each response category
-# """
-# function prob_item(
-#     model::String,
-#     a::Real,
-#     bs::Vector{<:Real},
-#     c::Real,
-#     θ::Real;
-#     D::Real=1.0
-# )
-#     T = promote_type(Float64, typeof(a), typeof(c), typeof(θ), typeof(D))
-
-#     if model in ("2PL", "3PL")
-#         # Handle dichotomous models
-#         b = bs[1]  # Only one difficulty parameter
-#         z = D * a * (θ - b)
-#         p = c + (1 - c) / (1 + exp(-z))
-#         return T[1 - p, p]
-#     else
-#         # Handle polytomous models (PCM/GPCM)
-#         K = length(bs)  # Number of categories
-#         if model == "PCM"
-#             # Partial Credit Model
-#             nums = zeros(T, K)
-#             nums[1] = zero(T)
-#             for k in 2:K
-#                 nums[k] = nums[k-1] + D * (θ - bs[k-1])
-#             end
-#         else  # GPCM
-#             # Generalized Partial Credit Model
-#             nums = zeros(T, K)
-#             nums[1] = zero(T)
-#             for k in 2:K
-#                 nums[k] = nums[k-1] + D * a * (θ - bs[k-1])
-#             end
-#         end
-
-#         # Calculate category probabilities
-#         probs = exp.(nums)
-#         return probs ./ sum(probs)
-#     end
-# end
-
-
-
-# function lw_dist(item_params, θ; D = 1.0)
-#     num_items = size(item_params, 1)
-#     # Calculate maximum potential score from items
-#     max_score = sum([length(prob_item(item_params[i, 4], item_params[i, 1], item_params[i, 2], item_params[i, 3], θ; D)) - 1 for i in 1:num_items])
-#     res = zeros(max_score + 1)  # Initialize result vector
-#     res[1] = 1.0  # Start with probability of zero score
-
-#     for i in 1:num_items
-#         a = item_params[i, 1]
-#         bs = item_params[i, 2]  # Assuming `bs` is a vector of difficulty parameters
-#         c = item_params[i, 3]   # Guessing parameter, used for dichotomous models (e.g., 3PL)
-#         model = item_params[i, 4]  # Model type (e.g., "3PL", "PCM", "GRM")
-
-#         # Get probabilities for each response category for the given model
-#         response_probs = prob_item(model, a, bs, c, θ; D)
-#         prov = zeros(length(res))
-
-#         for category in 1:length(response_probs)
-#             for score in 0:(length(res) - 1)
-#                 new_score = score + (category - 1)  # Increment score by category level (0, 1, ...)
-#                 if new_score < length(prov)
-#                     prov[new_score + 1] += response_probs[category] * res[score + 1]
-#                 end
-#             end
-#         end
-#         res .= prov
-#     end
-#     return res
-# end
-
-
-
-
-
-
-
-# function normalize_expected_scores_zscore(expected_scores)
-#     # Calculate the global mean and standard deviation
-#     mean_val = mean(expected_scores)
-#     std_val = std(expected_scores)
-
-#     # Avoid division by zero if std_val is 0
-#     if std_val > 0
-#         normalized_scores = (expected_scores .- mean_val) ./ std_val
-#     else
-#         normalized_scores = fill(0.0, size(expected_scores))  # Assign zero if all values are the same
-#     end
-
-#     return normalized_scores
-# end
-
-
-
-
-# function calc_normalized_scores_reference(expected_scores, N; num_forms = 250)
-#     # Normalize and scale the expected scores
-#     num_items, _ = size(expected_scores)
-#     normalized_expected_scores = normalize_expected_scores_zscore(expected_scores)
-
-#     if N == 0
-#         # Compute tau_mean and tau_var directly from normalized scores
-#         raw_tau_mean = vec(mean(normalized_expected_scores; dims = 1))
-#         raw_tau_var = vec(var(normalized_expected_scores; dims = 1))
-#         # Joint normalization of tau_mean and tau_var
-#         min_val = min(minimum(raw_tau_mean), minimum(raw_tau_var))
-#         max_val = max(maximum(raw_tau_mean), maximum(raw_tau_var))
-#         range_val = max_val - min_val
-
-#         # Normalize tau_mean and tau_var using the same scale
-#         if range_val > 0
-#             tau_mean = (raw_tau_mean .- min_val) ./ range_val * N
-#             tau_var = (raw_tau_var .- min_val) ./ range_val * N
-#         else
-#             tau_mean = fill(0.5 * N, length(raw_tau_mean))
-#             tau_var = fill(0.5 * N, length(raw_tau_var))
-#         end
-#         return tau_mean, tau_var
-#     end
-
-#     rng = MersenneTwister()
-#     seeds = rand(rng, UInt64, num_forms)
-
-#     function process_form(seed)
-#         local_rng = MersenneTwister(seed)
-#         sampled_indices = randperm(local_rng, num_items)[1:N]
-#         sampled_scores = normalized_expected_scores[sampled_indices, :]
-#         form_mean = mean(sampled_scores; dims = 1)
-#         form_var = var(sampled_scores; dims = 1)
-#         return form_mean, form_var
-#     end
-
-#     results = ThreadsX.map(process_form, seeds)
-#     form_means = vcat([res[1] for res in results]...)
-#     form_vars = vcat([res[2] for res in results]...)
-#     raw_tau_mean = vec(mean(form_means; dims = 1))
-#     raw_tau_var = vec(mean(form_vars; dims = 1))
-
-#     # Joint normalization of tau_mean and tau_var
-#     min_val = min(minimum(raw_tau_mean), minimum(raw_tau_var))
-#     max_val = max(maximum(raw_tau_mean), maximum(raw_tau_var))
-#     range_val = max_val - min_val
-
-#     # Normalize tau_mean and tau_var using the same scale
-#     if range_val > 0
-#         tau_mean = (raw_tau_mean .- min_val) ./ range_val * N
-#         tau_var = (raw_tau_var .- min_val) ./ range_val * N
-#     else
-#         tau_mean = fill(0.5 * N, length(raw_tau_mean))
-#         tau_var = fill(0.5 * N, length(raw_tau_var))
-#     end
-
-#     return tau_mean, tau_var
-# end
-
-
-
 
 end # module IRTUtils

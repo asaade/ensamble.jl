@@ -18,7 +18,6 @@ struct BankLoadError <: ATAError
     details::Any
 end
 
-
 """
 Reads and processes the item bank file
 """
@@ -118,7 +117,8 @@ end
 """
 Selects valid items based on IRT parameter limits
 """
-function select_valid_items!(bank::DataFrame, limits::IRTLimits = DEFAULT_IRT_LIMITS)::DataFrame
+function select_valid_items!(
+        bank::DataFrame, limits::IRTLimits = DEFAULT_IRT_LIMITS)::DataFrame
     try
         original_size = nrow(bank)
 
