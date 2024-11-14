@@ -188,8 +188,6 @@ and processes the results, then generates and saves a report.
 function assemble_tests(config_file::String = "data/config.toml")::DataFrame
     config, orig_parms = configure_system(config_file)
 
-    # validate_parameters(orig_parms)
-
     constraints = read_constraints(config.constraints_file, orig_parms)
     parms = deepcopy(orig_parms)
     results_df = DataFrame()
