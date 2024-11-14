@@ -35,11 +35,7 @@ struct BasicConfig
             end
         end
 
-        # Validate solver
-        valid_solvers = ["CPLEX", "HIGHS", "GLPK", "CBC", "SCIP"]
-        if !(uppercase(solver) in valid_solvers)
-            throw(ValidationError("Invalid solver specified", "solver", solver))
-        end
+        validate_solver(solver)
 
         # Validate verbose level
         if !(0 ≤ verbose ≤ 3)

@@ -2,7 +2,7 @@
 module ConfigValidation
 
 export validate_config_data, validate_files, validate_irt_parameters,
-       IRTLimits, DEFAULT_IRT_LIMITS, validate_bank_columns
+       IRTLimits, DEFAULT_IRT_LIMITS, validate_bank_columns, validate_solver
 
 using DataFrames
 using ..ATAErrors
@@ -21,6 +21,9 @@ struct IRTLimits
 end
 
 const DEFAULT_IRT_LIMITS = IRTLimits(0.4, 2.0, -3.5, 3.5, 0.0, 0.5)
+const VALID_OBJECTIVES = [
+    "TCC", "MIXED", "TIC", "TIC2", "TIC3"
+]
 
 """
 Validates required columns in the item bank
@@ -79,7 +82,13 @@ function validate_forms_section(config_data::Dict{Symbol, Any})::Nothing
         end
     end
 
-    return nothing
+    if config_data[:NUMFORMS] < 1
+        throw(ConfigError(
+            "Number FORMS section",
+            "Configuration",
+            config_data[:NUMFORMS]
+        ))
+    end
 end
 
 """
@@ -167,7 +176,7 @@ function validate_irt_config(config_data::Dict{Symbol, Any})::Dict{Symbol, Any}
     # Validate D parameter
     if haskey(irt_data, :D)
         D = irt_data[:D]
-        if !isa(D, Number) || D <= 0
+        if !isa(D, Number) || !(1 <= D <= 2)
             throw(ValidationError(
                 "D must be a positive number",
                 "IRT.D",
@@ -209,6 +218,11 @@ function validate_irt_parameters(bank::DataFrame)
             row.C = 0.0
         end
 
+        if row.MODEL in SUPPORTED_DICHOTOMOUS_MODELS && categories != 2
+            push!(invalid_items, row)
+            break
+        end
+
         if ismissing(row.A) || row.A <= 0.0 || !(0.0 ≤ row.C ≤ 1.0) || categories == 0
             push!(invalid_items, row)
             break
@@ -222,6 +236,14 @@ function validate_irt_parameters(bank::DataFrame)
     end
 
     return invalid_items
+end
+
+function validate_solver(solver)
+    # Validate solver
+    valid_solvers = ["CPLEX", "HIGHS", "GLPK", "CBC", "SCIP"]
+    if !(uppercase(solver) in valid_solvers)
+        throw(ValidationError("Invalid solver specified", "solver", solver))
+    end
 end
 
 end # module ConfigValidation
