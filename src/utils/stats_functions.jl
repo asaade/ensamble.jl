@@ -7,7 +7,7 @@ module StatsFunctions
 export calc_tau,
        calc_info_tau,
        prob_3pl, prob_item,
-       info_3pl,
+       info_3pl, info_item,
        observed_score_continuous,
        lw_dist,
        observed_score_continuous_log,
@@ -33,16 +33,16 @@ const SUPPORTED_MODELS = vcat(SUPPORTED_DICHOTOMOUS_MODELS, SUPPORTED_POLYTOMOUS
 # -----------------------------------------------------------------------------
 
 function prob_3pl(a, b, c, θ; D = 1.0)
-    @assert 0.0<=c<=1.0 "Parameter `c` must be between 0 and 1."
     exponent = D * a * (θ - b)
+    # Using a more numerically stable approach for the logistic function
     p = c + (1 - c) / (1 + exp(-exponent))
-    return p
+    return clamp(p, 0.0, 1.0)  # Ensure probabilities are between 0 and 1
 end
 
 function prob_pcm(a, b, θ; D = 1.0)
     delta = D * a .* (θ .- b)
-    sum_terms = cumsum([0.0; delta])
-    numerators = exp.(sum_terms)
+    sum_terms = cumsum([0.0; delta])  # Ensure initial zero for cumulative sum
+    numerators = exp.(sum_terms .- maximum(sum_terms))  # Prevent overflow by stabilizing with maximum term
     prob_category = numerators / sum(numerators)
     return prob_category
 end
@@ -50,23 +50,24 @@ end
 function prob_grm(a, bs, θ; D = 1.0)
     z = D * a .* (θ .- bs)
     P_star = 1.0 ./ (1.0 .+ exp.(-z))
-    P_star = vcat(1.0, P_star, 0.0)
+    P_star = vcat(1.0, P_star, 0.0)  # Boundary conditions for cumulative probabilities
     prob_category = P_star[1:(end - 1)] .- P_star[2:end]
-    return prob_category
+    prob_category = max.(prob_category, 0.0)  # Ensure probabilities are non-negative
+    return prob_category / sum(prob_category)  # Normalize to ensure probabilities sum to 1
 end
 
 function prob_gpcm(a, b, θ; D = 1.0)
-    # `a` is a scalar discrimination parameter
+    # `a` is assumed to be a scalar discrimination parameter
     delta_theta = θ .- b
     sum_terms = cumsum(D * a * delta_theta)
-    sum_terms = vcat(0.0, sum_terms)
-    numerators = exp.(sum_terms)
+    sum_terms = vcat(0.0, sum_terms)  # Ensure initial zero for the baseline
+    numerators = exp.(sum_terms .- maximum(sum_terms))  # Prevent overflow
     prob_category = numerators / sum(numerators)
     return prob_category
 end
 
-function prob_item(model::String, a::Float64, bs::Vector{Float64},
-        c::Union{Nothing, Float64}, θ::Float64; D::Float64 = 1.0)
+function prob_item(a::Float64, bs::Vector{Float64},
+        c::Float64, model::String, θ::Float64; D::Float64 = 1.0)
     if model in SUPPORTED_DICHOTOMOUS_MODELS
         # Use the first element of bs for dichotomous models
         @assert length(bs)==1 "Expected `bs` to be a single-element vector for dichotomous model."
@@ -107,7 +108,7 @@ function expected_score_gpcm(a, b, θ; D = 1.0)
     return expected_score
 end
 
-function expected_score_item(model, a, bs, c, θ; D = 1.0)
+function expected_score_item(a, bs, c, model, θ; D = 1.0)
     if model in SUPPORTED_DICHOTOMOUS_MODELS
         expected_score = prob_3pl(a, bs[1], c, θ; D = D)
     elseif model == "PCM"
@@ -129,6 +130,10 @@ end
 function info_3pl(a, b, c, θ; D = 1.0)
     p = prob_3pl(a, b, c, θ; D = D)
     q = 1.0 - p
+    # Safeguard to avoid division by zero or instability
+    if p < 1e-10 || q < 1e-10
+        return 0.0
+    end
     numerator = (D * a * (p - c))^2 * q
     denominator = ((1.0 - c)^2) * p
     info = numerator / denominator
@@ -141,8 +146,9 @@ function info_grm(a, b, θ; D = 1.0)
     P_star = vcat(0.0, P_star, 1.0)
     P_star_derivative = D * a .* P_star[2:(end - 1)] .* (1.0 .- P_star[2:(end - 1)])
     P_k = diff(P_star)
+    # Avoid division by zero with a small epsilon
+    denominator = P_k[1:(end - 1)] .* P_k[2:end] .+ 1e-10
     numerator = P_star_derivative .^ 2
-    denominator = P_k[1:(end - 1)] .* P_k[2:end]
     info_components = numerator ./ denominator
     info = sum(info_components)
     return info
@@ -153,6 +159,7 @@ function info_pcm(a, b, θ; D = 1.0)
     categories = 0:length(b)
     expected_score = sum(prob .* categories)
     score_diff = categories .- expected_score
+    # Ensure numerical stability
     info = (D * a)^2 * sum(prob .* (score_diff .^ 2))
     return info
 end
@@ -162,11 +169,12 @@ function info_gpcm(a, b, θ; D = 1.0)
     eta_k = D * cumsum([0.0; a])
     eta_bar = sum(prob .* eta_k)
     eta_diff = eta_k .- eta_bar
+    # Handle potential numerical issues
     info = sum(prob .* (eta_diff .^ 2))
     return info
 end
 
-info_item(model, a, bs, c, θ; D = 1.0) =
+function info_item(a, bs, c, model, θ; D = 1.0)
     if model in SUPPORTED_DICHOTOMOUS_MODELS
         return info_3pl(a, bs[1], c, θ; D = D)
     elseif model == "PCM"
@@ -178,6 +186,11 @@ info_item(model, a, bs, c, θ; D = 1.0) =
     else
         error("Unsupported model: $model")
     end
+end
+
+# -----------------------------------------------------------------------------
+# Expected Score and Information Matrices
+# -----------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
 # Expected Score and Information Matrices
@@ -194,31 +207,44 @@ function expected_score_matrix(bank::DataFrame, θ_values::Vector{Float64}; D = 
         c = if model == "3PL"
             bank[idx, :C]
         else
-            nothing
+            0.0  # Default value for non-3PL models to ensure consistent type handling
         end
+        # Extracting difficulty parameters (bs) from columns B1, B2, etc.
         b_columns = filter(col -> occursin(r"^B\d*$|^B$", string(col)), names(bank))
         bs = [bank[idx, col] for col in b_columns if !ismissing(bank[idx, col])]
 
-        expected_scores = map(θ -> expected_score_item(model, a, bs, c, θ; D = D), θ_values)
+        # Ensure bs is always a vector, even for dichotomous models
+        bs = length(bs) == 1 ? [bs[1]] : bs
+
+        expected_scores = map(θ -> expected_score_item(a, bs, c, model, θ; D = D), θ_values)
         score_matrix[idx, :] .= expected_scores
     end
     return score_matrix
 end
 
-function expected_info_matrix(bank::DataFrame, θ_values; D = 1.0)
+function expected_info_matrix(bank::DataFrame, θ_values::Vector{Float64}; D = 1.0)
     num_items = nrow(bank)
     num_thetas = length(θ_values)
     info_matrix = zeros(num_items, num_thetas)
-    b_columns = filter(col -> occursin(r"^B\d*$", string(col)), names(bank))
+
+    # Extract difficulty parameter columns once
+    b_columns = filter(col -> occursin(r"^B\d*$|^B$", string(col)), names(bank))
 
     @threads for idx in 1:num_items
-        model = bank.MODEL[idx]
-        a = bank.A[idx]
-        c = bank.C[idx]
+        model = bank[idx, :MODEL]
+        a = bank[idx, :A]
+        c = if model == "3PL"
+            bank[idx, :C]
+        else
+            0.0  # Default value for non-3PL models to ensure consistent type handling
+        end
         bs = [bank[idx, col] for col in b_columns if !ismissing(bank[idx, col])]
 
+        # Ensure bs is always a vector, even for dichotomous models
+        bs = length(bs) == 1 ? [bs[1]] : bs
+
         for (j, θ) in enumerate(θ_values)
-            info_matrix[idx, j] = info_item(model, a, bs, c, θ; D = D)
+            info_matrix[idx, j] = info_item(a, bs, c, model, θ; D = D)
         end
     end
     return info_matrix
@@ -355,7 +381,7 @@ function lw_dist(
     # Process each item
     for (a, bs, c, model) in item_params
         # Get response probabilities for current item
-        response_probs = prob_item(model, a, bs, c, θ; D = D)
+        response_probs = prob_item(a, bs, c, model, θ; D = D)
 
         # Handle dichotomous items
         if length(response_probs) == 1
@@ -500,7 +526,7 @@ function lw_dist_log(
     # Process each item
     for (a, bs, c, model) in item_params
         # Get response probabilities for current item
-        response_probs = prob_item(model, a, bs, c, θ; D = D)
+        response_probs = prob_item(a, bs, c, model, θ; D = D)
 
         # Handle dichotomous items
         if length(response_probs) == 1

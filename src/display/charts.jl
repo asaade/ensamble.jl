@@ -1,6 +1,7 @@
 module Charts
 
-export plot_results, save_to_csv, simulate_scores, simulate_scores_log
+export plot_results, save_to_csv, simulate_scores, simulate_scores_log,
+    expected_score_curves, expected_info_curves
 
 using CSV, DataFrames, Plots, StatsPlots, Distributions, Measures
 using Base.Threads
@@ -9,19 +10,6 @@ using Base.Threads
 
 using ..Configuration, ..Utils
 
-"""
-    irt_params(bank, items) -> Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}}
-
-Extracts IRT parameters (a, b, c) for selected items.
-"""
-function irt_params(bank::DataFrame, items::Vector)
-    idx = bank.ID .∈ Ref(skipmissing(items))
-    a = bank[idx, :A]
-    b = bank[idx, :B]
-    c = bank[idx, :C]
-
-    return a, b, c
-end
 
 """
     irt_params(bank, idx) -> Tuple{Float64, Union{Float64, Vector{Float64}}, Union{Float64, Nothing}, String}
@@ -40,7 +28,7 @@ for a specified item index from an item bank DataFrame.
     the discrimination (`a`), difficulty parameters (`bs` as `Float64` or `Vector{Float64}`), guessing parameter (`c`),
     and the model type as a string.
 """
-function irt_params2(bank::DataFrame, idx::Int)
+function irt_params(bank::DataFrame, idx::Int)
     model = bank[idx, :MODEL]
     a = if model == "RASCH"
         1.0
@@ -110,7 +98,7 @@ function simulate_scores(
                      for item_id in items if haskey(id_to_index, item_id)]
 
         # Extract parameters for selected items
-        params = [irt_params2(bank, idx) for idx in items_idx]
+        params = [irt_params(bank, idx) for idx in items_idx]
 
         # Prepare the item_params list for lw_dist
         item_params = [Tuple(param) for param in params]
@@ -160,7 +148,7 @@ function simulate_scores_log(
                      for item_id in items if haskey(id_to_index, item_id)]
 
         # Extract parameters for selected items
-        params = [irt_params2(bank, idx) for idx in items_idx]
+        params = [irt_params(bank, idx) for idx in items_idx]
 
         # Prepare the item_params list for lw_dist_log
         item_params = [Tuple(param) for param in params]
@@ -188,17 +176,10 @@ function simulate_scores_log(
     return sim_matrix
 end
 
-"""
-    char_curves(parms, results, theta_range, r=1) -> DataFrame
-
-Generates characteristic curve data for all forms using dichotomous items.
-"""
-function char_curves(
-        parms::Parameters,
-        results::DataFrame,
-        theta_range::Union{AbstractVector, AbstractRange},
-        r::Int = 1
-)
+function expected_score_curves(
+        parms::Parameters, results::DataFrame,
+        theta_range::Union{AbstractVector, AbstractRange}
+)::DataFrame
     bank = parms.bank
     n_forms = size(results, 2)
     n_thetas = length(theta_range)
@@ -207,56 +188,27 @@ function char_curves(
 
     # Loop over each form
     for i in 1:n_forms
-        selected = results[:, i]
-        a, b, c = irt_params(bank, selected)
+        selected = results[:, i]  # Selected item IDs (strings)
         scores = zeros(Float64, n_thetas)
 
-        # Recalculate probabilities dynamically for each theta value
+        # Retrieve parameters for selected items using item IDs
+        item_params = [irt_params(bank, findfirst(==(id), bank.ID))
+                       for id in selected if !ismissing(id)]
+
+        # Calculate scores for each theta value
         for (j, theta) in enumerate(theta_range)
-            for k in eachindex(selected)
-                prob = prob_3pl(a[k], b[k], c[k], theta; D = parms.D)
-                scores[j] += prob^r  # Summing the probability for correct response
+            for param in item_params
+                a, bs, c, model = param
+
+                # Use expected_score_item for both dichotomous and polytomous items
+                expected_score = expected_score_item(a, bs, c, model, theta; D = parms.D)
+                scores[j] += expected_score  # Sum the expected scores (adjust exponent as needed)
             end
         end
 
         curves_matrix[:, i] = scores
     end
 
-    curves = DataFrame(curves_matrix, Symbol.(names(results)))
-    return round.(curves, digits = 2)
-end
-
-"""
-    score_curves(parms::Parameters, results::DataFrame,
-                     theta_range::Union{AbstractVector, AbstractRange})::DataFrame
-
-Generates expected scrore curve data for all forms using dichotomous items.
-"""
-function expected_score_curves(
-        parms::Parameters, results::DataFrame, theta_range::Union{
-            AbstractVector, AbstractRange}
-)::DataFrame
-    bank = parms.bank
-    theta::Vector{Float64} = collect(theta_range)
-    n_forms = size(results, 2)  # Number of forms (columns in results)
-    n_thetas = length(theta)  # Number of theta points
-
-    # Pre-allocate the curves matrix (theta points x forms)
-    curves_matrix = Matrix{Float64}(undef, n_thetas, n_forms)
-
-    # Loop over each form in parallel
-    @threads for i in 1:n_forms
-        selected = results[:, i]  # Select the i-th column
-        idx = bank.ID .∈ Ref(skipmissing(selected))  # Filter selected items from bank
-
-        # Compute the expected score matrix for the selected items
-        scores = expected_score_matrix(bank[idx, :], theta; parms.D)
-
-        # Store the sum of the scores for this form in the curves matrix
-        curves_matrix[:, i] = sum(scores; dims = 1)  # Sum along items (rows)
-    end
-
-    # Convert the curves matrix into a DataFrame and round the results
     curves = DataFrame(curves_matrix, Symbol.(names(results)))
     return round.(curves, digits = 2)
 end
@@ -297,8 +249,9 @@ function info_curves(
 end
 
 function expected_info_curves(
-        parms::Parameters, results::DataFrame, theta_range::Union{
-            AbstractVector, AbstractRange}
+        parms::Parameters,
+        results::DataFrame,
+        theta_range::Union{AbstractVector, AbstractRange}
 )
     bank = parms.bank
     theta::Vector{Float64} = collect(theta_range)
@@ -308,16 +261,32 @@ function expected_info_curves(
     # Pre-allocate the curves matrix (theta points x forms)
     curves_matrix = Matrix{Float64}(undef, n_thetas, n_forms)
 
-    # Loop over each form in parallel
-    @threads for i in 1:n_forms
-        selected = results[:, i]  # Select the i-th column
-        idx = bank.ID .∈ Ref(skipmissing(selected))  # Filter selected items from bank
+    # Loop over each form
+    for i in 1:n_forms
+        selected = results[:, i]  # Select the i-th column (item IDs as strings)
+        item_params = [irt_params(bank, findfirst(==(id), bank.ID))
+                       for id in selected if !ismissing(id)]
 
-        # Compute the expected information matrix for the selected items
-        info = expected_info_matrix(bank[idx, :], theta; parms.D)
+        # Initialize a vector to store the total information at each theta value
+        total_info = zeros(Float64, n_thetas)
 
-        # Store the sum of the information for this form in the curves matrix
-        curves_matrix[:, i] = sum(info; dims = 1)  # Sum along items (rows)
+        # Calculate expected information for each theta value and each item
+        for (j, theta) in enumerate(theta_range)
+            for param in item_params
+                a, bs, c, model = param
+
+                # Compute the information for the item at the given theta
+                item_info = info_item(a, bs, c, model, theta; D = parms.D)
+
+                # Sum item information:
+                # - For dichotomous items, `item_info` is a scalar.
+                # - For polytomous items, `item_info` is a vector, so we sum it.
+                total_info[j] += sum(item_info)
+            end
+        end
+
+        # Store the total information for this form
+        curves_matrix[:, i] = total_info
     end
 
     # Convert the curves matrix into a DataFrame and round the results
@@ -345,7 +314,9 @@ function plot_results(
         plot_file::String = "results/combined_plot.pdf"
 )::DataFrame
     # Generate characteristic and information curves
-    char_data, info_data = make_curves(parms, results, theta_range)
+    char_data = expected_score_curves(parms, results, theta_range)
+
+    info_data = expected_info_curves(parms, results, theta_range)
 
     # Generate simulation data
     sim_data = DataFrame(simulate_scores(parms.bank, results), :auto)
@@ -359,19 +330,6 @@ function plot_results(
     return char_data
 end
 
-"""
-    make_curves(parms, results, theta_range) -> Tuple{DataFrame, DataFrame}
-
-Generates both characteristic and information curves.
-"""
-function make_curves(
-        parms::Parameters, results::DataFrame, theta_range::Union{
-            AbstractVector, AbstractRange}
-)
-    char_data = expected_score_curves(parms, results, theta_range)
-    info_data = expected_info_curves(parms, results, theta_range)
-    return char_data, info_data
-end
 
 """
     combine_plots(parms, theta_range, char_data, info_data, sim_data) -> Plot
@@ -398,9 +356,6 @@ function combine_plots(
         linewidth = 2,
         label = "",
         grid = :both,
-        legend = :topright,
-        xticks = :auto,
-        yticks = :auto,
         color = :viridis,
         ylims = (0, parms.max_items)
     )
@@ -419,6 +374,8 @@ function combine_plots(
         grid = :both,
         color = :plasma
     )
+    (parms.method in ["MIXED", "TIC"]) &&
+        scatter!(parms.theta, parms.tau_info; label = "", markersize = 4)
 
     # Overlay a reference line at θ = 0
     vline!([0]; color = :gray, linestyle = :dash, label = "")
