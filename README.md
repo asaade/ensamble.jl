@@ -11,17 +11,19 @@ Ensamble.jl is a Julia-based ATA solution that integrates **Item Response Theory
   - **Optimized Test Assembly**: Facilitates the automated creation of standardized test forms.
   - **Flexible Constraint Management**: Enables custom constraints for item selection, including content, difficulty, and anchor items.
   - **Multi-Solver Compatibility**: Supports CPLEX, Gurobi, HiGHS, SCIP, and GLPK for flexible solver choice.
+  - **Implements Shadow test method**: Shadow tests serve as a mechanism to preserve item pools for future assemblies by reserving items with similar characteristics. This way, the forms cmay be assembled in iterations, making the work easier for the solver.
+  - **Anchor tests**: Anchor items are pre-determined items that appear across two or more operational forms and serve as a benchmark for consistency. Anchor tests may be defined in a separate file, and cycled between the operational forms.
+  - **Reports**: After the assemble, the system generates charts for the Test Characteristic and Information curves, as well as a simulated distribution of expected scores. A report file can be configured to include results for tolerance by form, number of anchor items, number of items by category and sums of values for a category by form. (i.e. How many words by form? How many by thematic areas?, How many by item model, etc.)
 
 ### Main Components
 
- 1. **IRT Framework**: Models item performance by aligning with ability levels.
+ 1. **IRT Framework**: Models item performance by aligning with ability levels. Currently, it supports 3P, PCN, GPCM, and GRM models.
  2. **MIP Solver Integration**: Optimizes item selection with defined constraints.
  3. **Adaptable Configuration**: `config.toml` and `constraints.csv` specify item parameters and assembly rules, including:
 
       + Number of forms and test length
       + Content balance and difficulty requirements
       + Solver choice and assembly methods (e.g., TCC, TIC, Mixed).
-
 
 ### Why Julia and JuMP?
 
@@ -35,7 +37,7 @@ Ensamble.jl is a Julia-based ATA solution that integrates **Item Response Theory
 
 TCC. Matches the test characteristic curve of selected items to a reference test, ensuring comparable scores across forms, a type of equating observed scores 'pre-equating'. When all items are dichotomous, the method is extended following van de Linden's suggestion to also equate the curve of powers of the probability of correct answer of the items (similar to his "local equating" of observed scores).
 
-TCC2. Matches the test characteristic curve and the variance of the selected items in the forms.
+TCC2. Matches the test characteristic curve and the variance of the selected items in the forms. NOT AVAILABLE AT THE MOMENT
 
 MIXED. Matches the test characteristic curve and the information curve of the the forms.
 
@@ -62,6 +64,7 @@ The TOML configuration file defines parameters for test assembly settings, item 
 #### `[IRT]`
 
   - **METHOD**: Specifies the method for scoring or matching (e.g., `TCC2`). Determines the model's scoring approach.
+
   - **THETA**: Ability level values to match expected scores and other metrics. I set of 3..5 well targeted theta points in the curve are often enough to match the compete range.
   - **TAU** and **TAU_INFO**: Arrays for target means and variances at specified theta levels for characteristic and information curves.
 
@@ -171,9 +174,11 @@ It uses a CSV. Here is an example:
 
 Ensamble.jl works with multiple solvers for flexibility:
 
-  - **CPLEX** (IBM)
-  - **HiGHS**
+  - **CPLEX** (IBM) Recommended commercial solver
+  - **HiGHS** Recommended free solver
+  - **Cbc**   A performant free solver, somewhat dated
   - **SCIP**
-  - **GLPK**
+  - **GLPK**  Very slow
+
 
 To use a specific solver, adjust the `SOLVER` entry in `config.toml` accordingly.
