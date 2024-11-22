@@ -15,7 +15,8 @@ export calc_tau,
        expected_score_item,
        expected_score_matrix,
        expected_info_matrix,
-       calc_scores_reference
+       calc_scores_reference,
+       mean_expected_scores
 export SUPPORTED_DICHOTOMOUS_MODELS
 export SUPPORTED_POLYTOMOUS_MODELS
 export SUPPORTED_MODELS
@@ -354,6 +355,17 @@ function calc_scores_reference(expected_scores, N; num_forms = 1000)
 end
 
 num_categories(bs::Vector{Float64}) = length(bs) + 1
+
+
+function mean_expected_scores(score_matrix::Matrix{Float64})
+    num_items, num_thetas = size(score_matrix)
+    # Calculate the mean of the expected scores across all items at each theta point
+    items_mean_score = [mean(score_matrix[:, k]) for k in 1:num_thetas]
+    return items_mean_score
+end
+
+
+
 
 # -----------------------------------------------------------------------------
 # Utility Functions

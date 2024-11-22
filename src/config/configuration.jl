@@ -66,7 +66,7 @@ mutable struct Parameters
     tau::Matrix{Float64}
     tau_info::Vector{Float64}
     tau_mean::Vector{Float64}
-    item_score_means::Vector{Float64}
+    items_mean_score::Vector{Float64}
     r::Int
     k::Int
     D::Float64
@@ -127,7 +127,7 @@ function transform_parameters_to_flat(
         irt_data.tau,                       # tau (Matrix{Float64})
         irt_data.tau_info,                  # tau_info (Vector{Float64})
         irt_data.tau_mean,
-        irt_data.item_score_means,
+        irt_data.items_mean_score,
         irt_data.r,
         irt_data.k,
         irt_data.D,

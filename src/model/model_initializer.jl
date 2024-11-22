@@ -147,8 +147,10 @@ function set_objective!(model::Model, parms::Parameters)
     if parms.method == "TCC"
         objective_match_characteristic_curve!(model, parms)
     elseif parms.method == "TCC2"
-        # objective_match_mean_var!(model, parms, 0.5)
+        # objective_match_variance!(model, parms, 0.01)
+        # objective_match_characteristic_curve!(model, parms)
         @error("TCC2 is temporarily disabled")
+        throw(ArgumentError("Unimplemented method: $(parms.method)"))
     elseif parms.method == "MIXED"
         objective_match_characteristic_curve!(model, parms)
         objective_match_information_curve!(model, parms)
@@ -169,7 +171,7 @@ end
     apply_individual_constraint!(model::Model, parms::Parameters,
                                       constraint::Constraint)
 
-Apply an individual constraint to the model based on the constraint type.
+Incorporate an individual constraint to the model based on the constraint type.
 """
 function apply_individual_constraint!(
         model::Model, parms::Parameters, constraint::Constraint

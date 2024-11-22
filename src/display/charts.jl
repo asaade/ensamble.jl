@@ -213,40 +213,6 @@ function expected_score_curves(
     return round.(curves, digits = 2)
 end
 
-"""
-    info_curves(parms, results, theta_range) -> DataFrame
-
-Generates information curve data for all forms using dichotomous items.
-"""
-function info_curves(
-        parms::Parameters, results::DataFrame, theta_range::Union{
-            AbstractVector, AbstractRange}
-)
-    bank = parms.bank
-    n_forms = size(results, 2)
-    n_thetas = length(theta_range)
-
-    info_matrix = Matrix{Float64}(undef, n_thetas, n_forms)
-
-    # Loop over each form
-    for i in 1:n_forms
-        selected = results[:, i]
-        a, b, c = irt_params(bank, selected)
-        info = zeros(Float64, n_thetas)
-
-        # Recalculate information dynamically for each theta value
-        for (j, theta) in enumerate(theta_range)
-            for k in eachindex(selected)
-                info[j] += info_3pl(a[k], b[k], c[k], theta; D = parms.D)
-            end
-        end
-
-        info_matrix[:, i] = info
-    end
-
-    info_data = DataFrame(info_matrix, Symbol.(names(results)))
-    return round.(info_data, digits = 2)
-end
 
 function expected_info_curves(
         parms::Parameters,

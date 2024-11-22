@@ -18,7 +18,8 @@ export upSymbol,
        lw_dist_log, expected_score_item,
        expected_score_matrix,
        expected_info_matrix,
-       calc_scores_reference
+       calc_scores_reference,
+       mean_expected_scores
 export SUPPORTED_DICHOTOMOUS_MODELS
 export SUPPORTED_POLYTOMOUS_MODELS
 export SUPPORTED_MODELS

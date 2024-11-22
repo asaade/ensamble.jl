@@ -42,7 +42,7 @@ mutable struct IRTModelData
     tau::Matrix{Float64}
     tau_info::Vector{Float64}
     tau_mean::Vector{Float64}
-    item_score_means::Vector{Float64}
+    items_mean_score::Vector{Float64}
     relative_target_weights::Vector
     relative_target_points::Vector{Float64}
     k::Int
@@ -58,7 +58,7 @@ mutable struct IRTModelData
             tau::Matrix{Float64},
             tau_info::Vector{Float64},
             tau_mean::Vector{Float64},
-            item_score_means::Vector{Float64},
+            items_mean_score::Vector{Float64},
             relative_target_weights::Vector,
             relative_target_points::Vector{Float64},
             k::Int,
@@ -77,7 +77,7 @@ mutable struct IRTModelData
         end
 
         return new(method, theta, score_matrix, info_matrix,
-            tau, tau_info, tau_mean, item_score_means,
+            tau, tau_info, tau_mean, items_mean_score,
             relative_target_weights, relative_target_points, k, r, D)
     end
 end
@@ -184,11 +184,11 @@ function load_irt_data(
     tau = get_tau(irt_dict, score_matrix, r, N)
     tau_info = get_tau_info(irt_dict, info_matrix, N)
     tau_mean = tau[1, :]
-    item_score_means = map(x -> mean(trim(x, prop = 0.1)), eachcol(score_matrix))
+    items_mean_score = mean_expected_scores(score_matrix)
 
     return IRTModelData(
         method, theta, score_matrix, info_matrix, tau, tau_info,
-        tau_mean, item_score_means, relative_target_weights, relative_target_points,
+        tau_mean, items_mean_score, relative_target_weights, relative_target_points,
         length(theta), r, D
     )
 end
