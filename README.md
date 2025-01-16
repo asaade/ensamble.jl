@@ -121,4 +121,7 @@ Adjust `SOLVER` in your config file to switch between them.
 
 ---
 
-For more details, see the complete documentation in [`docs/structure.md`](docs/structure.md).
+For more details, see the complete documentation in:
+- [`docs/configuration.md`](docs/configuration.md).
+- [`docs/constraints.md`](docs/constraints.md).
+- [`docs/structure.md`](docs/structure.md).
