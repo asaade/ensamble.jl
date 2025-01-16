@@ -1,184 +1,124 @@
-### Ensamble.jl
+# Ensamble.jl
 
-**Efficient Automated Test Assembly (ATA) in Julia using Mixed Integer Programming (MIP)**
+**Automated Test Assembly (ATA) in Julia using Mixed Integer Programming (MIP)**
 
-* * *
+Ensamble.jl is a Julia-based ATA tool that integrates **Item Response Theory (IRT)** with **Mixed Integer Programming**. It generates balanced, comparable test forms under various constraints—ensuring content coverage, difficulty alignment, and fair distribution of items across multiple forms.
 
-Ensamble.jl is a Julia-based ATA solution that integrates **Item Response Theory (IRT)** with **Mixed Integer Programming** to generate comparable, balanced test forms. The system accommodates multiple test assembly constraints, ensuring content balance, difficulty, and fairness across test forms.
+## Key Features
 
-### Key Features
+- **Optimized Test Assembly**
+  Automatically create standardized forms that meet target criteria (e.g., item difficulty, content, test length).
 
-  - **Optimized Test Assembly**: Facilitates the automated creation of standardized test forms.
-  - **Flexible Constraint Management**: Enables custom constraints for item selection, including content, difficulty, and anchor items.
-  - **Multi-Solver Compatibility**: Supports CPLEX, Gurobi, HiGHS, SCIP, and GLPK for flexible solver choice.
-  - **Implements Shadow test method**: Shadow tests serve as a mechanism to preserve item pools for future assemblies by reserving items with similar characteristics. This way, the forms cmay be assembled in iterations, making the work easier for the solver.
-  - **Anchor tests**: Anchor items are pre-determined items that appear across two or more operational forms and serve as a benchmark for consistency. Anchor tests may be defined in a separate file, and cycled between the operational forms.
-  - **Reports**: After the assemble, the system generates charts for the Test Characteristic and Information curves, as well as a simulated distribution of expected scores. A report file can be configured to include results for tolerance by form, number of anchor items, number of items by category and sums of values for a category by form. (i.e. How many words by form? How many by thematic areas?, How many by item model, etc.)
+- **Flexible Constraints**
+  Handle a wide variety of constraints (content, difficulty, anchor items, and more) through a user-defined configuration.
 
-### Main Components
+- **Multi-Solver Compatibility**
+  Works with CPLEX, Gurobi, HiGHS, SCIP, GLPK, and others.
 
- 1. **IRT Framework**: Models item performance by aligning with ability levels. Currently, it supports 3P, PCN, GPCM, and GRM models.
- 2. **MIP Solver Integration**: Optimizes item selection with defined constraints.
- 3. **Adaptable Configuration**: `config.toml` and `constraints.csv` specify item parameters and assembly rules, including:
+- **Shadow Tests & Anchor Items**
+  - **Shadow tests** preserve item pools for subsequent assemblies, allowing iterative form-building.
+  - **Anchor items** are predefined items appearing in multiple operational forms to ensure score comparability.
 
-      + Number of forms and test length
-      + Content balance and difficulty requirements
-      + Solver choice and assembly methods (e.g., TCC, TIC, Mixed).
+- **Reporting**
+  Generates charts (Test Characteristic and Information Curves) and summary reports (e.g., number of items by category, anchor usage, expected scores).
 
-### Why Julia and JuMP?
+## Why Julia + JuMP?
 
-**Julia** is a high-performance programming language that excels in scientific computing and optimization tasks. It combines the ease of writing high-level code with execution speeds close to lower-level languages like C or Fortran. This makes Julia ideal for test assembly processes, which involve heavy computation and avoid the need to mix different programming languages, as is common in R and Python. Julia's syntax is closer to mathematical notation, making it very intuitive for expressing mathematical models, optimization problems, and complex algorithms.
+Julia is a high-performance language well-suited for scientific computing and large-scale optimization. Its syntax is close to mathematical notation, making it intuitive for modeling.
+**JuMP**, a Julia-based optimization layer, makes constraint definitions straightforward and integrates seamlessly with high-performance solvers (e.g., Gurobi, CPLEX, HiGHS, GLPK).
 
-**JuMP** is a rich domain-specific language for mathematical optimization embedded in Julia. It allows users to formulate complex optimization models in a flexible, high-level manner. For Ensamble.jl, JuMP manages the optimization of test item selection under predefined constraints. JJuMP integrates seamlessly with high-performance solvers (e.g., Gurobi, CPLEX, HiGHS, GLPK), providing flexibility in choosing solvers for test assembly. While Python and R also have access to solvers, Julia’s JuMP is particularly well-optimized for this purpose.
+## Supported Assembly Methods
 
-### Supported Assembly Methods
+- **Test Characteristic Curve (TCC)**
+  Matches item-based curves to a reference test, enabling consistent expected scores across forms.
+- **Test Information Curve (TIC)**
+  Maximizes measurement precision at specified ability levels.
 
-#### Test Characteristic Curve (TCC)
+Both methods can be combined or extended (e.g., TCC + TIC, multi-point optimization) for specialized needs.
 
-TCC. Matches the test characteristic curve of selected items to a reference test, ensuring comparable scores across forms, a type of equating observed scores 'pre-equating'. When all items are dichotomous, the method is extended following van de Linden's suggestion to also equate the curve of powers of the probability of correct answer of the items (similar to his "local equating" of observed scores).
+## Configuration Overview
 
-TCC2. Matches the test characteristic curve and the variance of the selected items in the forms. NOT AVAILABLE AT THE MOMENT
+All assembly rules and file paths reside in a `config.toml` file, which includes:
 
-MIXED. Matches the test characteristic curve and the information curve of the the forms.
+- **[FORMS]**
+  Number of forms, anchor test details, and whether shadow tests are used.
+- **[IRT]**
+  Assembly method (TCC/TIC), the ability levels (`THETA`) to target, and whether to match expected scores or information curves.
+- **[FILES]**
+  Paths for item banks, anchor items, constraints, and output files.
+- **[SOLVER]**
+  Desired solver (e.g., `cplex`, `highs`) and verbosity level.
 
-#### Test Information Curve (TIC)
-
-TIC. Optimizes measurement precision by matching test information to predefined targets at specific ability levels.
-
-TIC2. Maximizes the information of all forms at selected points of the ability scale.
-
-TIC3. Selects items to maximize information at potentially different points of the ability scale.
-
-* * *
-
-### Configuration File Documentation
-
-The TOML configuration file defines parameters for test assembly settings, item constraints, file paths, and solver options. It consists of several key sections:
-
-#### `[FORMS]`
-
-  - **NumForms**: Sets the number of forms to be assembled.
-  - **AnchorTests**: Specifies the number of anchor forms, used cycling across all forms to ensure consistency.
-  - **ShadowTest**: Indicates the use of a 'shadow test' for iterative assembly. Shadow tests are used as an heuristic method to maintain constraints across multiple assembly cycles by reserving items for future forms.
-
-#### `[IRT]`
-
-  - **METHOD**: Specifies the method for scoring or matching (e.g., `TCC2`). Determines the model's scoring approach.
-
-  - **THETA**: Ability level values to match expected scores and other metrics. I set of 3..5 well targeted theta points in the curve are often enough to match the compete range.
-  - **TAU** and **TAU_INFO**: Arrays for target means and variances at specified theta levels for characteristic and information curves.
-
-      + TAU can either be an empty array or a set of vectors (e.g., `[[0.5, 0.4], ...]`).. If TAU is emplty, an approximation will be estimated from the items in the bank
-  - **RELATIVETARGETWEIGHTS** and **RELATIVETARGETPOINTS**: Lists of weights and target points for information or score matching, providing flexibility in test design goals.
-  - **R**: The maximum power for item probabilities of correct response for use using the TCC method, folowing van del Linden's observed scores "local equating" method.
-  - **D**: Scaling constant for IRT logistic models (typically `1.0` for standard logistic models and 1.7 to approximate a normat curve).
-
-#### `[FILES]`
-
-  - **ITEMSFILE**: Path to the CSV file with item parameters and attributes.
-  - **ANCHORFILE**: Path to the anchor items CSV, if applicable.
-  - **CONSTRAINTSFILE**: Path to the constraints CSV, specifying the conditions items must satisfy.
-  - **RESULTSFILE**: Path for outputting final test assembly results.
-  - **FORMSFILE**: Path to save individual form compositions.
-  - **TCCFILE**: Output file for Test Characteristic Curve (TCC) data.
-  - **PLOTFILE**: Path to save visual plots for test information and TCC data.
-  - **REPORTCATEGORIES** and **REPORTSUMS**: Lists of item attributes to include in reporting (e.g., categories for content analysis and sums for item attributes).
-
-#### Solver and Debugging
-
-  - **SOLVER**: Name of the solver (e.g., `cplex`) used for optimization.
-  - **VERBOSE**: Level of verbosity for logging and debugging, where `0` is silent, and higher values increase detail in the output.
-
-### Configuration Examples
-
-#### Example `config.toml`
+### Example `config.toml`
 
 ```toml
 [FORMS]
-NumForms = 4       # New forms to assemble
-AnchorTests = 2    # Number of anchor test forms in the anchor test file
-ShadowTest = 1     # Use a shadow test
+NumForms = 4
+AnchorTests = 2
+ShadowTest = 1
 
 [IRT]
-METHOD = "TCC"                        # Test Characteristic Curve matching
-THETA = [-2.5, -0.5, 0.0, 0.5, 2.5]   # Points in the theta scale to confirm the match
-TAU = []                              # Value of the expected scores from the reference test at THETA. If empty,
-                                      # the values are test estimated scores as an average from the items in the bank
-TAU_INFO = []                         # Value of the test information at THETA. They are estimated, but not needed here.
-R = 3                                 # Number of powers of the probability to compare. Only used with dichotomous items.
-D = 1.0                               # Constant
+METHOD = "TCC"
+THETA = [-2.5, -0.5, 0.0, 0.5, 2.5]
+TAU = []
+TAU_INFO = []
+R = 3
+D = 1.0
 
 [FILES]
-# Inputs
 ITEMSFILE = "data/items.csv"
 ANCHORFILE = "data/anchor.csv"
 CONSTRAINTSFILE = "data/constraints.csv"
-# Outputs
 RESULTSFILE = "results/results.csv"
 FORMSFILE = "results/forms.csv"
 TCCFILE = "results/tcc_output.csv"
 PLOTFILE = "results/plot_output.png"
+REPORTCATEGORIES = ["CONTENT","LEVEL"]
+REPORTSUMS = ["WORDS","IMAGES"]
 
-# Special reports
-REPORTCATEGORIES = ["CONTENT", "LEVEL"] # Reports counts per form on these columns of the bank
-REPORTSUMS = ["WORDS", "IMAGES"]        # Reports sums per form on these columns
-
-# Other
-SOLVER = "cplex"  # An open source performat option is "highs". Any solver shoud be installed separatedly
-VERBOSE = 1       # Three levels of detail in printed information
+SOLVER = "cplex"
+VERBOSE = 1
 ```
 
-#### Constraint configuration `constraints.csv`
+## Constraint Format
 
-Ensamble.jl includes facilities to modify the constraints used to assemble the tests with a format inspired by the [TestDesign R Package](https://cran.r-project.org/package=TestDesign), An R package designed for automated test assembly and item selection for educational testing and psychometrics.
-
-It uses a CSV. Here is an example:
+A CSV file (e.g., `constraints.csv`) defines additional constraints (e.g., test length, item groupings, all-or-none rules). Here’s an example:
 
 | CONSTRAINT_ID | TYPE      | CONDITION        | LB | UB | ONOFF |
-|:------------- |:--------- |:---------------- |:-- |:-- |:----- |
-| C1            | TEST      |                  | 30 | 30 | ON    |
-| C2            | NUMBER    | LEVEL == 3       | 10 | 10 | ON    |
-| C3            | SUM       | WORDS, LEVEL==1  | 50 | 80 | ON    |
-| C4            | ALLORNONE | ID IN [101, 102] |    |    | ON    |
-| C5            | ENEMIES   | ENEMIES          |    |    | ON    |
+|---------------|-----------|------------------|----|----|------|
+| C1            | TEST      |                  | 30 | 30 | ON   |
+| C2            | NUMBER    | LEVEL == 3       | 10 | 10 | ON   |
+| C3            | SUM       | WORDS, LEVEL==1  | 50 | 80 | ON   |
+| C4            | ALLORNONE | ID IN [101,102]  |    |    | ON   |
+| C5            | ENEMIES   | ENEMIES          |    |    | ON   |
 
-  - `C1` (Test Length): Specifies a total of 30 items per form.
-  - `C2` (Content Balance): Requires exactly 10 items at Level 3.
-  - `C3` (Conditional Sum): Ensures that items meeting `LEVEL == 1` contribute a total of 50–80 words.
-  - `C4` (All-or-None): Items 101 and 102 must be either both included or excluded in any form.
-  - `C5` (Enemies): Items in column ENEMIES are not to be paired with items with the same value/group in that column.
+## Running the Assembly
 
-* * *
+1. **Prepare Items**
+   Provide a CSV with item parameters and attributes.
+2. **Set Constraints**
+   Edit `config.toml` and `constraints.csv`.
+3. **Execute in Julia**
+   ```julia
+   include("src/ensamble.jl")
+   using .Ensamble
+   results = Ensamble.assemble_tests("data/config.toml")
+   ```
 
-### Running the Assembly Process
+## Output Files
 
- 1. **Prepare Item Bank**: Provide item bank data in CSV format, including IRT parameters.
+- **Results**: `results.csv` and `forms.csv`
+- **Plots & TCC Data**: `tcc_output.csv`, `plot_output.png`
+- **Reports**: Summaries by category, anchor usage, etc.
 
- 2. **Define Constraints**: Set test assembly rules in `config.toml` and `constraints.csv`.
- 3. **Run Assembly**:
+## Supported Solvers
 
-    ```julia
-    include("src/ensamble.jl")
-    using .Ensamble
-    results = Ensamble.assemble_tests("data/config.toml")
-    ```
+- **CPLEX** (commercial)
+- **Gurobi** (commercial)
+- **HiGHS**, **Cbc**, **SCIP**, **GLPK** (open source)
 
-### Available Files and Output
+Adjust `SOLVER` in your config file to switch between them.
 
-  - **Results**: Check `results.csv`, `forms.csv`, `tcc_output.csv`, and `plot_output.png` for outputs.
-  - **Documentation**: Detailed descriptions available in `docs/structure.md`.
+---
 
-* * *
-
-### Supported Solvers
-
-Ensamble.jl works with multiple solvers for flexibility:
-
-  - **CPLEX** (IBM) Recommended commercial solver
-  - **HiGHS** Recommended free solver
-  - **Cbc**   A performant free solver, somewhat dated
-  - **SCIP**
-  - **GLPK**  Very slow
-
-
-To use a specific solver, adjust the `SOLVER` entry in `config.toml` accordingly.
+For more details, see the complete documentation in [`docs/structure.md`](docs/structure.md).
